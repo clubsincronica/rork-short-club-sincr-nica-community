@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Filter } from 'lucide-react-native';
+import { Search, Filter } from '@/components/SmartIcons';
 import { ServiceCard } from '@/components/ServiceCard';
 import { LodgingCard } from '@/components/LodgingCard';
 import { FoodCard } from '@/components/FoodCard';

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { X, Plus, Minus, Leaf, Flame, AlertCircle, Info } from 'lucide-react-native';
+import { X, Plus, Minus, Leaf, Flame, AlertCircle, Info } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { mockMenuItems } from '@/mocks/menu-data';
 import { mockFoodProviders } from '@/mocks/data';

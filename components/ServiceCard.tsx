@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Star, MapPin, Clock, Wifi, WifiOff } from 'lucide-react-native';
+import { Star, MapPin, Clock, Wifi, WifiOff } from '@/components/SmartIcons';
 import { Service } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { FloatingCard } from '@/components/FloatingCard';

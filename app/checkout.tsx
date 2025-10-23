@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CreditCard, Smartphone, DollarSign, Check, AlertCircle } from 'lucide-react-native';
+import { CreditCard, Smartphone, DollarSign, Check, AlertCircle } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useFoodCart } from '@/hooks/food-cart-store';
 

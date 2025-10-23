@@ -24,7 +24,7 @@ import {
   Calendar,
   Clock,
   MapPin,
-} from 'lucide-react-native';
+} from '../components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';

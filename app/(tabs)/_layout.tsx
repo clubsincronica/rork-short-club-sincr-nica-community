@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Briefcase, MessageCircle, User, MapPin } from 'lucide-react-native';
+import { Home, Briefcase, MessageCircle, User, MapPin } from '@/components/SmartIcons';
 
 export default function TabLayout() {
   return (

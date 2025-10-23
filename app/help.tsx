@@ -24,7 +24,7 @@ import {
   ChevronUp,
   Send,
   ExternalLink,
-} from 'lucide-react-native';
+} from '../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useRouter } from 'expo-router';
 import { TouchableScale } from '@/components/TouchableScale';

@@ -34,7 +34,7 @@ import {
   Lock,
   CreditCard,
   Tag,
-} from 'lucide-react-native';
+} from '../components/SmartIcons';
 import { useCalendar, useEventsForDate } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
 import { Colors, Gradients } from '@/constants/colors';

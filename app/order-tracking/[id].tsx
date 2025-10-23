@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Package, Clock, MapPin, Phone, MessageCircle, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Package, Clock, MapPin, Phone, MessageCircle, CheckCircle } from '../../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useFoodCart } from '@/hooks/food-cart-store';
 import { FoodOrder } from '@/types/user';

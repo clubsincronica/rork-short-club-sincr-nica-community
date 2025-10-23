@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { ArrowLeft, Package, Bell, CreditCard, Star, Tag, X } from 'lucide-react-native';
+import { ArrowLeft, Package, Bell, CreditCard, Star, Tag, X } from '../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useFoodCart } from '@/hooks/food-cart-store';
 import { OrderNotification } from '@/types/user';

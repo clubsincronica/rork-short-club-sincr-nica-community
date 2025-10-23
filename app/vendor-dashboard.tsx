@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
-import { ArrowLeft, Plus, Edit2, Trash2, Eye, DollarSign, Package, TrendingUp, Clock, Star } from 'lucide-react-native';
+import { ArrowLeft, Plus, Edit2, Trash2, Eye, DollarSign, Package, TrendingUp, Clock, Star } from '../components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ConstellationBackground } from '@/components/ConstellationBackground';

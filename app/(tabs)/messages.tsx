@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, MessageCircle, Phone, Video, MoreHorizontal } from 'lucide-react-native';
+import { Search, MessageCircle, Phone, Video, MoreHorizontal } from '../../components/SmartIcons';
 import { mockUsers } from '@/mocks/data';
 import { Colors } from '@/constants/colors';
 

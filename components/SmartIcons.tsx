@@ -1,93 +1,120 @@
-// Smart icon system that works with both Expo Go and Development Builds
+// Smart icon system using only @expo/vector-icons for compatibility
 import React from 'react';
+import { Ionicons, Feather, MaterialIcons, AntDesign, FontAwesome } from '@expo/vector-icons';
 
-// Try to import lucide-react-native, fallback to Expo Vector Icons
-let LucideIcons: any = null;
-let useExpoIcons = false;
-
-try {
-  LucideIcons = require('lucide-react-native');
-} catch (error) {
-  console.log('Lucide icons not available, using Expo Vector Icons fallback');
-  useExpoIcons = true;
-}
-
-// Expo Vector Icons as fallback
-import { Ionicons, Feather } from '@expo/vector-icons';
-
-// Smart icon component that switches between Lucide and Expo icons
-const createSmartIcon = (lucideName: string, expoName: string, expoFamily: any = Ionicons) => {
+// Smart icon component using only Expo Vector Icons
+const createIcon = (expoName: string, expoFamily: any = Ionicons) => {
   return (props: any) => {
-    if (!useExpoIcons && LucideIcons && LucideIcons[lucideName]) {
-      const LucideIcon = LucideIcons[lucideName];
-      return <LucideIcon {...props} />;
-    }
     const ExpoIcon = expoFamily;
     return <ExpoIcon name={expoName} {...props} />;
   };
 };
 
-// Export smart icons
-export const Star = createSmartIcon('Star', 'star');
-export const MapPin = createSmartIcon('MapPin', 'location');
-export const Clock = createSmartIcon('Clock', 'time');
-export const Users = createSmartIcon('Users', 'people');
-export const User = createSmartIcon('User', 'person');
-export const X = createSmartIcon('X', 'close');
-export const Plus = createSmartIcon('Plus', 'add');
-export const Minus = createSmartIcon('Minus', 'remove');
-export const ArrowLeft = createSmartIcon('ArrowLeft', 'arrow-back');
-export const ChevronRight = createSmartIcon('ChevronRight', 'chevron-forward');
-export const Mail = createSmartIcon('Mail', 'mail');
-export const Lock = createSmartIcon('Lock', 'lock-closed');
-export const Eye = createSmartIcon('Eye', 'eye');
-export const EyeOff = createSmartIcon('EyeOff', 'eye-off');
-export const Globe = createSmartIcon('Globe', 'globe');
-export const DollarSign = createSmartIcon('DollarSign', 'logo-usd');
-export const Check = createSmartIcon('Check', 'checkmark');
-export const CheckCircle = createSmartIcon('CheckCircle', 'checkmark-circle');
-export const Package = createSmartIcon('Package', 'cube');
-export const Bell = createSmartIcon('Bell', 'notifications');
-export const Phone = createSmartIcon('Phone', 'call');
-export const MessageCircle = createSmartIcon('MessageCircle', 'chatbubble');
-export const CreditCard = createSmartIcon('CreditCard', 'card');
-export const Smartphone = createSmartIcon('Smartphone', 'phone-portrait');
-export const ShoppingCart = createSmartIcon('ShoppingCart', 'cart');
-export const ShoppingBag = createSmartIcon('ShoppingBag', 'bag');
-export const Truck = createSmartIcon('Truck', 'car');
-export const Wifi = createSmartIcon('Wifi', 'wifi');
-export const WifiOff = createSmartIcon('WifiOff', 'wifi-off', Feather);
-export const Edit2 = createSmartIcon('Edit2', 'create');
-export const Trash2 = createSmartIcon('Trash2', 'trash');
-export const TrendingUp = createSmartIcon('TrendingUp', 'trending-up');
-export const AlertCircle = createSmartIcon('AlertCircle', 'alert-circle');
-export const Info = createSmartIcon('Info', 'information-circle');
-export const Leaf = createSmartIcon('Leaf', 'leaf');
-export const Flame = createSmartIcon('Flame', 'flame');
-export const Tag = createSmartIcon('Tag', 'pricetag');
-export const Flashlight = createSmartIcon('Flashlight', 'flashlight');
-export const FlashlightOff = createSmartIcon('FlashlightOff', 'flashlight-off', Feather);
-export const RefreshCw = createSmartIcon('RefreshCw', 'refresh');
-export const Settings = createSmartIcon('Settings', 'settings');
-export const HelpCircle = createSmartIcon('HelpCircle', 'help-circle');
-export const Shield = createSmartIcon('Shield', 'shield');
-export const LogOut = createSmartIcon('LogOut', 'log-out');
-export const Moon = createSmartIcon('Moon', 'moon');
-export const Sun = createSmartIcon('Sun', 'sunny');
-export const Volume2 = createSmartIcon('Volume2', 'volume-high');
-export const VolumeX = createSmartIcon('VolumeX', 'volume-mute');
-export const Zap = createSmartIcon('Zap', 'flash');
-export const Navigation = createSmartIcon('Navigation', 'navigate');
-export const Languages = createSmartIcon('Languages', 'language');
-export const FileText = createSmartIcon('FileText', 'document-text');
-export const BookOpen = createSmartIcon('BookOpen', 'book');
-export const Database = createSmartIcon('Database', 'server');
+// Export all icons using Expo Vector Icons
+export const Star = createIcon('star');
+export const MapPin = createIcon('location');
+export const Clock = createIcon('time');
+export const Users = createIcon('people');
+export const User = createIcon('person');
+export const X = createIcon('close');
+export const Plus = createIcon('add');
+export const Minus = createIcon('remove');
+export const ArrowLeft = createIcon('arrow-back');
+export const ChevronRight = createIcon('chevron-forward');
+export const Mail = createIcon('mail');
+export const Lock = createIcon('lock-closed');
+export const Eye = createIcon('eye');
+export const EyeOff = createIcon('eye-off');
+export const Globe = createIcon('globe');
+export const DollarSign = createIcon('logo-usd');
+export const Check = createIcon('checkmark');
+export const CheckCircle = createIcon('checkmark-circle');
+export const Package = createIcon('cube');
+export const Bell = createIcon('notifications');
+export const Phone = createIcon('call');
+export const MessageCircle = createIcon('chatbubble');
+export const CreditCard = createIcon('card');
+export const Smartphone = createIcon('phone-portrait');
+export const ShoppingCart = createIcon('cart');
+export const ShoppingBag = createIcon('bag');
+export const Truck = createIcon('car');
+export const Wifi = createIcon('wifi');
+export const WifiOff = createIcon('wifi-off', Feather);
+export const Edit2 = createIcon('create');
+export const Trash2 = createIcon('trash');
+export const TrendingUp = createIcon('trending-up');
+export const AlertCircle = createIcon('alert-circle');
+export const Info = createIcon('information-circle');
+export const Leaf = createIcon('leaf');
+export const Flame = createIcon('flame');
+export const Tag = createIcon('pricetag');
+export const Flashlight = createIcon('flashlight');
+export const FlashlightOff = createIcon('flashlight-outline');
+export const RefreshCw = createIcon('refresh');
+export const Settings = createIcon('settings');
+export const HelpCircle = createIcon('help-circle');
+export const Shield = createIcon('shield');
+export const LogOut = createIcon('log-out');
+export const Moon = createIcon('moon');
+export const Sun = createIcon('sunny');
+export const Volume2 = createIcon('volume-high');
+export const VolumeX = createIcon('volume-mute');
+export const Zap = createIcon('flash');
+export const Navigation = createIcon('navigate');
+export const Languages = createIcon('language');
+export const FileText = createIcon('document-text');
+export const BookOpen = createIcon('book');
+export const Database = createIcon('server');
 
 // Additional icons for compatibility
-export const Heart = createSmartIcon('Heart', 'heart');
-export const Brain = createSmartIcon('Brain', 'bulb');
-export const Focus = createSmartIcon('Focus', 'eye');
-export const Dumbbell = createSmartIcon('Dumbbell', 'fitness');
-export const Apple = createSmartIcon('Apple', 'nutrition');
-export const Sparkles = createSmartIcon('Sparkles', 'sparkles');
-export const AlertTriangle = createSmartIcon('AlertTriangle', 'warning');
+export const Heart = createIcon('heart');
+export const Brain = createIcon('bulb');
+export const Focus = createIcon('eye');
+export const Dumbbell = createIcon('fitness');
+export const Apple = createIcon('nutrition');
+export const Sparkles = createIcon('sparkles');
+export const AlertTriangle = createIcon('warning');
+
+// Additional missing icons
+export const Home = createIcon('home');
+export const Briefcase = createIcon('briefcase');
+export const MessageSquare = createIcon('chatbox', Ionicons);
+export const Calendar = createIcon('calendar');
+export const QrCode = createIcon('qr-code');
+export const Search = createIcon('search');
+export const Filter = createIcon('filter');
+export const Sort = createIcon('swap-vertical');
+export const Download = createIcon('download');
+export const Upload = createIcon('cloud-upload');
+export const Share = createIcon('share');
+export const Copy = createIcon('copy');
+export const Delete = createIcon('trash');
+export const Edit = createIcon('pencil');
+export const Save = createIcon('save');
+export const Cancel = createIcon('close');
+export const Confirm = createIcon('checkmark');
+export const Warning = createIcon('warning');
+export const Error = createIcon('alert-circle');
+export const Success = createIcon('checkmark-circle');
+export const Loading = createIcon('refresh');
+export const Edit3 = createIcon('create');
+export const Award = createIcon('trophy');
+export const Camera = createIcon('camera');
+export const Trophy = createIcon('trophy');
+export const Activity = createIcon('pulse');
+export const Utensils = createIcon('restaurant');
+
+// New missing icons
+export const ChevronLeft = createIcon('chevron-back');
+export const ChevronDown = createIcon('chevron-down');
+export const ChevronUp = createIcon('chevron-up');
+export const Video = createIcon('videocam');
+export const Send = createIcon('send');
+export const ExternalLink = createIcon('open');
+export const MoreHorizontal = createIcon('ellipsis-horizontal');
+export const Book = createIcon('book');
+
+// Additional needed icons
+export const UserX = createIcon('person-remove');
+export const ImageIcon = createIcon('image');
+export const Type = createIcon('text');

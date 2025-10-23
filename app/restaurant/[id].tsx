@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Clock, MapPin, Star, ShoppingCart, Truck, ShoppingBag } from 'lucide-react-native';
+import { ArrowLeft, Clock, MapPin, Star, ShoppingCart, Truck, ShoppingBag } from '../../components/SmartIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
 import { Colors, Gradients } from '@/constants/colors';

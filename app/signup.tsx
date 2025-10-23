@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, User } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { Colors } from '@/constants/colors';
 import { User as UserType } from '@/types/user';

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { ArrowLeft, Clock, MapPin, ChevronRight, Package, CheckCircle } from 'lucide-react-native';
+import { ArrowLeft, Clock, MapPin, ChevronRight, Package, CheckCircle } from '../components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
 import { useFoodCart } from '@/hooks/food-cart-store';
 import { LinearGradient } from 'expo-linear-gradient';

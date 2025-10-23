@@ -1,11 +1,22 @@
-import createContextHook from '@nkzw/create-context-hook';
+import React, { createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { User, PaymentMethod, UserPreferences } from '@/types/user';
 import { mockUsers } from '@/mocks/data';
 
-export const [UserProvider, useUser] = createContextHook(() => {
+// Create the context manually for better React 19 compatibility
+const UserContext = createContext<ReturnType<typeof useUserStore> | null>(null);
+
+export const useUser = () => {
+  const context = useContext(UserContext);
+  if (!context) {
+    throw new Error('useUser must be used within a UserProvider');
+  }
+  return context;
+};
+
+const useUserStore = () => {
   // Check if we're in a preview environment
   const isPreview = (() => {
     try {
@@ -241,4 +252,10 @@ export const [UserProvider, useUser] = createContextHook(() => {
     setDefaultPaymentMethodMutation.mutate,
     loginMutation.isPending
   ]);
-});
+};
+
+// Manual provider component for React 19 compatibility
+export const UserProvider = ({ children }: { children: React.ReactNode }) => {
+  const userStore = useUserStore();
+  return React.createElement(UserContext.Provider, { value: userStore }, children);
+};

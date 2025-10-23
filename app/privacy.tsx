@@ -22,7 +22,7 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-} from 'lucide-react-native';
+} from '../components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { Colors } from '@/constants/colors';
 import { useRouter } from 'expo-router';

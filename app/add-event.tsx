@@ -22,10 +22,10 @@ import {
   Tag,
   ArrowLeft,
   Check,
-  Image as ImageIcon,
+  ImageIcon,
   Type,
   FileText,
-} from 'lucide-react-native';
+} from '../components/SmartIcons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';

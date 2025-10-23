@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Leaf, Flame, AlertCircle } from 'lucide-react-native';
+import { Leaf, Flame, AlertCircle } from '@/components/SmartIcons';
 import { MenuItem, FoodProvider } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { FloatingCard } from '@/components/FloatingCard';

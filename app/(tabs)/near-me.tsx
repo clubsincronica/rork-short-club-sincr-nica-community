@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MapPin, Navigation, Users, ShoppingBag, Utensils } from 'lucide-react-native';
+import { MapPin, Navigation, Users, ShoppingBag, Utensils } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { allMockUsers, mockServices, mockFoodProviders } from '@/mocks/data';
 import { User, Service, FoodProvider } from '@/types/user';

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Trash2, Plus, Minus, ShoppingBag, Truck, MapPin, Clock } from 'lucide-react-native';
+import { Trash2, Plus, Minus, ShoppingBag, Truck, MapPin, Clock } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useFoodCart } from '@/hooks/food-cart-store';
 

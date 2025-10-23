@@ -4,7 +4,7 @@ import { QRScanner } from '@/components/QRScanner';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
-import { X } from 'lucide-react-native';
+import { X } from '@/components/SmartIcons';
 
 export default function QRScannerScreen() {
   const router = useRouter();

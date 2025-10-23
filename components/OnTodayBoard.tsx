@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, Users, MapPin, TrendingUp } from 'lucide-react-native';
+import { Clock, Users, MapPin, TrendingUp } from '@/components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
 import { CalendarEvent } from '@/types/user';
 import { FloatingCard } from '@/components/FloatingCard';

@@ -31,7 +31,7 @@ import {
   Mail,
   Lock,
   Globe
-} from 'lucide-react-native';
+} from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { Colors, Gradients } from '@/constants/colors';
 import { useAppSettings } from '@/hooks/app-settings-store';

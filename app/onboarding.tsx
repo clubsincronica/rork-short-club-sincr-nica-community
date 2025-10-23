@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronRight, Globe, MapPin, DollarSign, Check } from 'lucide-react-native';
+import { ChevronRight, Globe, MapPin, DollarSign, Check } from '@/components/SmartIcons';
 import { useAppSettings, Language, Currency } from '@/hooks/app-settings-store';
 import { SUPPORTED_LANGUAGES, SUPPORTED_CURRENCIES, POPULAR_COUNTRIES } from '@/constants/localization';
 import { Colors } from '@/constants/colors';
