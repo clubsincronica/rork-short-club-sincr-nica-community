@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Star, MapPin, Clock, Truck, ShoppingBag } from 'lucide-react-native';
+import { Star, MapPin, Clock, Truck, ShoppingBag } from './TempIcons';
 import { FoodProvider } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { FloatingCard } from '@/components/FloatingCard';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { Heart, Brain, Focus, Dumbbell, Zap, Apple, MessageCircle, Sparkles } from 'lucide-react-native';
+import { Heart, Brain, Focus, Dumbbell, Zap, Apple, MessageCircle, Sparkles } from './TempIcons';
 import { ServiceCategory } from '@/types/user';
 import { Colors } from '@/constants/colors';
 

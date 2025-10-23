@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Image, ImageProps, StyleSheet, TouchableOpacity } from 'react-native';
-import { RefreshCw } from 'lucide-react-native';
+import { RefreshCw } from './TempIcons';
 import { useOptimizedImage } from '@/hooks/useOptimizedImage';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Colors } from '@/constants/colors';

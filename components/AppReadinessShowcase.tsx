@@ -1,6 +1,15 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { CheckCircle, Zap, Shield, Smartphone, Globe, Heart } from 'lucide-react-native';
+// Temporarily replaced lucide icons with Expo vector icons
+import { Ionicons } from '@expo/vector-icons';
+
+// Icon replacement components
+const CheckCircle = (props: any) => <Ionicons name="checkmark-circle" {...props} />;
+const Zap = (props: any) => <Ionicons name="flash" {...props} />;
+const Shield = (props: any) => <Ionicons name="shield" {...props} />;
+const Smartphone = (props: any) => <Ionicons name="phone-portrait" {...props} />;
+const Globe = (props: any) => <Ionicons name="globe" {...props} />;
+const Heart = (props: any) => <Ionicons name="heart" {...props} />;
 import { AccessibleText, Heading } from './AccessibleText';
 import { TouchableScale } from './TouchableScale';
 import { FadeInView, SlideInView } from './AnimatedViews';
