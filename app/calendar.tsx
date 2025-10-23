@@ -134,11 +134,6 @@ export default function CalendarScreen() {
   };
 
   const handleCreateEvent = async () => {
-    if (!currentUser?.isServiceProvider) {
-      Alert.alert('Permiso Requerido', 'Solo los proveedores de servicios pueden crear eventos.');
-      return;
-    }
-
     if (!eventForm.title || !eventForm.date || !eventForm.startTime || !eventForm.endTime) {
       Alert.alert('Error', 'Por favor completa todos los campos requeridos.');
       return;
@@ -488,14 +483,12 @@ export default function CalendarScreen() {
               <Text style={styles.selectedDateTitle}>
                 {selectedDate.getDate()} de {MONTHS[selectedDate.getMonth()]}
               </Text>
-              {currentUser?.isServiceProvider && (
-                <TouchableOpacity
-                  style={styles.addEventButton}
-                  onPress={() => router.push('/add-event')}
-                >
-                  <Plus size={20} color={Colors.white} />
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.addEventButton}
+                onPress={() => router.push('/add-event')}
+              >
+                <Plus size={20} color={Colors.white} />
+              </TouchableOpacity>
             </View>
 
             {eventsForSelectedDate.length > 0 ? (
@@ -532,14 +525,12 @@ export default function CalendarScreen() {
               <View style={styles.emptyState}>
                 <CalendarIcon size={48} color={Colors.border} />
                 <Text style={styles.emptyStateText}>No has creado ningún evento</Text>
-                {currentUser?.isServiceProvider && (
-                  <TouchableOpacity
-                    style={styles.createFirstEventButton}
-                    onPress={() => openEventModal()}
-                  >
-                    <Text style={styles.createFirstEventText}>Crear mi primer evento</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.createFirstEventButton}
+                  onPress={() => openEventModal()}
+                >
+                  <Text style={styles.createFirstEventText}>Crear mi primer evento</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>

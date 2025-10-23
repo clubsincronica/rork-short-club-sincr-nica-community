@@ -187,11 +187,6 @@ export default function AddEventScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!currentUser?.isServiceProvider) {
-      Alert.alert('Permiso Requerido', 'Solo los proveedores de servicios pueden crear eventos.');
-      return;
-    }
-
     if (!validateStep(4)) {
       return;
     }
