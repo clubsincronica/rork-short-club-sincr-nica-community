@@ -603,7 +603,7 @@ export default function AddEventScreen() {
         {currentStep === 4 && renderStep4()}
       </ScrollView>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         {currentStep > 1 && (
           <TouchableOpacity style={styles.secondaryButton} onPress={handlePrevious}>
             <Text style={styles.secondaryButtonText}>Anterior</Text>
@@ -988,17 +988,24 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     padding: 16,
+    paddingTop: 20,
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     gap: 12,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   primaryButton: {
     flex: 1,
     backgroundColor: Colors.primary,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
+    minHeight: 50,
   },
   primaryButtonFull: {
     flex: 1,
@@ -1011,11 +1018,12 @@ const styles = StyleSheet.create({
   secondaryButton: {
     flex: 1,
     backgroundColor: Colors.white,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: Colors.border,
+    minHeight: 50,
   },
   secondaryButtonText: {
     fontSize: 16,
