@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, MessageCircle, Phone, Video, MoreHorizontal } from 'lucide-react-native';
+import { Search, MessageCircle, Phone, Video, MoreHorizontal, Send } from 'lucide-react-native';
 import { mockUsers } from '@/mocks/data';
-import { Colors } from '@/constants/colors';
+import { Colors, Gradients } from '@/constants/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ConstellationBackground } from '@/components/ConstellationBackground';
 
 
 
@@ -160,7 +162,7 @@ export default function MessagesScreen() {
             testID="message-input"
           />
           <TouchableOpacity style={styles.sendButton} testID="send-button">
-            <Text style={styles.sendButtonText}>Enviar</Text>
+            <Send size={20} color={Colors.white} />
           </TouchableOpacity>
         </View>
       </View>
@@ -168,14 +170,40 @@ export default function MessagesScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {!selectedConversation ? (
-        <>
-          <View style={[styles.header, { paddingTop: insets.top }]}>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Mensajes</Text>
-              <Text style={styles.headerSubtitle}>Conecta con tu comunidad</Text>
-              
+    <ConstellationBackground intensity="light">
+      <View style={styles.container}>
+        {!selectedConversation ? (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <LinearGradient colors={Gradients.messagesGradient} style={[styles.header, { paddingTop: insets.top }]}>
+              <View style={styles.headerContent}>
+                <Text style={styles.headerTitle}>Mensajes</Text>
+                <Text style={styles.headerSubtitle}>Conecta con tu comunidad</Text>
+              </View>
+            </LinearGradient>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{mockConversations.length}</Text>
+                <View style={styles.statLabel}>
+                  <MessageCircle size={14} color={Colors.primary} />
+                  <Text style={styles.statText}>Chats Activos</Text>
+                </View>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {mockConversations.filter(c => c.isOnline).length}
+                </Text>
+                <Text style={styles.statText}>En Línea</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>
+                  {mockConversations.reduce((sum, c) => sum + c.unreadCount, 0)}
+                </Text>
+                <Text style={styles.statText}>No Leídos</Text>
+              </View>
+            </View>
+
+            <View style={styles.searchSection}>
               <View style={styles.searchContainer}>
                 <Search size={20} color={Colors.textLight} />
                 <TextInput
@@ -188,138 +216,128 @@ export default function MessagesScreen() {
                 />
               </View>
             </View>
-          </View>
 
-          <View style={styles.content}>
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <MessageCircle size={20} color={Colors.primary} />
-                <Text style={styles.statValue}>{mockConversations.length}</Text>
-                <Text style={styles.statLabel}>Chats Activos</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.success }]} />
-                <Text style={styles.statValue}>
-                  {mockConversations.filter(c => c.isOnline).length}
-                </Text>
-                <Text style={styles.statLabel}>En Línea Ahora</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.warning }]} />
-                <Text style={styles.statValue}>
-                  {mockConversations.reduce((sum, c) => sum + c.unreadCount, 0)}
-                </Text>
-                <Text style={styles.statLabel}>No Leídos</Text>
-              </View>
+            <View style={styles.conversationsSection}>
+              <Text style={styles.sectionTitle}>Conversaciones</Text>
+              {renderConversationList()}
             </View>
-
-            {renderConversationList()}
-          </View>
-        </>
-      ) : (
-        renderChatView()
-      )}
-    </View>
+          </ScrollView>
+        ) : (
+          renderChatView()
+        )}
+      </View>
+    </ConstellationBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   header: {
-    paddingBottom: 20,
-    backgroundColor: Colors.background,
+    paddingBottom: 30,
   },
   headerContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.white,
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 16,
+    color: Colors.white,
+    opacity: 0.9,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    backgroundColor: Colors.white,
+    marginHorizontal: 16,
+    marginTop: -15,
+    borderRadius: 16,
+    paddingVertical: 20,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  statLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: 12,
     color: Colors.textLight,
-    marginBottom: 20,
+    fontWeight: '500',
+  },
+  searchSection: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: 25,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     color: Colors.text,
   },
-  content: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 20,
+  conversationsSection: {
     paddingHorizontal: 16,
-    backgroundColor: Colors.white,
-    marginHorizontal: 16,
-    marginTop: -10,
-    borderRadius: 16,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    paddingTop: 24,
+    paddingBottom: 100,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-  },
-  statValue: {
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '600',
     color: Colors.text,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.textLight,
-    marginTop: 4,
+    marginBottom: 12,
   },
   conversationsList: {
-    flex: 1,
-    paddingTop: 20,
+    gap: 8,
   },
   conversationItem: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: Colors.white,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
+    marginBottom: 8,
+    borderRadius: 12,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   selectedConversation: {
     backgroundColor: Colors.secondary,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: Colors.primary,
   },
   avatarContainer: {
@@ -474,24 +492,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    alignItems: 'flex-end',
+    alignItems: 'center',
     gap: 12,
   },
   messageInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 20,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
     maxHeight: 100,
+    color: Colors.text,
   },
   sendButton: {
+    width: 44,
+    height: 44,
     backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sendButtonText: {
     fontSize: 14,

@@ -5,7 +5,9 @@ import { Star, Calendar, DollarSign, Users, ShoppingCart, Bell, MessageSquare, C
 import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
 import { mockServices } from '@/mocks/data';
-import { Colors } from '@/constants/colors';
+import { Colors, Gradients } from '@/constants/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ConstellationBackground } from '@/components/ConstellationBackground';
 
 import { router } from 'expo-router';
 
@@ -419,146 +421,144 @@ export default function ServicesScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {activeSection === 'overview' ? (
-        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <View style={styles.greeting}>
-                <Text style={styles.headerTitle}>Mis Servicios</Text>
-                <Text style={styles.headerSubtitle}>Centro de gestión integral</Text>
-              </View>
-              
-              <TouchableOpacity 
-                style={styles.qrButton}
-                onPress={() => router.push('/qr-scanner')}
-                testID="qr-scanner-button"
-              >
-                <QrCode size={24} color={Colors.white} />
-              </TouchableOpacity>
-              
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <DollarSign size={20} color={Colors.textOnGold} />
-                  <Text style={styles.statValue}>${stats.totalEarnings}</Text>
-                  <Text style={styles.statLabel}>Ganancias</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Users size={20} color={Colors.textOnGold} />
-                  <Text style={styles.statValue}>{stats.totalBookings}</Text>
-                  <Text style={styles.statLabel}>Reservas</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Star size={20} color={Colors.textOnGold} />
-                  <Text style={styles.statValue}>{stats.averageRating}</Text>
-                  <Text style={styles.statLabel}>Calificación</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Calendar size={20} color={Colors.textOnGold} />
-                  <Text style={styles.statValue}>{stats.activeServices}</Text>
-                  <Text style={styles.statLabel}>Activos</Text>
+    <ConstellationBackground intensity="light">
+      <View style={styles.container}>
+        {activeSection === 'overview' ? (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <LinearGradient colors={Gradients.servicesGradient} style={[styles.header, { paddingTop: insets.top }]}>
+              <View style={styles.headerContent}>
+                <View style={styles.headerTop}>
+                  <View style={styles.greeting}>
+                    <Text style={styles.headerTitle}>Mis Servicios</Text>
+                    <Text style={styles.headerSubtitle}>Centro de gestión integral</Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.qrButton}
+                    onPress={() => router.push('/qr-scanner')}
+                    testID="qr-scanner-button"
+                  >
+                    <QrCode size={24} color={Colors.white} />
+                  </TouchableOpacity>
                 </View>
               </View>
-            </View>
-          </View>
+            </LinearGradient>
 
-          <View style={styles.content}>
-            {renderOverview()}
-          </View>
-        </ScrollView>
-      ) : (
-        <View style={styles.fullContainer}>
-          <View style={styles.header}>
-            <View style={styles.headerContent}>
-              <View style={styles.greeting}>
-                <Text style={styles.headerTitle}>Mis Servicios</Text>
-                <Text style={styles.headerSubtitle}>Centro de gestión integral</Text>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>${stats.totalEarnings}</Text>
+                <View style={styles.statLabelRow}>
+                  <DollarSign size={14} color={Colors.success} />
+                  <Text style={styles.statText}>Ganancias</Text>
+                </View>
               </View>
-              
-              <TouchableOpacity 
-                style={styles.qrButton}
-                onPress={() => router.push('/qr-scanner')}
-                testID="qr-scanner-button"
-              >
-                <QrCode size={24} color={Colors.white} />
-              </TouchableOpacity>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.totalBookings}</Text>
+                <Text style={styles.statText}>Reservas</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.averageRating}</Text>
+                <View style={styles.statLabelRow}>
+                  <Star size={14} color={Colors.warning} fill={Colors.warning} />
+                  <Text style={styles.statText}>Rating</Text>
+                </View>
+              </View>
             </View>
+
+            <View style={styles.content}>
+              {renderOverview()}
+            </View>
+          </ScrollView>
+        ) : (
+          <View style={styles.fullContainer}>
+            <LinearGradient colors={Gradients.servicesGradient} style={[styles.header, { paddingTop: insets.top }]}>
+              <View style={styles.headerContent}>
+                <View style={styles.headerTop}>
+                  <View style={styles.greeting}>
+                    <Text style={styles.headerTitle}>Mis Servicios</Text>
+                    <Text style={styles.headerSubtitle}>Centro de gestión integral</Text>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.qrButton}
+                    onPress={() => router.push('/qr-scanner')}
+                    testID="qr-scanner-button"
+                  >
+                    <QrCode size={24} color={Colors.white} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </LinearGradient>
+            
+            {activeSection === 'calendar' && (
+              <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
+                {renderCalendar()}
+              </ScrollView>
+            )}
+            {activeSection === 'reservations' && (
+              <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
+                {renderReservations()}
+              </ScrollView>
+            )}
+            {activeSection === 'cart' && (
+              <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
+                {renderCart()}
+              </ScrollView>
+            )}
+            {activeSection === 'followup' && (
+              <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
+                {renderFollowUp()}
+              </ScrollView>
+            )}
+            {activeSection === 'notifications' && (
+              <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
+                {renderNotifications()}
+              </ScrollView>
+            )}
           </View>
-          
-          {activeSection === 'calendar' && (
-            <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
-              {renderCalendar()}
-            </ScrollView>
-          )}
-          {activeSection === 'reservations' && (
-            <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
-              {renderReservations()}
-            </ScrollView>
-          )}
-          {activeSection === 'cart' && (
-            <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
-              {renderCart()}
-            </ScrollView>
-          )}
-          {activeSection === 'followup' && (
-            <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
-              {renderFollowUp()}
-            </ScrollView>
-          )}
-          {activeSection === 'notifications' && (
-            <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
-              {renderNotifications()}
-            </ScrollView>
-          )}
-        </View>
-      )}
-    </View>
+        )}
+      </View>
+    </ConstellationBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContainer: {
-    flex: 1,
   },
   header: {
-    backgroundColor: Colors.white,
-    paddingBottom: 20,
-    paddingTop: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingBottom: 30,
   },
   headerContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    zIndex: 1,
-    position: 'relative',
+    paddingTop: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   greeting: {
-    marginBottom: 24,
+    flex: 1,
   },
-
   headerTitle: {
     fontSize: 24,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: '700',
+    color: Colors.white,
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: Colors.textLight,
-    marginBottom: 20,
+    fontSize: 16,
+    color: Colors.white,
+    opacity: 0.9,
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.gold,
+    backgroundColor: Colors.white,
+    marginHorizontal: 16,
+    marginTop: -15,
     borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 4,
+    paddingVertical: 20,
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -566,20 +566,24 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   statItem: {
-    alignItems: 'center',
     flex: 1,
+    alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
-    color: Colors.textOnGold,
-    marginTop: 4,
+    color: Colors.text,
+    marginBottom: 4,
   },
-  statLabel: {
+  statLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
     fontSize: 12,
-    color: Colors.textOnGold,
-    opacity: 0.9,
-    marginTop: 2,
+    color: Colors.textLight,
+    fontWeight: '500',
   },
   tabContainer: {
     flexDirection: 'row',
@@ -612,10 +616,8 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   content: {
-    flex: 1,
-    paddingTop: 20,
-    minHeight: '100%',
-    backgroundColor: Colors.background,
+    paddingTop: 24,
+    paddingBottom: 100,
   },
   servicesSection: {
     paddingHorizontal: 16,
@@ -627,9 +629,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: Colors.text,
+    marginBottom: 12,
   },
   addButton: {
     flexDirection: 'row',
@@ -819,55 +822,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    marginBottom: 8,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionButtonHighlight: {
-    borderWidth: 2,
-    borderColor: Colors.gold,
-    backgroundColor: '#FFF8E1',
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: Colors.secondary,
   },
   sectionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: Colors.background,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.secondary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   sectionIconHighlight: {
-    backgroundColor: Colors.gold + '20',
+    backgroundColor: Colors.primary + '20',
   },
   sectionInfo: {
     flex: 1,
   },
   sectionButtonTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   sectionButtonSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.textLight,
   },
   recentActivity: {
-    marginBottom: 24,
+    marginTop: 24,
   },
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   activityIcon: {
     width: 40,
@@ -1434,11 +1443,9 @@ const styles = StyleSheet.create({
   },
   fullContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   sectionScrollContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   sectionHeaderWithAction: {
     flexDirection: 'row',
@@ -1484,19 +1491,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   qrButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primary,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
 });
