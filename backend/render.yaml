@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: clubsincronica-backend
+    env: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase: POSTGRESQL

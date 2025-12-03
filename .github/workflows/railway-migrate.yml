@@ -1,0 +1,49 @@
+name: Railway DB Migration
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm ci
+      - name: Setup Google Cloud SDK (optional)
+        if: ${{ secrets.GCP_SA_KEY != '' && secrets.GCP_DB_GS_URL != '' }}
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+      - name: Download DB from GCS (optional)
+        if: ${{ secrets.GCP_SA_KEY != '' && secrets.GCP_DB_GS_URL != '' }}
+        run: |
+          echo "Downloading DB from GCS: ${{ secrets.GCP_DB_GS_URL }}"
+          gsutil cp "${{ secrets.GCP_DB_GS_URL }}" backend/clubsincronica.db
+      - name: Download DB (optional)
+        if: ${{ secrets.DB_DOWNLOAD_URL != '' }}
+        run: |
+          echo "Downloading DB from DB_DOWNLOAD_URL"
+          curl -fSL -o backend/clubsincronica.db "${{ secrets.DB_DOWNLOAD_URL }}"
+      - name: Run migration to Postgres (Railway)
+        env:
+          DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "RAILWAY_DATABASE_URL secret is not set. Add it in GitHub repo settings.";
+            exit 1;
+          fi
+          if [ ! -f backend/clubsincronica.db ]; then
+            echo "backend/clubsincronica.db not found. Provide DB by committing it (not recommended) or set DB_DOWNLOAD_URL secret to a signed URL.";
+            exit 1;
+          fi
+          npx ts-node src/scripts/migrate-to-postgres.ts

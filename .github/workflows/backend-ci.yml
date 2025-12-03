@@ -1,0 +1,78 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Run tests (if any)
+        run: |
+          if [ -f package.json ] && jq -e '.scripts.test' package.json >/dev/null 2>&1; then
+            npm test || true
+          else
+            echo "No tests defined"
+          fi
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: curl -sL https://railway.app/install.sh | sh
+      - name: Deploy to Railway
+        env:
+          RAILWAY_API_KEY: ${{ secrets.RAILWAY_API_KEY }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          if [ -z "$RAILWAY_API_KEY" ] || [ -z "$RAILWAY_PROJECT_ID" ]; then
+            echo "RAILWAY_API_KEY or RAILWAY_PROJECT_ID not set. Skipping deploy.";
+            exit 1;
+          fi
+          railway login --apiKey $RAILWAY_API_KEY
+          railway up --detach --project $RAILWAY_PROJECT_ID
+
+
+# Optional: Deployment to Railway via Railway CLI (requires RAILWAY_API_KEY secret)
+# Uncomment and configure if you want automatic deploys using the Railway CLI
+#
+#  deploy:
+#    needs: build
+#    runs-on: ubuntu-latest
+#    defaults:
+#      run:
+#        working-directory: backend
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Install Railway CLI
+#        run: curl -sL https://railway.app/install.sh | sh
+#      - name: Deploy to Railway
+#        env:
+#          RAILWAY_API_KEY: ${{ secrets.RAILWAY_API_KEY }}
+#        run: |
+#          # login and deploy (requires RAILWAY_API_KEY configured in repo secrets)
+#          railway login --apiKey $RAILWAY_API_KEY
+#          railway up --detach

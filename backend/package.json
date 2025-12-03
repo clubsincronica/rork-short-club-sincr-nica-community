@@ -1,0 +1,41 @@
+{
+  "name": "clubsincronica-backend",
+  "version": "1.0.0",
+  "description": "Backend server for Club Sincrónica - Real-time messaging and profile discovery",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "db:init": "ts-node src/models/init-db.ts",
+    "migrate:pg": "npx ts-node src/scripts/migrate-to-postgres.ts"
+  },
+  "keywords": [
+    "socket.io",
+    "express",
+    "typescript",
+    "real-time"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.6.1",
+    "sql.js": "^1.8.0",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.6",
+    "@types/sql.js": "^1.4.9",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  }
+}
