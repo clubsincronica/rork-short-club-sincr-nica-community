@@ -1,0 +1,44 @@
+name: Simple Test
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Simple echo
+        run: echo "GitHub Actions is working!"
+      - name: Check secrets
+        run: |
+          if [ -z "${{ secrets.GCP_SA_KEY }}" ]; then
+            echo "❌ GCP_SA_KEY secret is NOT set"
+          else
+            echo "✅ GCP_SA_KEY secret is set"
+          fi
+          
+          if [ -z "${{ secrets.GCP_DB_GS_URL }}" ]; then
+            echo "❌ GCP_DB_GS_URL secret is NOT set"
+          else
+            echo "✅ GCP_DB_GS_URL secret is set (value: ${{ secrets.GCP_DB_GS_URL }})"
+          fi
+          
+          if [ -z "${{ secrets.RAILWAY_DATABASE_URL }}" ]; then
+            echo "❌ RAILWAY_DATABASE_URL secret is NOT set"
+          else
+            echo "✅ RAILWAY_DATABASE_URL secret is set"
+          fi
+          
+          if [ -z "${{ secrets.RAILWAY_API_KEY }}" ]; then
+            echo "❌ RAILWAY_API_KEY secret is NOT set"
+          else
+            echo "✅ RAILWAY_API_KEY secret is set"
+          fi
+          
+          if [ -z "${{ secrets.RAILWAY_PROJECT_ID }}" ]; then
+            echo "❌ RAILWAY_PROJECT_ID secret is NOT set"
+          else
+            echo "✅ RAILWAY_PROJECT_ID secret is set (value: ${{ secrets.RAILWAY_PROJECT_ID }})"
+          fi
