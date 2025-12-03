@@ -2,6 +2,12 @@ name: Railway DB Migration
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'backend/**'
+      - '.github/workflows/railway-migrate.yml'
 
 jobs:
   migrate:
