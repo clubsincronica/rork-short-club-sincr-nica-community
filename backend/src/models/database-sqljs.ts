@@ -27,7 +27,7 @@ if (usePostgres) {
   pgClient = require('../db/postgres-client');
 }
 
-async function locateSqlJsFile(file: string) {
+function locateSqlJsFile(file: string): string {
   return path.join(__dirname, '../../node_modules/sql.js/dist', file);
 }
 

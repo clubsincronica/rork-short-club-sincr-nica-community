@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { query as pgQuery } from '../db/postgres-client';
 
-async function locateSqlJsFile(file: string) {
+function locateSqlJsFile(file: string): string {
   return path.join(__dirname, '../../node_modules/sql.js/dist', file);
 }
 
@@ -51,7 +51,7 @@ async function migrate() {
       try {
         await pgQuery(`SELECT setval(pg_get_serial_sequence($1, 'id'), (SELECT MAX(id) FROM ${table}))`, [table]);
       } catch (err) {
-        console.warn('Could not set sequence for', table, err.message || err);
+        console.warn('Could not set sequence for', table, (err as Error).message || err);
       }
     }
   }
