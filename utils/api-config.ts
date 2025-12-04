@@ -65,8 +65,8 @@ export const getApiBaseUrl = (): string => {
     return `http://${API_CONFIG.LOCAL_IP}:${API_CONFIG.PORT}`;
   }
 
-  // 5) Fallback production URL (change when you deploy)
-  return 'https://your-production-url.com';
+  // 5) Fallback production URL (Railway backend)
+  return 'https://rork-short-club-sincr-nica-community-production.up.railway.app';
 };
 
 export const API_BASE_URL = getApiBaseUrl();
