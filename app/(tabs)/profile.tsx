@@ -30,7 +30,10 @@ import {
   User,
   Mail,
   Lock,
-  Globe
+  Globe,
+  DollarSign,
+  ChevronDown,
+  ChevronUp
 } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { Colors, Gradients } from '@/constants/colors';
@@ -77,6 +80,7 @@ export default function ProfileScreen() {
   const [isSignupModalVisible, setIsSignupModalVisible] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'activity' | 'achievements'>('activity');
+  const [isMiCuentaExpanded, setIsMiCuentaExpanded] = useState(false);
   
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
@@ -89,6 +93,11 @@ export default function ProfileScreen() {
     specialties: currentUser?.specialties || [],
     interests: currentUser?.interests || [],
     avatar: currentUser?.avatar || '',
+    instagram: currentUser?.instagram || '',
+    facebook: currentUser?.facebook || '',
+    tiktok: currentUser?.tiktok || '',
+    twitter: currentUser?.twitter || '',
+    linkedin: currentUser?.linkedin || '',
   });
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
@@ -96,18 +105,10 @@ export default function ProfileScreen() {
     { id: '2', type: 'card', last4: '5555', brand: 'Mastercard', isDefault: false },
   ]);
 
-  const achievements: Achievement[] = [
-    { id: '1', title: 'Primera Sesión', description: 'Completa tu primera sesión', icon: Star, earned: true, earnedDate: '2024-01-15' },
-    { id: '2', title: 'Sanador Certificado', description: 'Obtén 5 reseñas de 5 estrellas', icon: Trophy, earned: true, earnedDate: '2024-02-20' },
-    { id: '3', title: 'Comunidad Activa', description: 'Participa en 10 eventos', icon: Heart, earned: false },
-    { id: '4', title: 'Maestro del Bienestar', description: 'Completa 50 sesiones', icon: Award, earned: false },
-  ];
+  // Remove mock achievements and activities - will be populated from backend
+  const achievements: Achievement[] = [];
 
-  const activities: Activity[] = [
-    { id: '1', type: 'booking', title: 'Sesión de Reiki', description: 'Con María González', date: '2024-03-15', icon: Calendar },
-    { id: '2', type: 'review', title: 'Reseña recibida', description: '5 estrellas de Juan Pérez', date: '2024-03-10', icon: Star },
-    { id: '3', type: 'achievement', title: 'Logro desbloqueado', description: 'Sanador Certificado', date: '2024-02-20', icon: Trophy },
-  ];
+  const activities: Activity[] = [];
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -249,12 +250,16 @@ export default function ProfileScreen() {
       highlight: true,
     },
     {
-      icon: Globe,
-      title: 'Language & Region',
-      subtitle: settings.language ? `${settings.language.nativeName} • ${settings.location?.city || 'Not set'}` : 'Set your preferences',
-      onPress: () => router.push('/onboarding'),
-      testId: 'localization',
+      icon: Activity,
+      title: 'Mi Tablero',
+      subtitle: 'Gestiona tus servicios y eventos',
+      onPress: () => router.push('/mi-tablero'),
+      testId: 'mi-tablero',
+      highlight: true,
     },
+  ];
+
+  const miCuentaItems = [
     {
       icon: Edit3,
       title: 'Editar Perfil',
@@ -263,11 +268,25 @@ export default function ProfileScreen() {
       testId: 'edit-profile',
     },
     {
+      icon: Globe,
+      title: 'Language & Region',
+      subtitle: settings.language ? `${settings.language.nativeName} • ${settings.location?.city || 'Not set'}` : 'Set your preferences',
+      onPress: () => router.push('/onboarding'),
+      testId: 'localization',
+    },
+    {
       icon: CreditCard,
       title: 'Métodos de Pago',
       subtitle: 'Gestiona tarjetas y facturación',
-      onPress: () => setIsPaymentModalVisible(true),
+      onPress: () => router.push('/payment-methods'),
       testId: 'payment-methods',
+    },
+    {
+      icon: DollarSign,
+      title: 'Cuentas Bancarias',
+      subtitle: 'Gestiona tus cuentas',
+      onPress: () => router.push('/bank-accounts'),
+      testId: 'bank-accounts',
     },
     {
       icon: Bell,
@@ -298,6 +317,9 @@ export default function ProfileScreen() {
       onPress: () => router.push('/settings'),
       testId: 'settings',
     },
+  ];
+
+  const additionalMenuItems = [
     {
       icon: HelpCircle,
       title: 'Ayuda y Soporte',
@@ -410,57 +432,77 @@ export default function ProfileScreen() {
 
           {activeTab === 'activity' ? (
             <View style={styles.activityList}>
-              {activities.map((activity) => (
-                <View key={activity.id} style={styles.activityItem}>
-                  <View style={[styles.activityIcon, activity.type === 'achievement' && styles.activityIconHighlight]}>
-                    <activity.icon size={20} color={activity.type === 'achievement' ? Colors.gold : Colors.primary} />
+              {activities.length > 0 ? (
+                activities.map((activity) => (
+                  <View key={activity.id} style={styles.activityItem}>
+                    <View style={[styles.activityIcon, activity.type === 'achievement' && styles.activityIconHighlight]}>
+                      <activity.icon size={20} color={activity.type === 'achievement' ? Colors.gold : Colors.primary} />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityTitle}>{activity.title}</Text>
+                      <Text style={styles.activityDescription}>{activity.description}</Text>
+                      <View style={styles.activityDate}>
+                        <Clock size={12} color={Colors.textLight} />
+                        <Text style={styles.activityDateText}>
+                          {new Date(activity.date).toLocaleDateString('es-ES', { 
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.activityContent}>
-                    <Text style={styles.activityTitle}>{activity.title}</Text>
-                    <Text style={styles.activityDescription}>{activity.description}</Text>
-                    <View style={styles.activityDate}>
-                      <Clock size={12} color={Colors.textLight} />
-                      <Text style={styles.activityDateText}>
-                        {new Date(activity.date).toLocaleDateString('es-ES', { 
-                          day: 'numeric',
+                ))
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <Activity size={48} color={Colors.textLight} />
+                  <Text style={styles.emptyStateTitle}>Sin Actividad</Text>
+                  <Text style={styles.emptyStateText}>
+                    Tu actividad reciente aparecerá aquí
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.achievementGrid}>
+              {achievements.length > 0 ? (
+                achievements.map((achievement) => (
+                  <View 
+                    key={achievement.id} 
+                    style={[styles.achievementCard, achievement.earned && styles.achievementCardEarned]}
+                  >
+                    <View style={[styles.achievementIcon, achievement.earned && styles.achievementIconEarned]}>
+                      <achievement.icon 
+                        size={24} 
+                        color={achievement.earned ? Colors.gold : Colors.textLight} 
+                      />
+                    </View>
+                    <Text style={[styles.achievementTitle, achievement.earned && styles.achievementTitleEarned]}>
+                      {achievement.title}
+                    </Text>
+                    <Text style={styles.achievementDescription}>
+                      {achievement.description}
+                    </Text>
+                    {achievement.earned && achievement.earnedDate && (
+                      <Text style={styles.achievementDate}>
+                        {new Date(achievement.earnedDate).toLocaleDateString('es-ES', { 
                           month: 'short',
                           year: 'numeric'
                         })}
                       </Text>
-                    </View>
+                    )}
                   </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.achievementGrid}>
-              {achievements.map((achievement) => (
-                <View 
-                  key={achievement.id} 
-                  style={[styles.achievementCard, achievement.earned && styles.achievementCardEarned]}
-                >
-                  <View style={[styles.achievementIcon, achievement.earned && styles.achievementIconEarned]}>
-                    <achievement.icon 
-                      size={24} 
-                      color={achievement.earned ? Colors.gold : Colors.textLight} 
-                    />
-                  </View>
-                  <Text style={[styles.achievementTitle, achievement.earned && styles.achievementTitleEarned]}>
-                    {achievement.title}
+                ))
+              ) : (
+                <View style={styles.emptyStateContainer}>
+                  <Trophy size={48} color={Colors.textLight} />
+                  <Text style={styles.emptyStateTitle}>Sin Logros</Text>
+                  <Text style={styles.emptyStateText}>
+                    Completa actividades para desbloquear logros
                   </Text>
-                  <Text style={styles.achievementDescription}>
-                    {achievement.description}
-                  </Text>
-                  {achievement.earned && achievement.earnedDate && (
-                    <Text style={styles.achievementDate}>
-                      {new Date(achievement.earnedDate).toLocaleDateString('es-ES', { 
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                    </Text>
-                  )}
                 </View>
-              ))}
+              )}
             </View>
           )}
         </View>
@@ -475,6 +517,76 @@ export default function ProfileScreen() {
               testID={item.testId}
             >
               <View style={styles.menuItemLeft}>
+                <View style={[styles.menuIcon, item.highlight && styles.menuIconHighlight]}>
+                  <item.icon size={20} color={item.highlight ? Colors.white : Colors.primary} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuTitle, item.highlight && styles.menuTitleHighlight]}>
+                    {item.title}
+                  </Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+              </View>
+              <ChevronRight size={20} color={Colors.textLight} />
+            </TouchableOpacity>
+          ))}
+
+          {/* Mi Cuenta Collapsible Section */}
+          <TouchableOpacity
+            style={[styles.menuItem, styles.miCuentaButton]}
+            onPress={() => setIsMiCuentaExpanded(!isMiCuentaExpanded)}
+            testID="mi-cuenta-toggle"
+          >
+            <View style={styles.menuItemLeft}>
+              <View style={[styles.menuIcon, styles.miCuentaIcon]}>
+                <User size={20} color={Colors.gold} />
+              </View>
+              <View style={styles.menuContent}>
+                <Text style={[styles.menuTitle, styles.miCuentaTitle]}>Mi Cuenta</Text>
+                <Text style={styles.menuSubtitle}>Ajustes de perfil y seguridad</Text>
+              </View>
+            </View>
+            {isMiCuentaExpanded ? (
+              <ChevronUp size={20} color={Colors.gold} />
+            ) : (
+              <ChevronDown size={20} color={Colors.gold} />
+            )}
+          </TouchableOpacity>
+
+          {/* Mi Cuenta Submenu Items */}
+          {isMiCuentaExpanded && (
+            <View style={styles.submenuContainer}>
+              {miCuentaItems.map((item, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.submenuItem}
+                  onPress={item.onPress}
+                  testID={item.testId}
+                >
+                  <View style={styles.menuItemLeft}>
+                    <View style={styles.submenuIcon}>
+                      <item.icon size={18} color={Colors.primary} />
+                    </View>
+                    <View style={styles.menuContent}>
+                      <Text style={styles.submenuTitle}>{item.title}</Text>
+                      <Text style={styles.submenuSubtitle}>{item.subtitle}</Text>
+                    </View>
+                  </View>
+                  {item.rightComponent || <ChevronRight size={18} color={Colors.textLight} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Additional Menu Items */}
+          {additionalMenuItems.map((item, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.menuItem}
+              onPress={item.onPress}
+              testID={item.testId}
+            >
+              <View style={styles.menuItemLeft}>
                 <View style={styles.menuIcon}>
                   <item.icon size={20} color={Colors.primary} />
                 </View>
@@ -483,9 +595,7 @@ export default function ProfileScreen() {
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
               </View>
-              <View style={styles.menuItemRight}>
-                {item.rightComponent || <ChevronRight size={20} color={Colors.textLight} />}
-              </View>
+              <ChevronRight size={20} color={Colors.textLight} />
             </TouchableOpacity>
           ))}
         </View>
@@ -601,6 +711,63 @@ export default function ProfileScreen() {
                     interests: text.split(',').map(i => i.trim()).filter(i => i)
                   })}
                   placeholder="Yoga, Meditación, Nutrición..."
+                />
+              </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 20, marginBottom: 12 }]}>Redes Sociales</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Instagram</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editedProfile.instagram}
+                  onChangeText={(text) => setEditedProfile({...editedProfile, instagram: text})}
+                  placeholder="@usuario"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Facebook</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editedProfile.facebook}
+                  onChangeText={(text) => setEditedProfile({...editedProfile, facebook: text})}
+                  placeholder="nombre.usuario"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>TikTok</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editedProfile.tiktok}
+                  onChangeText={(text) => setEditedProfile({...editedProfile, tiktok: text})}
+                  placeholder="@usuario"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Twitter/X</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editedProfile.twitter}
+                  onChangeText={(text) => setEditedProfile({...editedProfile, twitter: text})}
+                  placeholder="@usuario"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>LinkedIn</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editedProfile.linkedin}
+                  onChangeText={(text) => setEditedProfile({...editedProfile, linkedin: text})}
+                  placeholder="nombre-usuario"
+                  autoCapitalize="none"
                 />
               </View>
             </ScrollView>
@@ -980,6 +1147,69 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  menuItemHighlight: {
+    borderWidth: 2,
+    borderColor: Colors.gold || '#fbeb5c',
+    backgroundColor: Colors.white,
+  },
+  menuIconHighlight: {
+    backgroundColor: Colors.gold || '#fbeb5c',
+  },
+  menuTitleHighlight: {
+    color: Colors.text,
+    fontWeight: '700',
+  },
+  miCuentaButton: {
+    borderWidth: 2,
+    borderColor: Colors.gold || '#fbeb5c',
+    backgroundColor: `${Colors.gold || '#fbeb5c'}15`,
+  },
+  miCuentaIcon: {
+    backgroundColor: `${Colors.gold || '#fbeb5c'}25`,
+  },
+  miCuentaTitle: {
+    color: Colors.gold || '#fbeb5c',
+    fontWeight: '700',
+  },
+  submenuContainer: {
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    marginBottom: 8,
+    paddingVertical: 4,
+    marginLeft: 8,
+    marginRight: 0,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.gold || '#fbeb5c',
+  },
+  submenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 2,
+  },
+  submenuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.secondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  submenuTitle: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: Colors.text,
+  },
+  submenuSubtitle: {
+    fontSize: 12,
+    color: Colors.textLight,
+    marginTop: 2,
+  },
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1118,11 +1348,6 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
   },
-  menuItemHighlight: {
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.secondary,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1247,7 +1472,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activityIconHighlight: {
-    backgroundColor: Colors.gold + '20',
+    backgroundColor: `${Colors.gold}20`,
     borderWidth: 1,
     borderColor: Colors.gold,
   },
@@ -1278,6 +1503,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 32,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: Colors.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
   },
   achievementCard: {
     width: '48%',
