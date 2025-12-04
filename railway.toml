@@ -1,7 +1,0 @@
-[build]
-builder = "nixpacks"
-buildCommand = "cd backend && npm ci && npm run build"
-
-[deploy]
-startCommand = "cd backend && node dist/server.js"
-restartPolicyType = "always"
