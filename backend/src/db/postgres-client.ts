@@ -9,8 +9,8 @@ if (!connectionString) {
 
 const pool = new Pool({
   connectionString: connectionString || undefined,
-  // If using self-signed certs on some hosts you might need:
-  // ssl: { rejectUnauthorized: false }
+  // Railway requires SSL for PostgreSQL connections
+  ssl: connectionString ? { rejectUnauthorized: false } : undefined
 });
 
 export const query = async (text: string, params?: any[]) => {
