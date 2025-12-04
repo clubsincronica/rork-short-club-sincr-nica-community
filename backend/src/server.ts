@@ -141,7 +141,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for Railway
+const HOST = '0.0.0.0'; // Always listen on all interfaces for Railway
 
 // Initialize database then start server
 initializeDatabase().then(() => {
