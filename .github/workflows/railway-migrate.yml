@@ -29,7 +29,8 @@ jobs:
       - name: Authenticate with GCP
         run: |
           echo "Setting up service account credentials"
-          echo "${{ secrets.GCP_SA_KEY }}" | base64 -d > ${HOME}/gcp-key.json
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > ${HOME}/gcp-key.json
+          cat ${HOME}/gcp-key.json | jq . > /dev/null && echo "Valid JSON" || echo "Invalid JSON"
           gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
           gcloud config set project analog-codex-472715-d7
           echo "Authentication successful"
