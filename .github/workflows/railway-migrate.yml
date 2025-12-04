@@ -32,14 +32,24 @@ jobs:
       - name: Download DB from GCS
         run: |
           echo "Downloading DB from GCS: ${{ secrets.GCP_DB_GS_URL }}"
+          echo "Current directory: $(pwd)"
+          echo "Files before download:"
+          ls -la
           gsutil cp "${{ secrets.GCP_DB_GS_URL }}" clubsincronica.db
+          echo "Files after download:"
+          ls -la
       - name: Verify DB downloaded
         run: |
+          echo "Verifying DB in directory: $(pwd)"
           if [ ! -f clubsincronica.db ]; then
             echo "ERROR: clubsincronica.db not found after download"
+            echo "Current directory contents:"
+            ls -la
             exit 1
           fi
+          echo "SUCCESS: DB file found"
           ls -lh clubsincronica.db
+          echo "DB file size: $(stat -f%z clubsincronica.db 2>/dev/null || stat -c%s clubsincronica.db)"
       - name: Run migration to Postgres (Railway)
         env:
           DATABASE_URL: ${{ secrets.RAILWAY_DATABASE_URL }}
