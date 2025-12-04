@@ -141,13 +141,14 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0'; // Listen on all interfaces for Railway
 
 // Initialize database then start server
 initializeDatabase().then(() => {
   console.log('✅ Database ready for connections');
   
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
     console.log(`📡 WebSocket ready for real-time messaging`);
     console.log(`💾 Database: ${process.env.DATABASE_PATH || 'clubsincronica.db'}`);
     
