@@ -24,16 +24,16 @@ jobs:
           node-version: 18
       - name: Install dependencies
         run: npm ci
-      - name: Setup Google Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-      - name: Authenticate with GCP
+      - name: Decode and set GCP credentials
         run: |
-          echo "Setting up service account credentials"
-          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > ${HOME}/gcp-key.json
-          cat ${HOME}/gcp-key.json | jq . > /dev/null && echo "Valid JSON" || echo "Invalid JSON"
-          gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
-          gcloud config set project analog-codex-472715-d7
-          echo "Authentication successful"
+          echo "${{ secrets.GCP_SA_KEY }}" | base64 --decode > ${RUNNER_TEMP}/gcp-key.json
+          echo "GCP_KEY_JSON=$(cat ${RUNNER_TEMP}/gcp-key.json)" >> $GITHUB_ENV
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ env.GCP_KEY_JSON }}'
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
       - name: Download DB from GCS
         run: |
           echo "Downloading DB from GCS: ${{ secrets.GCP_DB_GS_URL }}"
