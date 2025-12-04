@@ -1,0 +1,14 @@
+# Ignore frontend - only deploy backend
+app/
+assets/
+components/
+constants/
+hooks/
+mocks/
+types/
+utils/
+android/
+ios/
+.expo/
+node_modules/
+*.log
