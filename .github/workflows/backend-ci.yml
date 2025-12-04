@@ -45,15 +45,13 @@ jobs:
         run: curl -sL https://railway.app/install.sh | sh
       - name: Deploy to Railway
         env:
-          RAILWAY_API_KEY: ${{ secrets.RAILWAY_API_KEY }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_KEY }}
         run: |
-          if [ -z "$RAILWAY_API_KEY" ] || [ -z "$RAILWAY_PROJECT_ID" ]; then
-            echo "RAILWAY_API_KEY or RAILWAY_PROJECT_ID not set. Skipping deploy.";
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "RAILWAY_API_KEY not set. Skipping deploy.";
             exit 1;
           fi
-          railway login --apiKey $RAILWAY_API_KEY
-          railway up --detach --project $RAILWAY_PROJECT_ID
+          railway up --detach
 
 
 # Optional: Deployment to Railway via Railway CLI (requires RAILWAY_API_KEY secret)
