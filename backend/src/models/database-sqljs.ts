@@ -298,6 +298,13 @@ export const conversationQueries = usePostgres ? {
       [userId]
     );
     return rows || [];
+  },
+
+  updateConversation: async (conversationId: number) => {
+    await pgClient.query(
+      `UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [conversationId]
+    );
   }
 } : {
   createConversation: (participant1Id: number, participant2Id: number) => {
@@ -333,6 +340,14 @@ export const conversationQueries = usePostgres ? {
       [userId, userId, userId, userId, userId]
     );
     return result[0]?.values.map((row: any) => rowToObject(result[0].columns, row)) || [];
+  },
+
+  updateConversation: (conversationId: number) => {
+    db.run(
+      `UPDATE conversations SET updated_at = datetime('now') WHERE id = ?`,
+      [conversationId]
+    );
+    saveDatabase();
   }
 };
 
@@ -349,7 +364,13 @@ export const messageQueries = usePostgres ? {
   },
 
   getMessageById: async (id: number) => {
-    const rows = await pgClient.query(`SELECT * FROM messages WHERE id = $1 LIMIT 1`, [id]);
+    const rows = await pgClient.query(
+      `SELECT m.*, u.name as sender_name, u.avatar as sender_avatar 
+       FROM messages m 
+       LEFT JOIN users u ON m.sender_id = u.id 
+       WHERE m.id = $1 LIMIT 1`, 
+      [id]
+    );
     return rows[0] ?? null;
   },
 
@@ -384,7 +405,13 @@ export const messageQueries = usePostgres ? {
   },
 
   getMessageById: (id: number) => {
-    const result = db.exec(`SELECT * FROM messages WHERE id = ? LIMIT 1`, [id]);
+    const result = db.exec(
+      `SELECT m.*, u.name as sender_name, u.avatar as sender_avatar 
+       FROM messages m 
+       LEFT JOIN users u ON m.sender_id = u.id 
+       WHERE m.id = ? LIMIT 1`, 
+      [id]
+    );
     return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
   },
   

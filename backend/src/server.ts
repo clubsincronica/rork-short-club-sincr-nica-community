@@ -61,20 +61,51 @@ io.on('connection', (socket) => {
   socket.on('message:send', async (data: { conversationId: number; senderId: number; receiverId: number; text: string }) => {
     try {
       const { conversationId, senderId, receiverId, text } = data;
+      console.log('💬 Received message:send', { conversationId, senderId, receiverId, text });
+
+      // If conversationId is 0 or missing, create or get conversation
+      let finalConversationId = conversationId;
+      if (!conversationId || conversationId === 0) {
+        console.log('Creating/getting conversation for users:', senderId, receiverId);
+        let conversation: any = await conversationQueries.getConversation(senderId, receiverId);
+        
+        if (!conversation) {
+          const result = await conversationQueries.createConversation(
+            Math.min(senderId, receiverId),
+            Math.max(senderId, receiverId)
+          );
+          finalConversationId = result.lastID;
+          console.log('Created new conversation:', finalConversationId);
+        } else {
+          finalConversationId = conversation.id;
+          console.log('Using existing conversation:', finalConversationId);
+        }
+      }
 
       // Save message to database
-      const result = await messageQueries.createMessage(conversationId, senderId, receiverId, text);
+      const result = await messageQueries.createMessage(finalConversationId, senderId, receiverId, text);
+      console.log('💾 Message saved, result:', result);
+
+      // Update conversation timestamp
+      await conversationQueries.updateConversation(finalConversationId);
 
       // Fetch the created message in a DB-agnostic way
       const message: any = await messageQueries.getMessageById(result.lastID);
+      console.log('📨 Fetched message from DB:', message);
+
+      if (!message) {
+        console.error('❌ Failed to fetch message after creation');
+        socket.emit('message:error', { error: 'Message saved but could not be retrieved' });
+        return;
+      }
 
       // Emit to both sender and receiver
       io.to(`user:${senderId}`).emit('message:new', message);
       io.to(`user:${receiverId}`).emit('message:new', message);
 
-      console.log(`💬 Message sent: ${senderId} -> ${receiverId}`);
+      console.log(`✅ Message sent: ${senderId} -> ${receiverId} (conversation ${finalConversationId})`);
     } catch (error) {
-      console.error('Message send error:', error);
+      console.error('❌ Message send error:', error);
       socket.emit('message:error', { error: 'Failed to send message' });
     }
   });
@@ -144,7 +175,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0'; // Always listen on all interfaces for Railway
 
 // Initialize database then start server

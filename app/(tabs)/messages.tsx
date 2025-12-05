@@ -1,224 +1,549 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, MessageCircle, Phone, Video, MoreHorizontal } from '../../components/SmartIcons';
-import { mockUsers } from '@/mocks/data';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Search, MessageCircle, Send, ArrowLeft, X } from '../../components/SmartIcons';
 import { Colors } from '@/constants/colors';
+import { useUser } from '@/hooks/user-store';
+import { initSocket, getSocket } from '@/app/services/socket';
+import { getApiBaseUrl } from '@/utils/api-config';
 
-
-
-interface MockConversation {
-  id: string;
-  participant: typeof mockUsers[0];
-  lastMessage: string;
-  timestamp: string;
-  unreadCount: number;
-  isOnline: boolean;
+interface Conversation {
+  id: number;
+  other_user_id: number;
+  name: string;
+  avatar?: string;
+  last_message?: string;
+  last_message_time?: string;
+  unread_count: number;
 }
 
-const mockConversations: MockConversation[] = [
-  {
-    id: '1',
-    participant: mockUsers[0],
-    lastMessage: '¡Gracias por la increíble sesión de Reiki! Me siento mucho mejor.',
-    timestamp: 'hace 2m',
-    unreadCount: 2,
-    isOnline: true,
-  },
-  {
-    id: '2',
-    participant: mockUsers[1],
-    lastMessage: 'Esperando con ansias nuestra sesión de coaching mañana a las 3 PM.',
-    timestamp: 'hace 1h',
-    unreadCount: 0,
-    isOnline: true,
-  },
-  {
-    id: '3',
-    participant: mockUsers[2],
-    lastMessage: '¡El baño de sonido fue increíble! ¿Podemos programar otro?',
-    timestamp: 'hace 3h',
-    unreadCount: 1,
-    isOnline: false,
-  },
-];
+interface Message {
+  id: string;
+  text: string;
+  senderId: string;
+  sender: 'me' | 'other';
+  timestamp: Date;
+}
 
 export default function MessagesScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
+  const router = useRouter();
+  const { currentUser } = useUser();
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversation, setActiveConversation] = useState<{
+    userId: string;
+    userName: string;
+    userAvatar?: string;
+    conversationId?: number;
+  } | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messageText, setMessageText] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
+  const socketRef = useRef<ReturnType<typeof initSocket> | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  const filteredConversations = mockConversations.filter(conversation =>
-    conversation.participant.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Load conversations from backend
+  const loadConversations = async () => {
+    if (!currentUser) return;
+    
+    setIsLoadingConversations(true);
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📬 Loaded conversations:', data);
+        setConversations(data);
+      }
+    } catch (error) {
+      console.error('Failed to load conversations:', error);
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  };
 
-  const renderConversationList = () => (
-    <ScrollView style={styles.conversationsList} showsVerticalScrollIndicator={false}>
-      {filteredConversations.map((conversation) => (
-        <TouchableOpacity
-          key={conversation.id}
-          style={[
-            styles.conversationItem,
-            selectedConversation === conversation.id && styles.selectedConversation
-          ]}
-          onPress={() => setSelectedConversation(conversation.id)}
-          testID={`conversation-${conversation.id}`}
-        >
-          <View style={styles.avatarContainer}>
-            <Image source={{ uri: conversation.participant.avatar }} style={styles.avatar} />
-            {conversation.isOnline && <View style={styles.onlineIndicator} />}
-          </View>
+  // Load conversations on mount and when new messages arrive
+  useEffect(() => {
+    loadConversations();
+  }, [currentUser]);
+
+  // Initialize socket connection
+  useEffect(() => {
+    if (currentUser) {
+      socketRef.current = initSocket({ userId: parseInt(currentUser.id as string) });
+      
+      const socket = getSocket();
+      if (socket) {
+        // Update connection status
+        setIsSocketConnected(socket.connected);
+        
+        // If already connected, join immediately
+        if (socket.connected) {
+          console.log('Socket already connected, joining room for user:', currentUser.id);
+          socket.emit('user:join', parseInt(currentUser.id as string));
+        }
+        
+        socket.on('connect', () => {
+          console.log('Socket connected for messaging, user:', currentUser.id);
+          setIsSocketConnected(true);
+          // Join user room
+          console.log('Emitting user:join for user:', currentUser.id);
+          socket.emit('user:join', parseInt(currentUser.id as string));
+        });
+
+        socket.on('disconnect', () => {
+          console.log('Socket disconnected for user:', currentUser.id);
+          setIsSocketConnected(false);
+        });
+
+        // Listen for incoming messages (backend emits 'message:new')
+        socket.on('message:new', (message: any) => {
+          console.log('🔔 RECEIVED message:new event for user', currentUser.id, '- Message:', message);
           
-          <View style={styles.conversationContent}>
-            <View style={styles.conversationHeader}>
-              <Text style={styles.participantName}>{conversation.participant.name}</Text>
-              <Text style={styles.timestamp}>{conversation.timestamp}</Text>
-            </View>
-            <View style={styles.messagePreview}>
-              <Text style={styles.lastMessage} numberOfLines={1}>
-                {conversation.lastMessage}
-              </Text>
-              {conversation.unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadCount}>{conversation.unreadCount}</Text>
-                </View>
-              )}
-            </View>
-          </View>
+          // Safety check - backend might return null
+          if (!message || !message.text) {
+            console.warn('❌ Received invalid message from backend:', message);
+            return;
+          }
+          
+          console.log('✅ Message is valid, sender:', message.sender_id, 'receiver:', message.receiver_id, 'current user:', currentUser.id);
+          
+          // Reload conversations list to show new message
+          loadConversations();
+
+          // If I received a message (not sent by me), show notification
+          const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
+          const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
+          
+          if (isReceivedByMe && !isSentByMe) {
+            // Check if this conversation is currently active
+            const isActiveConvo = activeConversation && 
+              message.sender_id === parseInt(activeConversation.userId);
+            
+            if (!isActiveConvo) {
+              // Auto-open conversation with the sender
+              console.log('📬 New message from user', message.sender_id, '- opening conversation');
+              
+              // Use sender info from the message (backend now includes sender_name and sender_avatar)
+              const senderId = message.sender_id.toString();
+              const senderName = message.sender_name || `User ${senderId}`;
+              const senderAvatar = message.sender_avatar || undefined;
+              
+              console.log('📬 Opening conversation with:', { senderId, senderName, senderAvatar });
+              
+              // Open the conversation immediately with sender's avatar and conversation ID
+              setActiveConversation({
+                userId: senderId,
+                userName: senderName,
+                userAvatar: senderAvatar,
+                conversationId: message.conversation_id,
+              });
+            }
+          }
+          
+          // Only add message if it's part of the active conversation
+          setMessages(prev => {
+            // Check if this message belongs to the active conversation
+            if (activeConversation) {
+              const isFromActiveUser = message.sender_id === parseInt(activeConversation.userId);
+              const isToActiveUser = message.receiver_id === parseInt(activeConversation.userId);
+              const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
+              const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
+              
+              // Only add if message is between me and the active conversation user
+              if (!((isSentByMe && isToActiveUser) || (isReceivedByMe && isFromActiveUser))) {
+                console.log('⏭️ Message not for active conversation, ignoring');
+                return prev;
+              }
+            }
+            
+            // Check for duplicate by ID
+            const messageId = message.id?.toString();
+            if (messageId && prev.some(m => m.id === messageId)) {
+              console.log('⏭️ Duplicate message ID, ignoring');
+              return prev;
+            }
+            
+            console.log('💬 Message added to local state');
+            return [...prev, {
+              id: message.id?.toString() || Date.now().toString(),
+              text: message.text,
+              senderId: message.sender_id?.toString() || message.senderId,
+              sender: message.sender_id === parseInt(currentUser.id as string) ? 'me' : 'other',
+              timestamp: new Date(message.created_at || message.timestamp),
+            }];
+          });
+        });
+      }
+
+      return () => {
+        if (socket) {
+          socket.off('message:new');
+          socket.off('connect');
+          socket.off('disconnect');
+        }
+      };
+    }
+  }, [currentUser]);
+
+  // Load message history for active conversation
+  const loadConversationMessages = async (conversationId: number) => {
+    setIsLoadingMessages(true);
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversationId}/messages`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('💬 Loaded messages:', data.length);
+        setMessages(data.map((msg: any) => ({
+          id: msg.id.toString(),
+          text: msg.text,
+          senderId: msg.sender_id.toString(),
+          sender: msg.sender_id === parseInt(currentUser?.id as string) ? 'me' : 'other',
+          timestamp: new Date(msg.created_at),
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  // Create or get conversation ID
+  const getOrCreateConversation = async (userId1: number, userId2: number): Promise<number | null> => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/conversations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user1Id: userId1, user2Id: userId2 }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        console.log('💬 Conversation ID:', data.id);
+        return data.id;
+      }
+    } catch (error) {
+      console.error('Failed to get/create conversation:', error);
+    }
+    return null;
+  };
+
+  // Auto-create conversation when startConversationWith param is present
+  useEffect(() => {
+    if (params.startConversationWith && params.userName && currentUser) {
+      const initConversation = async () => {
+        const conversationId = await getOrCreateConversation(
+          parseInt(currentUser.id as string),
+          parseInt(params.startConversationWith as string)
+        );
+        
+        setActiveConversation({
+          userId: params.startConversationWith as string,
+          userName: params.userName as string,
+          userAvatar: params.userAvatar as string | undefined,
+          conversationId: conversationId || undefined,
+        });
+        
+        // Load conversation history if we have a conversation ID
+        if (conversationId) {
+          await loadConversationMessages(conversationId);
+        } else {
+          setMessages([]);
+        }
+      };
+      
+      initConversation();
+    }
+  }, [params.startConversationWith, params.userName, params.userAvatar, currentUser]);
+
+  // Load messages when active conversation changes
+  useEffect(() => {
+    if (activeConversation?.conversationId) {
+      loadConversationMessages(activeConversation.conversationId);
+    }
+  }, [activeConversation?.conversationId]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !activeConversation || !currentUser) return;
+    
+    const socket = getSocket();
+    if (!socket || !socket.connected) {
+      console.warn('Socket not connected');
+      Alert.alert('Error', 'No estás conectado. Por favor, intenta de nuevo.');
+      return;
+    }
+
+    // Ensure we have a conversation ID
+    let conversationId = activeConversation.conversationId;
+    if (!conversationId) {
+      console.log('Creating conversation...');
+      conversationId = await getOrCreateConversation(
+        parseInt(currentUser.id as string),
+        parseInt(activeConversation.userId)
+      ) || undefined;
+      
+      if (!conversationId) {
+        Alert.alert('Error', 'No se pudo crear la conversación');
+        return;
+      }
+      
+      // Update active conversation with the new ID
+      setActiveConversation(prev => prev ? { ...prev, conversationId } : null);
+    }
+
+    console.log('Sending message via socket:', {
+      conversationId,
+      senderId: currentUser.id,
+      receiverId: activeConversation.userId,
+      text: messageText
+    });
+    
+    // Emit to server (backend expects 'message:send')
+    socket.emit('message:send', {
+      conversationId,
+      senderId: parseInt(currentUser.id as string),
+      receiverId: parseInt(activeConversation.userId),
+      text: messageText,
+    });
+    
+    // Clear input immediately for better UX
+    setMessageText('');
+  };
+
+  const handleCloseConversation = () => {
+    setActiveConversation(null);
+    setMessages([]);
+    setMessageText('');
+  };
+
+  const renderConversation = () => (
+    <KeyboardAvoidingView 
+      style={styles.conversationContainer}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={100}
+    >
+      {/* Conversation Header */}
+      <View style={[styles.conversationHeader, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity onPress={handleCloseConversation} style={styles.backButton}>
+          <ArrowLeft size={24} color={Colors.text} />
         </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-
-  const renderChatView = () => {
-    const conversation = mockConversations.find(c => c.id === selectedConversation);
-    if (!conversation) return null;
-
-    return (
-      <View style={styles.chatContainer}>
-        <View style={styles.chatHeader}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => setSelectedConversation(null)}
-            testID="back-button"
-          >
-            <Text style={styles.backButtonText}>← Atrás</Text>
-          </TouchableOpacity>
-          
-          <View style={styles.chatHeaderInfo}>
-            <Image source={{ uri: conversation.participant.avatar }} style={styles.chatAvatar} />
-            <View>
-              <Text style={styles.chatParticipantName}>{conversation.participant.name}</Text>
-              <Text style={styles.chatStatus}>
-                {conversation.isOnline ? 'En línea' : 'Visto hace 2h'}
-              </Text>
-            </View>
-          </View>
-          
-          <View style={styles.chatActions}>
-            <TouchableOpacity style={styles.chatActionButton} testID="phone-button">
-              <Phone size={20} color={Colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.chatActionButton} testID="video-button">
-              <Video size={20} color={Colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.chatActionButton} testID="more-button">
-              <MoreHorizontal size={20} color={Colors.primary} />
-            </TouchableOpacity>
+        <View style={styles.conversationHeaderInfo}>
+          {activeConversation?.userAvatar && (
+            <Image 
+              source={{ uri: activeConversation.userAvatar }} 
+              style={styles.conversationAvatar}
+            />
+          )}
+          <View>
+            <Text style={styles.conversationName}>{activeConversation?.userName}</Text>
+            <Text style={[
+              styles.conversationStatus,
+              isSocketConnected ? styles.onlineStatus : styles.offlineStatus
+            ]}>
+              {isSocketConnected ? 'En línea' : 'Conectando...'}
+            </Text>
           </View>
         </View>
+        <TouchableOpacity onPress={handleCloseConversation}>
+          <X size={24} color={Colors.text} />
+        </TouchableOpacity>
+      </View>
 
-        <ScrollView style={styles.messagesContainer} showsVerticalScrollIndicator={false}>
-          <View style={styles.messageReceived}>
-            <Text style={styles.messageText}>
-              ¡Hola! Estoy interesado en reservar una sesión de Reiki. ¿Qué horarios tienes disponibles esta semana?
+      {/* Messages List */}
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.messagesList}
+        contentContainerStyle={styles.messagesContent}
+      >
+        {messages.length === 0 ? (
+          <View style={styles.emptyConversation}>
+            <MessageCircle size={48} color={Colors.textLight} />
+            <Text style={styles.emptyConversationText}>
+              Comienza la conversación con {activeConversation?.userName}
             </Text>
-            <Text style={styles.messageTime}>Ayer, 2:30 PM</Text>
           </View>
-          
-          <View style={styles.messageSent}>
-            <Text style={styles.messageText}>
-              ¡Hola! Tengo disponibilidad el miércoles a las 3 PM o el viernes a las 10 AM. Ambas sesiones serían de 60 minutos. ¿Te funcionaría alguna de esas?
-            </Text>
-            <Text style={styles.messageTime}>Ayer, 3:15 PM</Text>
-          </View>
-          
-          <View style={styles.messageReceived}>
-            <Text style={styles.messageText}>
-              {conversation.lastMessage}
-            </Text>
-            <Text style={styles.messageTime}>Hoy, 10:30 AM</Text>
-          </View>
-        </ScrollView>
+        ) : (
+          messages.map((message) => (
+            <View
+              key={message.id}
+              style={[
+                styles.messageBubble,
+                message.sender === 'me' ? styles.myMessage : styles.otherMessage
+              ]}
+            >
+              <Text style={[
+                styles.messageText,
+                message.sender === 'me' ? styles.myMessageText : styles.otherMessageText
+              ]}>
+                {message.text}
+              </Text>
+              <Text style={[
+                styles.messageTime,
+                message.sender === 'me' ? styles.myMessageTime : styles.otherMessageTime
+              ]}>
+                {message.timestamp.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            </View>
+          ))
+        )}
+      </ScrollView>
 
-        <View style={styles.messageInputContainer}>
-          <TextInput
-            style={styles.messageInput}
-            placeholder="Escribe un mensaje..."
-            placeholderTextColor={Colors.textLight}
-            multiline
-            testID="message-input"
-          />
-          <TouchableOpacity style={styles.sendButton} testID="send-button">
-            <Text style={styles.sendButtonText}>Enviar</Text>
-          </TouchableOpacity>
+      {/* Message Input */}
+      <View style={[styles.messageInputContainer, { paddingBottom: insets.bottom }]}>
+        <TextInput
+          style={styles.messageInput}
+          placeholder="Escribe un mensaje..."
+          placeholderTextColor={Colors.textLight}
+          value={messageText}
+          onChangeText={setMessageText}
+          multiline
+          maxLength={500}
+        />
+        <TouchableOpacity 
+          style={[styles.sendButton, !messageText.trim() && styles.sendButtonDisabled]}
+          onPress={handleSendMessage}
+          disabled={!messageText.trim()}
+        >
+          <Send size={20} color={messageText.trim() ? Colors.white : Colors.textLight} />
+        </TouchableOpacity>
+      </View>
+    </KeyboardAvoidingView>
+  );
+
+  const handleOpenConversation = async (conversation: Conversation) => {
+    setActiveConversation({
+      userId: conversation.other_user_id.toString(),
+      userName: conversation.name,
+      userAvatar: conversation.avatar,
+      conversationId: conversation.id,
+    });
+  };
+
+  const renderConversationItem = (conversation: Conversation) => (
+    <TouchableOpacity
+      key={conversation.id}
+      style={styles.conversationItem}
+      onPress={() => handleOpenConversation(conversation)}
+    >
+      <Image
+        source={{ uri: conversation.avatar || 'https://via.placeholder.com/50' }}
+        style={styles.avatar}
+      />
+      <View style={styles.conversationInfo}>
+        <View style={styles.conversationHeader}>
+          <Text style={styles.conversationName}>{conversation.name}</Text>
+          {conversation.last_message_time && (
+            <Text style={styles.timestamp}>
+              {new Date(conversation.last_message_time).toLocaleTimeString('es', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </Text>
+          )}
+        </View>
+        <View style={styles.lastMessageRow}>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {conversation.last_message || 'Sin mensajes'}
+          </Text>
+          {conversation.unread_count > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadCount}>{conversation.unread_count}</Text>
+            </View>
+          )}
         </View>
       </View>
+    </TouchableOpacity>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <MessageCircle size={64} color={Colors.textLight} />
+      <Text style={styles.emptyStateTitle}>Sin Conversaciones</Text>
+      <Text style={styles.emptyStateText}>
+        Las conversaciones aparecerán aquí cuando te conectes con otros miembros de la comunidad.
+      </Text>
+      <Text style={styles.emptyStateHint}>
+        Ve a "Cerca de Mí" o "Descubrir" para encontrar personas con quien conectar.
+      </Text>
+    </View>
+  );
+
+  // Show conversation view if active
+  if (activeConversation) {
+    return (
+      <View style={styles.container}>
+        {renderConversation()}
+      </View>
     );
-  };
+  }
 
   return (
     <View style={styles.container}>
-      {!selectedConversation ? (
-        <>
-          <View style={[styles.header, { paddingTop: insets.top }]}>
-            <View style={styles.headerContent}>
-              <Text style={styles.headerTitle}>Mensajes</Text>
-              <Text style={styles.headerSubtitle}>Conecta con tu comunidad</Text>
-              
-              <View style={styles.searchContainer}>
-                <Search size={20} color={Colors.textLight} />
-                <TextInput
-                  style={styles.searchInput}
-                  placeholder="Buscar conversaciones..."
-                  placeholderTextColor={Colors.textLight}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  testID="search-conversations"
-                />
-              </View>
-            </View>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Mensajes</Text>
+          <Text style={styles.headerSubtitle}>Conecta con tu comunidad</Text>
+          
+          <View style={styles.searchContainer}>
+            <Search size={20} color={Colors.textLight} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar conversaciones..."
+              placeholderTextColor={Colors.textLight}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              testID="search-conversations"
+            />
           </View>
+        </View>
+      </View>
 
-          <View style={styles.content}>
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <MessageCircle size={20} color={Colors.primary} />
-                <Text style={styles.statValue}>{mockConversations.length}</Text>
-                <Text style={styles.statLabel}>Chats Activos</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.success }]} />
-                <Text style={styles.statValue}>
-                  {mockConversations.filter(c => c.isOnline).length}
-                </Text>
-                <Text style={styles.statLabel}>En Línea Ahora</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statIcon, { backgroundColor: Colors.warning }]} />
-                <Text style={styles.statValue}>
-                  {mockConversations.reduce((sum, c) => sum + c.unreadCount, 0)}
-                </Text>
-                <Text style={styles.statLabel}>No Leídos</Text>
-              </View>
-            </View>
-
-            {renderConversationList()}
+      <View style={styles.content}>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <MessageCircle size={20} color={Colors.textOnGold} />
+            <Text style={styles.statValue}>{conversations.length}</Text>
+            <Text style={styles.statLabel}>Chats</Text>
           </View>
-        </>
-      ) : (
-        renderChatView()
-      )}
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: Colors.success }]} />
+            <Text style={styles.statValue}>{isSocketConnected ? 1 : 0}</Text>
+            <Text style={styles.statLabel}>En Línea</Text>
+          </View>
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: Colors.warning }]} />
+            <Text style={styles.statValue}>
+              {conversations.reduce((sum, c) => sum + c.unread_count, 0)}
+            </Text>
+            <Text style={styles.statLabel}>No Leídos</Text>
+          </View>
+        </View>
+
+        {isLoadingConversations ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>Cargando conversaciones...</Text>
+          </View>
+        ) : conversations.length === 0 ? (
+          renderEmptyState()
+        ) : (
+          <ScrollView style={styles.conversationsList}>
+            {conversations.map(renderConversationItem)}
+          </ScrollView>
+        )}
+      </View>
     </View>
   );
 }
@@ -251,10 +576,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.white,
-    borderRadius: 25,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   searchInput: {
     flex: 1,
@@ -263,24 +590,22 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.gold,
     marginHorizontal: 16,
-    marginTop: -10,
+    marginBottom: 20,
+    padding: 16,
     borderRadius: 16,
     shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   statItem: {
+    flex: 1,
     alignItems: 'center',
   },
   statIcon: {
@@ -289,61 +614,194 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textOnGold,
     marginTop: 8,
   },
   statLabel: {
     fontSize: 12,
-    color: Colors.textLight,
+    color: Colors.textOnGold,
     marginTop: 4,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: Colors.textLight,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  emptyStateHint: {
+    fontSize: 14,
+    color: Colors.textLight,
+    textAlign: 'center',
+    lineHeight: 20,
+    fontStyle: 'italic',
+  },
+  // Conversation styles
+  conversationContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  conversationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  backButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  conversationHeaderInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  conversationAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  conversationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  conversationStatus: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  onlineStatus: {
+    color: Colors.success,
+  },
+  offlineStatus: {
+    color: Colors.textLight,
+  },
+  messagesList: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  messagesContent: {
+    padding: 16,
+    flexGrow: 1,
+  },
+  emptyConversation: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyConversationText: {
+    fontSize: 16,
+    color: Colors.textLight,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  messageBubble: {
+    maxWidth: '80%',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+  },
+  myMessage: {
+    alignSelf: 'flex-end',
+    backgroundColor: Colors.gold,
+  },
+  otherMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.secondary,
+  },
+  messageText: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  myMessageText: {
+    color: Colors.text,
+  },
+  otherMessageText: {
+    color: Colors.text,
+  },
+  messageTime: {
+    fontSize: 11,
+    marginTop: 4,
+  },
+  myMessageTime: {
+    color: Colors.textLight,
+    textAlign: 'right',
+  },
+  otherMessageTime: {
+    color: Colors.textLight,
+  },
+  messageInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  messageInput: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginRight: 8,
+    color: Colors.text,
+    fontSize: 15,
+    maxHeight: 100,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.gold,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: Colors.border,
   },
   conversationsList: {
     flex: 1,
-    paddingTop: 20,
   },
   conversationItem: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    padding: 16,
     backgroundColor: Colors.white,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 16,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  selectedConversation: {
-    backgroundColor: Colors.secondary,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   avatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    marginRight: 12,
   },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.success,
-    borderWidth: 2,
-    borderColor: Colors.white,
-  },
-  conversationContent: {
+  conversationInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   conversationHeader: {
     flexDirection: 'row',
@@ -351,151 +809,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 4,
   },
-  participantName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
   timestamp: {
     fontSize: 12,
     color: Colors.textLight,
   },
-  messagePreview: {
+  lastMessageRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   lastMessage: {
+    flex: 1,
     fontSize: 14,
     color: Colors.textLight,
-    flex: 1,
-    marginRight: 8,
   },
   unreadBadge: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.gold,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
+    marginLeft: 8,
   },
   unreadCount: {
+    color: Colors.white,
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.white,
-  },
-  chatContainer: {
-    flex: 1,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  backButton: {
-    marginRight: 12,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: Colors.primary,
-    fontWeight: '500',
-  },
-  chatHeaderInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  chatAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  chatParticipantName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  chatStatus: {
-    fontSize: 12,
-    color: Colors.textLight,
-  },
-  chatActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  chatActionButton: {
-    padding: 8,
-  },
-  messagesContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  messageReceived: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderBottomLeftRadius: 4,
-    marginBottom: 16,
-    maxWidth: '80%',
-  },
-  messageSent: {
-    alignSelf: 'flex-end',
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
-    borderBottomRightRadius: 4,
-    marginBottom: 16,
-    maxWidth: '80%',
-  },
-  messageText: {
-    fontSize: 14,
-    color: Colors.text,
-    lineHeight: 20,
-  },
-  messageTime: {
-    fontSize: 11,
-    color: Colors.textLight,
-    marginTop: 4,
-  },
-  messageInputContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.white,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    alignItems: 'flex-end',
-    gap: 12,
-  },
-  messageInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-  },
-  sendButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.white,
   },
 });
