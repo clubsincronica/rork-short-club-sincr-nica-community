@@ -11,28 +11,42 @@ export const initSocket = (opts?: { token?: string; userId?: number }) => {
   if (opts?.userId) query.userId = opts.userId;
 
   socket = io(SOCKET_URL, {
-    transports: ['websocket'],
+    transports: ['polling', 'websocket'],
+    upgrade: true,
     autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: Infinity,
+    reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
+    timeout: 20000,
+    path: '/socket.io/',
+    forceNew: true,
     query,
   });
 
   socket.on('connect', () => {
     // eslint-disable-next-line no-console
-    console.log('Socket connected', socket?.id, '->', SOCKET_URL);
+    console.log('✅ Socket connected', socket?.id, '->', SOCKET_URL);
+    console.log('📡 Transport:', socket?.io?.engine?.transport?.name);
   });
 
   socket.on('disconnect', (reason) => {
     // eslint-disable-next-line no-console
-    console.log('Socket disconnected', reason);
+    console.log('❌ Socket disconnected', reason);
   });
 
   socket.on('connect_error', (err) => {
     // eslint-disable-next-line no-console
-    console.warn('Socket connect_error', err);
+    console.warn('⚠️ Socket connect_error:', err.message);
+    console.log('🔄 Will retry with polling...');
+  });
+
+  socket.io.on('reconnect_attempt', () => {
+    console.log('🔄 Attempting to reconnect...');
+  });
+
+  socket.io.on('reconnect', (attemptNumber) => {
+    console.log('✅ Reconnected after', attemptNumber, 'attempts');
   });
 
   return socket;

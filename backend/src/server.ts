@@ -23,8 +23,12 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE']
-  }
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  },
+  transports: ['polling', 'websocket'],
+  allowEIO3: true,
+  path: '/socket.io/'
 });
 
 // Middleware

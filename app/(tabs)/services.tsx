@@ -56,22 +56,11 @@ export default function ServicesScreen() {
     };
   });
 
-  const cartItems = [
-    { id: '1', service: 'Curso de Mindfulness', price: 250, quantity: 1, provider: 'Centro Luz' },
-    { id: '2', service: 'Kit de Cristales', price: 45, quantity: 2, provider: 'Tienda Mística' },
-  ];
+  const cartItems: any[] = [];
 
-  const notifications = [
-    { id: '1', type: 'booking', title: 'Nueva Reserva', message: 'María García reservó una sesión de Reiki', time: 'Hace 5 min', unread: true },
-    { id: '2', type: 'payment', title: 'Pago Recibido', message: 'Has recibido $120 por Terapia Holística', time: 'Hace 2 horas', unread: true },
-    { id: '3', type: 'reminder', title: 'Recordatorio', message: 'Tienes una sesión en 30 minutos', time: 'Hace 3 horas', unread: false },
-    { id: '4', type: 'review', title: 'Nueva Reseña', message: 'Juan dejó una reseña de 5 estrellas', time: 'Ayer', unread: false },
-  ];
+  const notifications: any[] = [];
 
-  const followUpClients = [
-    { id: '1', name: 'Carlos Mendoza', lastSession: 'Hace 1 semana', service: 'Coaching Personal', notes: 'Seguimiento sobre objetivos' },
-    { id: '2', name: 'Laura Díaz', lastSession: 'Hace 2 semanas', service: 'Terapia de Sanación', notes: 'Verificar progreso' },
-  ];
+  const followUpClients: any[] = [];
 
   const renderSectionButton = (section: ServiceSection, icon: React.ReactNode, title: string, subtitle: string, highlight?: boolean) => {
     if (!section.trim()) return null;
@@ -98,10 +87,10 @@ export default function ServicesScreen() {
     <View style={styles.overviewContainer}>
       <View style={styles.quickActions}>
         {renderSectionButton('calendar', <Calendar size={24} color={Colors.primary} />, 'Mi Calendario', 'Ver disponibilidad y eventos', false)}
-        {renderSectionButton('reservations', <Clock size={24} color={Colors.secondary} />, 'Administrar Reservas', '3 reservas pendientes', true)}
-        {renderSectionButton('cart', <ShoppingCart size={24} color={Colors.accent} />, 'Carrito y Pagos', '2 items - $340', false)}
-        {renderSectionButton('followup', <MessageSquare size={24} color={Colors.accentLight} />, 'Seguimiento', '2 clientes para contactar', false)}
-        {renderSectionButton('notifications', <Bell size={24} color={Colors.warning} />, 'Notificaciones', '2 nuevas notificaciones', true)}
+        {renderSectionButton('reservations', <Clock size={24} color={Colors.secondary} />, 'Administrar Reservas', `${upcomingReservations.length} reservas`, upcomingReservations.length > 0)}
+        {renderSectionButton('cart', <ShoppingCart size={24} color={Colors.accent} />, 'Carrito y Pagos', `${cartItems.length} items`, false)}
+        {renderSectionButton('followup', <MessageSquare size={24} color={Colors.accentLight} />, 'Seguimiento', `${followUpClients.length} clientes`, false)}
+        {renderSectionButton('notifications', <Bell size={24} color={Colors.warning} />, 'Notificaciones', `${notifications.filter((n: any) => n.unread).length} nuevas`, notifications.some((n: any) => n.unread))}
       </View>
 
       <View style={styles.recentActivity}>
@@ -345,7 +334,7 @@ export default function ServicesScreen() {
       {followUpClients.map(client => (
         <View key={client.id} style={styles.followUpCard}>
           <View style={styles.followUpAvatar}>
-            <Text style={styles.followUpAvatarText}>{client.name.split(' ').map(n => n[0]).join('')}</Text>
+            <Text style={styles.followUpAvatarText}>{client.name.split(' ').map((n: string) => n[0]).join('')}</Text>
           </View>
           <View style={styles.followUpContent}>
             <Text style={styles.followUpName}>{client.name}</Text>
