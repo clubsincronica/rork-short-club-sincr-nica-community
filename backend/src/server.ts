@@ -147,8 +147,8 @@ const HOST = '0.0.0.0'; // Always listen on all interfaces for Railway
 initializeDatabase().then(() => {
   console.log('✅ Database ready for connections');
   
-  httpServer.listen(PORT, HOST, () => {
-    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
     console.log(`📡 WebSocket ready for real-time messaging`);
     console.log(`💾 Database: ${process.env.DATABASE_PATH || 'clubsincronica.db'}`);
     
