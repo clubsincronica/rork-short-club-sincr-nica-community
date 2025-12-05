@@ -118,3 +118,12 @@ export const Book = createIcon('book');
 export const UserX = createIcon('person-remove');
 export const ImageIcon = createIcon('image');
 export const Type = createIcon('text');
+
+// Social Media Icons
+export const Instagram = createIcon('logo-instagram');
+export const Facebook = createIcon('logo-facebook');
+export const Tiktok = createIcon('logo-tiktok');
+export const Twitter = createIcon('logo-twitter');
+export const Linkedin = createIcon('logo-linkedin');
+export const Youtube = createIcon('logo-youtube');
+export const Share2 = createIcon('share-social');

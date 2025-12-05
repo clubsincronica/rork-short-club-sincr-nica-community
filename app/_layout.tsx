@@ -8,6 +8,8 @@ import { UserProvider } from '@/hooks/user-store';
 import { CalendarProvider } from '@/hooks/calendar-store';
 import { FoodCartProvider } from '@/hooks/food-cart-store';
 import { VendorProvider } from '@/hooks/vendor-store';
+import { ProductsProvider } from '@/hooks/products-store';
+import { ServicesProvider } from '@/hooks/services-store';
 import CustomSplashScreen from '@/components/SplashScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/app-settings-store';
@@ -166,13 +168,17 @@ export default function RootLayout() {
         <AppSettingsProvider>
           <UserProvider>
             <CalendarProvider>
-              <FoodCartProvider>
-                <VendorProvider>
-                  <GestureHandlerRootView style={styles.rootContainer}>
-                    <RootLayoutNav />
-                  </GestureHandlerRootView>
-                </VendorProvider>
-              </FoodCartProvider>
+              <ServicesProvider>
+                <ProductsProvider>
+                  <FoodCartProvider>
+                    <VendorProvider>
+                      <GestureHandlerRootView style={styles.rootContainer}>
+                        <RootLayoutNav />
+                      </GestureHandlerRootView>
+                    </VendorProvider>
+                  </FoodCartProvider>
+                </ProductsProvider>
+              </ServicesProvider>
             </CalendarProvider>
           </UserProvider>
         </AppSettingsProvider>

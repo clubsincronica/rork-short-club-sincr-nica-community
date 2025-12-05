@@ -4,11 +4,17 @@ import { SOCKET_URL } from '../../utils/api-config';
 let socket: Socket | null = null;
 
 export const initSocket = (opts?: { token?: string; userId?: number }) => {
-  if (socket && socket.connected) return socket;
+  // Return existing socket if already connected
+  if (socket && socket.connected) {
+    console.log('♻️ Reusing existing socket connection');
+    return socket;
+  }
 
   const query: any = {};
   if (opts?.token) query.token = opts.token;
   if (opts?.userId) query.userId = opts.userId;
+
+  console.log('🔌 Creating new socket connection with userId:', opts?.userId);
 
   socket = io(SOCKET_URL, {
     transports: ['polling', 'websocket'],
@@ -20,7 +26,7 @@ export const initSocket = (opts?: { token?: string; userId?: number }) => {
     reconnectionDelayMax: 5000,
     timeout: 20000,
     path: '/socket.io/',
-    forceNew: true,
+    forceNew: false, // Changed to false to allow socket reuse
     query,
   });
 

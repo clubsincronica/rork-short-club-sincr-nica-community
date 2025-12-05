@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Star, Calendar, DollarSign, Users, ShoppingCart, Bell, MessageSquare, Clock, CreditCard, ChevronRight, Package, TrendingUp, AlertCircle, CheckCircle, Plus, QrCode } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
@@ -27,6 +27,11 @@ export default function ServicesScreen() {
     averageRating: 4.9, // This would come from reviews in a real app
     activeServices: userEvents.length,
   };
+  
+  // Debug logging
+  console.log('📊 MisServicios Stats for user', currentUser?.name, ':', stats);
+  console.log('📊 User events count:', userEvents.length);
+  console.log('📊 Upcoming events:', upcomingEvents.length);
 
   // Convert calendar events to reservation format for display
   const upcomingReservations = upcomingEvents.slice(0, 3).map(event => {
@@ -211,6 +216,43 @@ export default function ServicesScreen() {
                   </Text>
                 </View>
               </View>
+              
+              {/* Action buttons for pending reservations */}
+              {reservation.status === 'pending' && (
+                <View style={styles.reservationActions}>
+                  <TouchableOpacity 
+                    style={styles.declineButton}
+                    onPress={() => {
+                      Alert.alert(
+                        'Cancelar Reserva',
+                        '¿Estás seguro que deseas cancelar esta reserva?',
+                        [
+                          { text: 'No', style: 'cancel' },
+                          { 
+                            text: 'Sí, Cancelar',
+                            style: 'destructive',
+                            onPress: () => {
+                              // TODO: Implement cancel reservation logic
+                              Alert.alert('Reserva cancelada');
+                            }
+                          }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.declineButtonText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.acceptButton}
+                    onPress={() => {
+                      // TODO: Implement accept reservation logic
+                      Alert.alert('Reserva confirmada', 'La reserva ha sido confirmada exitosamente.');
+                    }}
+                  >
+                    <Text style={styles.acceptButtonText}>Aceptar</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           ))}
         </>

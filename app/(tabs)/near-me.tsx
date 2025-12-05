@@ -6,10 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Navigation, Users, ShoppingBag, Utensils } from '@/components/SmartIcons';
-import { Colors } from '@/constants/colors';
+import { Colors, Gradients } from '@/constants/colors';
 import { allMockUsers, mockServices, mockFoodProviders } from '@/mocks/data';
 import { User, Service, FoodProvider } from '@/types/user';
 import { ServiceCard } from '@/components/ServiceCard';
@@ -17,7 +20,7 @@ import { FoodCard } from '@/components/FoodCard';
 
 
 
-type FilterType = 'all' | 'services' | 'food' | 'users';
+type FilterType = 'all' | 'services' | 'users';
 
 interface LocationData {
   latitude: number;
@@ -37,6 +40,7 @@ interface NearbyItem {
 
 export default function NearMeScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [filter, setFilter] = useState<FilterType>('all');
   const [userLocation, setUserLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -176,29 +180,7 @@ export default function NearMeScreen() {
       });
     }
 
-    // Add food providers if filter allows
-    if (filter === 'all' || filter === 'food') {
-      mockFoodProviders.forEach((food) => {
-        if (food.provider.coordinates) {
-          const distance = calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            food.provider.coordinates.latitude,
-            food.provider.coordinates.longitude
-          );
-          items.push({
-            id: `food-${food.id}`,
-            type: 'food',
-            title: food.businessName,
-            subtitle: `${food.cuisine.join(', ')} • ${food.provider.name}`,
-            location: food.location,
-            coordinates: food.provider.coordinates,
-            distance,
-            data: food,
-          });
-        }
-      });
-    }
+    // Food providers removed - using dedicated food/restaurant discovery instead
 
     // Sort by distance
     items.sort((a, b) => (a.distance || 0) - (b.distance || 0));
@@ -252,8 +234,21 @@ export default function NearMeScreen() {
     // User card
     const user = item.data as User;
     return (
-      <TouchableOpacity key={item.id} style={styles.userCard}>
+      <TouchableOpacity 
+        key={item.id} 
+        style={styles.userCard}
+        onPress={() => router.push({
+          pathname: '/user-profile',
+          params: {
+            userId: user.id,
+            userName: user.name,
+            userLocation: user.location,
+            distance: item.distance?.toFixed(1)
+          }
+        })}
+      >
         <View style={styles.userCardContent}>
+          <Image source={{ uri: user.avatar }} style={styles.userAvatar} />
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user.name}</Text>
             <Text style={styles.userSpecialties}>{user.specialties.join(', ')}</Text>
@@ -286,72 +281,82 @@ export default function NearMeScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Near Me</Text>
-        <View style={styles.locationInfo}>
-          <MapPin size={16} color={Colors.textLight} />
-          <Text style={styles.locationText}>
-            {locationPermission ? 'Location active' : 'Approximate location'}
-          </Text>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Header with Gradient */}
+        <LinearGradient 
+          colors={Gradients.primary || ['#4f8497', '#549ab4']} 
+          style={[styles.header, { paddingTop: insets.top }]}
+        >
+          <View style={styles.headerContent}>
+            <Text style={styles.title}>Near Me</Text>
+            <Text style={styles.subtitle}>Descubre personas y servicios cerca de ti</Text>
+            <View style={styles.locationInfo}>
+              <MapPin size={16} color={Colors.white} />
+              <Text style={styles.locationText}>
+                {locationPermission ? 'Ubicaci\u00f3n activa' : 'Ubicaci\u00f3n aproximada'}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Filters */}
+        <View style={styles.filtersSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filtersContent}
+          >
+            {renderFilterButton('all', 'Todos', Navigation)}
+            {renderFilterButton('services', 'Servicios', ShoppingBag)}
+            {renderFilterButton('users', 'Personas', Users)}
+          </ScrollView>
         </View>
-      </View>
 
-      {/* Filters */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtersContainer}
-        contentContainerStyle={styles.filtersContent}
-      >
-        {renderFilterButton('all', 'All', Navigation)}
-        {renderFilterButton('services', 'Services', ShoppingBag)}
-        {renderFilterButton('food', 'Food', Utensils)}
-        {renderFilterButton('users', 'Providers', Users)}
-      </ScrollView>
-
-      {/* Content */}
-      <View style={styles.listContainer}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Content */}
+        <View style={styles.listContainer}>
           <View style={styles.listContent}>
             {nearbyItems.length === 0 ? (
               <View style={styles.emptyState}>
                 <Navigation size={48} color={Colors.textLight} />
-                <Text style={styles.emptyStateText}>No nearby services found</Text>
+                <Text style={styles.emptyStateText}>No se encontraron servicios cercanos</Text>
                 <Text style={styles.emptyStateSubtext}>
-                  Try changing filters or checking your location
+                  Intenta cambiar los filtros o verificar tu ubicaci\u00f3n
                 </Text>
               </View>
             ) : (
               <>
                 <Text style={styles.resultsCount}>
-                  {nearbyItems.length} {nearbyItems.length === 1 ? 'result' : 'results'} found
+                  {nearbyItems.length} {nearbyItems.length === 1 ? 'resultado' : 'resultados'} encontrado{nearbyItems.length === 1 ? '' : 's'}
                 </Text>
                 {nearbyItems.map(renderListItem)}
               </>
             )}
           </View>
-        </ScrollView>
-      </View>
-
-      {/* Location permission notice */}
-      {!locationPermission && (
-        <View style={styles.permissionNotice}>
-          <Text style={styles.permissionText}>
-            📍 Enable location for more accurate results
-          </Text>
-          <TouchableOpacity onPress={requestLocationPermission}>
-            <Text style={styles.permissionAction}>Enable</Text>
-          </TouchableOpacity>
         </View>
-      )}
+
+        {/* Location permission notice */}
+        {!locationPermission && (
+          <View style={styles.permissionNotice}>
+            <Text style={styles.permissionText}>
+              \ud83d\udccd Activa la ubicaci\u00f3n para resultados m\u00e1s precisos
+            </Text>
+            <TouchableOpacity onPress={requestLocationPermission}>
+              <Text style={styles.permissionAction}>Activar</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scrollContainer: {
     flex: 1,
   },
   loadingContainer: {
@@ -366,42 +371,54 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingBottom: 30,
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: Colors.background,
+  },
+  headerContent: {
+    paddingTop: 20,
   },
   title: {
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: Colors.text,
+    color: Colors.white,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: Colors.white,
+    opacity: 0.9,
+    marginBottom: 12,
   },
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
   },
   locationText: {
-    fontSize: 12,
-    color: Colors.textLight,
+    fontSize: 13,
+    color: Colors.white,
     fontWeight: '500',
   },
-  filtersContainer: {
+  filtersSection: {
     backgroundColor: Colors.white,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    marginTop: -10,
   },
   filtersContent: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
     gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.white,
@@ -414,11 +431,11 @@ const styles = StyleSheet.create({
   filterButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
   filterButtonText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: Colors.text,
   },
   filterButtonTextActive: {
@@ -452,6 +469,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 12,
+  },
+  userAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.background,
   },
   userInfo: {
     flex: 1,

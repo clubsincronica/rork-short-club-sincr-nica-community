@@ -66,19 +66,21 @@ io.on('connection', (socket) => {
       // If conversationId is 0 or missing, create or get conversation
       let finalConversationId = conversationId;
       if (!conversationId || conversationId === 0) {
-        console.log('Creating/getting conversation for users:', senderId, receiverId);
+        console.log('🆕 Creating/getting conversation for users:', senderId, 'and', receiverId);
         let conversation: any = await conversationQueries.getConversation(senderId, receiverId);
         
         if (!conversation) {
-          const result = await conversationQueries.createConversation(
-            Math.min(senderId, receiverId),
-            Math.max(senderId, receiverId)
-          );
+          const participant1 = Math.min(senderId, receiverId);
+          const participant2 = Math.max(senderId, receiverId);
+          console.log(`🆕 Creating NEW conversation: participant1=${participant1}, participant2=${participant2}`);
+          
+          const result = await conversationQueries.createConversation(participant1, participant2);
           finalConversationId = result.lastID;
-          console.log('Created new conversation:', finalConversationId);
+          
+          console.log(`✅ Created conversation ID ${finalConversationId} between users ${participant1} and ${participant2}`);
         } else {
           finalConversationId = conversation.id;
-          console.log('Using existing conversation:', finalConversationId);
+          console.log(`♻️  Using existing conversation ${finalConversationId} between users ${senderId} and ${receiverId}`);
         }
       }
 

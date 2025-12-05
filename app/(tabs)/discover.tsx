@@ -40,8 +40,31 @@ export default function DiscoverScreen() {
   
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
+  // Update mock services with real user data (profile pictures, etc.)
+  const servicesWithRealUsers = useMemo(() => {
+    if (!currentUser) return mockServices;
+    
+    return mockServices.map(service => {
+      // If the service provider matches the current user or another real user, update their avatar
+      if (service.provider.id === currentUser.id || service.provider.email === currentUser.email) {
+        return {
+          ...service,
+          provider: {
+            ...service.provider,
+            avatar: currentUser.avatar || service.provider.avatar,
+            bio: currentUser.bio || service.provider.bio,
+            instagram: currentUser.instagram || service.provider.instagram,
+            facebook: currentUser.facebook || service.provider.facebook,
+            tiktok: currentUser.tiktok || service.provider.tiktok,
+          }
+        };
+      }
+      return service;
+    });
+  }, [currentUser]);
+
   const filteredServices = useMemo(() => {
-    let filtered = mockServices;
+    let filtered = servicesWithRealUsers;
     
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(service => service.category === selectedCategory);
@@ -58,7 +81,7 @@ export default function DiscoverScreen() {
     }
     
     return filtered;
-  }, [debouncedSearchQuery, selectedCategory]);
+  }, [debouncedSearchQuery, selectedCategory, servicesWithRealUsers]);
 
   const filteredLodging = useMemo(() => {
     let filtered = mockLodging;

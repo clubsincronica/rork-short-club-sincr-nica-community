@@ -16,7 +16,7 @@ const usePostgres = !!process.env.DATABASE_URL;
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../clubsincronica.db');
 
-let db: Database;
+let eas submit --platform iosdb: Database;
 let SQL: any;
 
 // If Postgres is enabled, use the Postgres client
@@ -285,7 +285,7 @@ export const conversationQueries = usePostgres ? {
 
   getUserConversations: async (userId: number) => {
     const rows = await pgClient.query(
-      `SELECT c.id, c.created_at, c.updated_at,
+      `SELECT c.id, c.participant1_id, c.participant2_id, c.created_at, c.updated_at,
               CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END as other_user_id,
               u.name, u.avatar, u.email,
               (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,

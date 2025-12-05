@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
 import { Search, MessageCircle, Send, ArrowLeft, X } from '../../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useUser } from '@/hooks/user-store';
@@ -31,6 +32,7 @@ export default function MessagesScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const { currentUser } = useUser();
+  const isFocused = useIsFocused();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversation, setActiveConversation] = useState<{
@@ -46,6 +48,13 @@ export default function MessagesScreen() {
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [newMessageNotification, setNewMessageNotification] = useState<{
+    senderName: string;
+    senderAvatar?: string;
+    messageText: string;
+    senderId: number;
+    conversationId: number;
+  } | null>(null);
 
   // Load conversations from backend
   const loadConversations = async () => {
@@ -56,7 +65,16 @@ export default function MessagesScreen() {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('📬 Loaded conversations:', data);
+        console.log('📬 Loaded conversations for user', currentUser.id, ':', data);
+        console.log('📬 Current user name:', currentUser.name, 'ID:', currentUser.id);
+        // Debug each conversation
+        data.forEach((conv: any) => {
+          console.log(`  📬 Conversation ${conv.id}:`);
+          console.log(`     - name: "${conv.name}" (should be OTHER user's name)`);
+          console.log(`     - other_user_id: ${conv.other_user_id}`);
+          console.log(`     - avatar: ${conv.avatar}`);
+          console.log(`     - ⚠️  ISSUE CHECK: Is name "${conv.name}" same as current user "${currentUser.name}"? ${conv.name === currentUser.name ? 'YES - BUG!' : 'No - OK'}`);
+        });
         setConversations(data);
       }
     } catch (error) {
@@ -71,12 +89,20 @@ export default function MessagesScreen() {
     loadConversations();
   }, [currentUser]);
 
-  // Initialize socket connection
+  // Initialize socket connection - use existing global socket
   useEffect(() => {
     if (currentUser) {
-      socketRef.current = initSocket({ userId: parseInt(currentUser.id as string) });
-      
+      // Get the existing global socket instead of creating a new one
       const socket = getSocket();
+      
+      if (!socket) {
+        console.warn('⚠️ Global socket not initialized, creating fallback socket');
+        socketRef.current = initSocket({ userId: parseInt(currentUser.id as string) });
+      } else {
+        console.log('✅ Using global socket connection for Messages screen');
+        socketRef.current = socket;
+      }
+      
       if (socket) {
         // Update connection status
         setIsSocketConnected(socket.connected);
@@ -120,28 +146,44 @@ export default function MessagesScreen() {
           const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
           
           if (isReceivedByMe && !isSentByMe) {
-            // Check if this conversation is currently active
-            const isActiveConvo = activeConversation && 
-              message.sender_id === parseInt(activeConversation.userId);
+            // Check if we're ACTIVELY VIEWING this specific conversation right now
+            // User must be: ON Messages tab AND viewing this specific conversation
+            const isActivelyViewingThisConversation = isFocused && 
+              activeConversation && 
+              message.sender_id === parseInt(activeConversation.userId) &&
+              message.conversation_id === activeConversation.conversationId;
             
-            if (!isActiveConvo) {
-              // Auto-open conversation with the sender
-              console.log('📬 New message from user', message.sender_id, '- opening conversation');
+            console.log('📬 Checking notification conditions:', {
+              isTabFocused: isFocused,
+              hasActiveConversation: !!activeConversation,
+              activeConvoUserId: activeConversation?.userId,
+              activeConvoId: activeConversation?.conversationId,
+              messageSenderId: message.sender_id,
+              messageConvoId: message.conversation_id,
+              isActivelyViewing: isActivelyViewingThisConversation
+            });
+            
+            if (!isActivelyViewingThisConversation) {
+              // Show notification modal - user is NOT actively viewing this conversation
+              console.log('📬 New message from user', message.sender_id, '- showing notification (not actively viewing)');
               
               // Use sender info from the message (backend now includes sender_name and sender_avatar)
-              const senderId = message.sender_id.toString();
+              const senderId = message.sender_id;
               const senderName = message.sender_name || `User ${senderId}`;
               const senderAvatar = message.sender_avatar || undefined;
               
-              console.log('📬 Opening conversation with:', { senderId, senderName, senderAvatar });
+              console.log('📬 Showing notification from:', { senderId, senderName, senderAvatar });
               
-              // Open the conversation immediately with sender's avatar and conversation ID
-              setActiveConversation({
-                userId: senderId,
-                userName: senderName,
-                userAvatar: senderAvatar,
+              // Show notification modal
+              setNewMessageNotification({
+                senderName,
+                senderAvatar,
+                messageText: message.text,
+                senderId,
                 conversationId: message.conversation_id,
               });
+            } else {
+              console.log('✅ User is actively viewing this conversation - no notification needed');
             }
           }
           
@@ -420,6 +462,9 @@ export default function MessagesScreen() {
           <Send size={20} color={messageText.trim() ? Colors.white : Colors.textLight} />
         </TouchableOpacity>
       </View>
+
+      {/* New message notification modal - also render when conversation is open */}
+      {renderNewMessageModal()}
     </KeyboardAvoidingView>
   );
 
@@ -443,7 +488,7 @@ export default function MessagesScreen() {
         style={styles.avatar}
       />
       <View style={styles.conversationInfo}>
-        <View style={styles.conversationHeader}>
+        <View style={styles.conversationItemHeader}>
           <Text style={styles.conversationName}>{conversation.name}</Text>
           {conversation.last_message_time && (
             <Text style={styles.timestamp}>
@@ -479,6 +524,70 @@ export default function MessagesScreen() {
         Ve a "Cerca de Mí" o "Descubrir" para encontrar personas con quien conectar.
       </Text>
     </View>
+  );
+
+  const renderNewMessageModal = () => (
+    <Modal
+      visible={newMessageNotification !== null}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setNewMessageNotification(null)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Nuevo Mensaje</Text>
+            <TouchableOpacity onPress={() => setNewMessageNotification(null)}>
+              <X size={24} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+          
+          {newMessageNotification && (
+            <>
+              <View style={styles.modalBody}>
+                <Image
+                  source={{ uri: newMessageNotification.senderAvatar || 'https://via.placeholder.com/60' }}
+                  style={styles.modalAvatar}
+                />
+                <Text style={styles.modalSenderName}>{newMessageNotification.senderName}</Text>
+                <Text style={styles.modalMessageText}>{newMessageNotification.messageText}</Text>
+              </View>
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonSecondary]}
+                  onPress={() => setNewMessageNotification(null)}
+                >
+                  <Text style={styles.modalButtonTextSecondary}>Cerrar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonPrimary]}
+                  onPress={() => {
+                    // Open conversation
+                    const convo = conversations.find(c => c.id === newMessageNotification.conversationId);
+                    if (convo) {
+                      handleOpenConversation(convo);
+                    } else {
+                      // If conversation not in list yet, create it manually
+                      setActiveConversation({
+                        userId: newMessageNotification.senderId.toString(),
+                        userName: newMessageNotification.senderName,
+                        userAvatar: newMessageNotification.senderAvatar,
+                        conversationId: newMessageNotification.conversationId,
+                      });
+                      loadConversationMessages(newMessageNotification.conversationId);
+                    }
+                    setNewMessageNotification(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonTextPrimary}>Abrir</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
   );
 
   // Show conversation view if active
@@ -544,6 +653,9 @@ export default function MessagesScreen() {
           </ScrollView>
         )}
       </View>
+      
+      {/* New message notification modal */}
+      {renderNewMessageModal()}
     </View>
   );
 }
@@ -803,7 +915,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  conversationHeader: {
+  conversationItemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -836,6 +948,83 @@ const styles = StyleSheet.create({
   unreadCount: {
     color: Colors.white,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 34,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  modalBody: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  modalAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+  },
+  modalSenderName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 8,
+  },
+  modalMessageText: {
+    fontSize: 16,
+    color: Colors.textLight,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalButtonPrimary: {
+    backgroundColor: Colors.gold,
+  },
+  modalButtonSecondary: {
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalButtonTextPrimary: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonTextSecondary: {
+    color: Colors.text,
+    fontSize: 16,
     fontWeight: '600',
   },
 });

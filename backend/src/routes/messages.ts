@@ -7,7 +7,33 @@ const router = express.Router();
 router.get('/conversations/user/:userId', async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.userId);
+    console.log('📬 Fetching conversations for user:', userId);
     const conversations: any[] = await conversationQueries.getUserConversations(userId);
+    
+    console.log('📬 Found', conversations.length, 'conversations');
+    conversations.forEach((conv, index) => {
+      console.log(`  📬 [${index}] Conversation ${conv.id}:`);
+      console.log(`     - RAW DATA FROM QUERY:`);
+      console.log(`       participant1_id: ${conv.participant1_id}`);
+      console.log(`       participant2_id: ${conv.participant2_id}`);
+      console.log(`     - CALCULATED VALUES:`);
+      console.log(`       current user ID (from request): ${userId}`);
+      console.log(`       other_user_id (from CASE): ${conv.other_user_id}`);
+      console.log(`       expected other_user_id: ${conv.participant1_id === userId ? conv.participant2_id : conv.participant1_id}`);
+      console.log(`     - JOINED USER DATA:`);
+      console.log(`       name: "${conv.name}"`);
+      console.log(`       email: ${conv.email}`);
+      console.log(`       avatar: ${conv.avatar}`);
+      
+      // Detailed check for debugging
+      if (conv.other_user_id === userId) {
+        console.log(`     ⚠️  WARNING: other_user_id ${conv.other_user_id} equals current user ${userId}! CASE statement is broken!`);
+      }
+      
+      if (conv.participant1_id === userId && conv.participant2_id === userId) {
+        console.log(`     ⚠️  WARNING: Both participants are the same user ${userId}! Bad conversation data!`);
+      }
+    });
 
     res.json(conversations);
   } catch (error) {

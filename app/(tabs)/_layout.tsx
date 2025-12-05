@@ -1,8 +1,15 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Briefcase, MessageCircle, User, MapPin } from '@/components/SmartIcons';
+import { useGlobalSocketConnection } from '@/hooks/useGlobalSocketConnection';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  
+  // Initialize global socket connection for real-time messaging across all tabs
+  useGlobalSocketConnection();
+  
   return (
     <Tabs
       screenOptions={{
@@ -13,6 +20,8 @@ export default function TabLayout() {
           backgroundColor: '#1a0d2e',
           borderTopWidth: 1,
           borderTopColor: 'rgba(107, 76, 138, 0.3)',
+          paddingBottom: insets.bottom, // Fix Android navigation bar covering tabs
+          height: 60 + insets.bottom, // Adjust height for safe area
         },
         tabBarLabelStyle: {
           fontSize: 12,

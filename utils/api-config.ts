@@ -61,9 +61,10 @@ export const getApiBaseUrl = (): string => {
   if (fromExpo) return fromExpo;
 
   // 4) Local dev (physical device using Expo Go)
-  if (typeof __DEV__ !== 'undefined' && __DEV__) {
-    return `http://${API_CONFIG.LOCAL_IP}:${API_CONFIG.PORT}`;
-  }
+  // TEMPORARILY DISABLED - Force Railway in dev mode for testing
+  // if (typeof __DEV__ !== 'undefined' && __DEV__) {
+  //   return `http://${API_CONFIG.LOCAL_IP}:${API_CONFIG.PORT}`;
+  // }
 
   // 5) Fallback production URL (Railway backend)
   return 'https://rork-short-club-sincr-nica-community-production.up.railway.app';

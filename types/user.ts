@@ -14,6 +14,11 @@ export interface User {
   reviewCount: number;
   joinedDate: string;
   verified: boolean;
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  twitter?: string;
+  linkedin?: string;
 }
 
 export interface Service {

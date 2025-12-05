@@ -57,3 +57,26 @@ export const Gradients = {
   glow: ['rgba(255, 255, 255, 0.3)', 'transparent'] as const,
   floating: ['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.85)'] as const,
 };
+
+export const TabThemes = {
+  services: {
+    headerGradient: ['#4f8497', '#549ab4'] as const,
+    accentColor: '#4f8497',
+  },
+  food: {
+    headerGradient: ['#acac74', '#b3bb8c'] as const,
+    accentColor: '#acac74',
+  },
+  messages: {
+    headerGradient: ['#ac8cb3', '#6aaaca'] as const,
+    accentColor: '#ac8cb3',
+  },
+  profile: {
+    headerGradient: ['#34748c', '#4f8497'] as const,
+    accentColor: '#34748c',
+  },
+  nearMe: {
+    headerGradient: ['#6aaaca', '#9bdbbf'] as const,
+    accentColor: '#6aaaca',
+  },
+};

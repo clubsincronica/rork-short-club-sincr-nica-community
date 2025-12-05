@@ -17,20 +17,11 @@ export const useUser = () => {
 };
 
 const useUserStore = () => {
-  // Check if we're in a preview environment
-  const isPreview = (() => {
-    try {
-      return typeof window !== 'undefined' && (
-        window.location?.hostname?.includes('rork') || 
-        window.location?.hostname?.includes('localhost') ||
-        window.location?.hostname?.includes('expo.dev')
-      );
-    } catch (error) {
-      return false;
-    }
-  })();
-
-  const [currentUser, setCurrentUser] = useState<User | null>(isPreview ? mockUsers[0] : null);
+  // Development mode: Use mock data for UI testing, but allow real login
+  // Set to true to test UI features, false to test backend integration
+  const isDevelopment = false;  // Using Railway backend with PostgreSQL
+  
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences>({
     notifications: true,
@@ -76,10 +67,30 @@ const useUserStore = () => {
       if (__DEV__) {
         console.log('Login mutation called with:', 'id' in userData ? 'User object' : userData.email);
       }
-      // If full user object is provided, use it directly (for signup)
-      const user = 'id' in userData ? userData : (mockUsers.find(u => u.email === userData.email) || mockUsers[0]);
+      
+      let user: User;
+      
+      // If full user object is provided, use it directly (for signup or backend login)
+      if ('id' in userData) {
+        user = userData;
+      } else {
+        // Try to find in mock users (supports both test emails and example emails)
+        const foundUser = mockUsers.find(u => u.email === userData.email);
+        user = foundUser || mockUsers[0];
+        
+        // Check if user already has stored data in AsyncStorage (preserve avatar, social media, etc.)
+        const storedUserJson = await AsyncStorage.getItem('currentUser');
+        if (storedUserJson) {
+          const storedUser = JSON.parse(storedUserJson);
+          // If same user, merge stored data with mock data (stored data takes precedence)
+          if (storedUser.id === user.id || storedUser.email === user.email) {
+            user = { ...user, ...storedUser };
+          }
+        }
+      }
+      
       if (__DEV__) {
-        console.log('User to login:', user.email);
+        console.log('User to login:', user.email, user.name);
       }
       await AsyncStorage.setItem('currentUser', JSON.stringify(user));
       

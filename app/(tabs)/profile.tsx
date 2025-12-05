@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Switch, Modal, TextInput, Alert } from 'react-native';
 import { TouchableScale } from '@/components/TouchableScale';
 import { AccessibleText, Heading } from '@/components/AccessibleText';
@@ -100,10 +100,27 @@ export default function ProfileScreen() {
     linkedin: currentUser?.linkedin || '',
   });
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
-    { id: '1', type: 'card', last4: '4242', brand: 'Visa', isDefault: true },
-    { id: '2', type: 'card', last4: '5555', brand: 'Mastercard', isDefault: false },
-  ]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+
+  // Sync editedProfile with currentUser when it changes (preserves avatar updates)
+  useEffect(() => {
+    if (currentUser) {
+      setEditedProfile({
+        name: currentUser.name || '',
+        email: currentUser.email || '',
+        bio: currentUser.bio || '',
+        location: currentUser.location || '',
+        specialties: currentUser.specialties || [],
+        interests: currentUser.interests || [],
+        avatar: currentUser.avatar || '',
+        instagram: currentUser.instagram || '',
+        facebook: currentUser.facebook || '',
+        tiktok: currentUser.tiktok || '',
+        twitter: currentUser.twitter || '',
+        linkedin: currentUser.linkedin || '',
+      });
+    }
+  }, [currentUser]);
 
   // Remove mock achievements and activities - will be populated from backend
   const achievements: Achievement[] = [];
@@ -321,11 +338,28 @@ export default function ProfileScreen() {
 
   const additionalMenuItems = [
     {
+      icon: User,
+      title: 'Vista Previa del Perfil',
+      subtitle: 'Ver cómo te ven otros usuarios',
+      onPress: () => router.push({
+        pathname: '/user-profile',
+        params: {
+          userId: currentUser.id,
+          userName: currentUser.name,
+          userLocation: currentUser.location,
+          isOwnProfile: 'true',
+        }
+      }),
+      testId: 'profile-preview',
+      highlight: true,
+    },
+    {
       icon: HelpCircle,
       title: 'Ayuda y Soporte',
       subtitle: 'Obtén asistencia',
       onPress: () => router.push('/help'),
       testId: 'help',
+      highlight: true,
     },
   ];
 
@@ -582,16 +616,16 @@ export default function ProfileScreen() {
           {additionalMenuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
-              style={styles.menuItem}
+              style={[styles.menuItem, item.highlight && styles.menuItemHighlight]}
               onPress={item.onPress}
               testID={item.testId}
             >
               <View style={styles.menuItemLeft}>
-                <View style={styles.menuIcon}>
-                  <item.icon size={20} color={Colors.primary} />
+                <View style={[styles.menuIcon, item.highlight && styles.menuIconHighlight]}>
+                  <item.icon size={20} color={item.highlight ? Colors.primary : Colors.primary} />
                 </View>
                 <View style={styles.menuContent}>
-                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={[styles.menuTitle, item.highlight && styles.menuTitleHighlight]}>{item.title}</Text>
                   <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                 </View>
               </View>
@@ -1162,13 +1196,13 @@ const styles = StyleSheet.create({
   miCuentaButton: {
     borderWidth: 2,
     borderColor: Colors.gold || '#fbeb5c',
-    backgroundColor: `${Colors.gold || '#fbeb5c'}15`,
+    backgroundColor: Colors.white,
   },
   miCuentaIcon: {
-    backgroundColor: `${Colors.gold || '#fbeb5c'}25`,
+    backgroundColor: Colors.gold || '#fbeb5c',
   },
   miCuentaTitle: {
-    color: Colors.gold || '#fbeb5c',
+    color: Colors.text,
     fontWeight: '700',
   },
   submenuContainer: {
