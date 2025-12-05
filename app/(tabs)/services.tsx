@@ -186,63 +186,43 @@ export default function ServicesScreen() {
       
       <Text style={styles.sectionTitle}>Administrar Reservas</Text>
       
-      <View style={styles.reservationTabs}>
-        <TouchableOpacity style={[styles.reservationTab, styles.activeReservationTab]}>
-          <Text style={styles.activeReservationTabText}>Pendientes (2)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.reservationTab}>
-          <Text style={styles.reservationTabText}>Confirmadas (5)</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.reservationTab}>
-          <Text style={styles.reservationTabText}>Completadas (18)</Text>
-        </TouchableOpacity>
-      </View>
-
-      {upcomingReservations.map(reservation => (
-        <View key={reservation.id} style={styles.reservationCard}>
-          <View style={styles.reservationHeader}>
-            <View>
-              <Text style={styles.reservationService}>{reservation.service}</Text>
-              <Text style={styles.reservationClient}>{reservation.client}</Text>
+      {upcomingReservations.length > 0 ? (
+        <>
+          {upcomingReservations.map(reservation => (
+            <View key={reservation.id} style={styles.reservationCard}>
+              <View style={styles.reservationHeader}>
+                <View>
+                  <Text style={styles.reservationService}>{reservation.service}</Text>
+                  <Text style={styles.reservationClient}>{reservation.client}</Text>
+                </View>
+                <Text style={styles.reservationPrice}>${reservation.price}</Text>
+              </View>
+              <View style={styles.reservationDetails}>
+                <View style={styles.reservationDate}>
+                  <Clock size={16} color={Colors.textLight} />
+                  <Text style={styles.reservationDateText}>{reservation.date}</Text>
+                </View>
+                <View style={[
+                  styles.reservationStatus,
+                  reservation.status === 'confirmed' ? styles.statusConfirmed : styles.statusPending
+                ]}>
+                  <Text style={styles.reservationStatusText}>
+                    {reservation.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
+                  </Text>
+                </View>
+              </View>
             </View>
-            <Text style={styles.reservationPrice}>${reservation.price}</Text>
-          </View>
-          <View style={styles.reservationDetails}>
-            <View style={styles.reservationDate}>
-              <Clock size={16} color={Colors.textLight} />
-              <Text style={styles.reservationDateText}>{reservation.date}</Text>
-            </View>
-            <View style={[
-              styles.reservationStatus,
-              reservation.status === 'confirmed' ? styles.statusConfirmed : styles.statusPending
-            ]}>
-              <Text style={styles.reservationStatusText}>
-                {reservation.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.reservationActions}>
-            {reservation.status === 'pending' && (
-              <>
-                <TouchableOpacity style={styles.acceptButton}>
-                  <CheckCircle size={16} color={Colors.white} />
-                  <Text style={styles.acceptButtonText}>Aceptar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.declineButton}>
-                  <AlertCircle size={16} color={Colors.error} />
-                  <Text style={styles.declineButtonText}>Rechazar</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            {reservation.status === 'confirmed' && (
-              <TouchableOpacity style={styles.messageButton}>
-                <MessageSquare size={16} color={Colors.primary} />
-                <Text style={styles.messageButtonText}>Enviar Mensaje</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          ))}
+        </>
+      ) : (
+        <View style={styles.emptyStateContainer}>
+          <Clock size={64} color={Colors.border} />
+          <Text style={styles.emptyStateTitle}>No hay reservas</Text>
+          <Text style={styles.emptyStateText}>
+            Las reservas de tus eventos aparecerán aquí cuando los usuarios se registren.
+          </Text>
         </View>
-      ))}
+      )}
     </View>
   );
 
@@ -255,56 +235,63 @@ export default function ServicesScreen() {
       
       <Text style={styles.sectionTitle}>Carrito y Pagos</Text>
       
-      <View style={styles.cartSummary}>
-        <View style={styles.cartSummaryRow}>
-          <Text style={styles.cartSummaryLabel}>Subtotal</Text>
-          <Text style={styles.cartSummaryValue}>$340</Text>
-        </View>
-        <View style={styles.cartSummaryRow}>
-          <Text style={styles.cartSummaryLabel}>Comisión plataforma</Text>
-          <Text style={styles.cartSummaryValue}>-$34</Text>
-        </View>
-        <View style={[styles.cartSummaryRow, styles.cartSummaryTotal]}>
-          <Text style={styles.cartTotalLabel}>Total a recibir</Text>
-          <Text style={styles.cartTotalValue}>$306</Text>
-        </View>
-      </View>
-
-      <TouchableOpacity 
-        style={styles.primaryButton}
-        onPress={() => router.push('/payment')}
-      >
-        <CreditCard size={20} color={Colors.white} />
-        <Text style={styles.primaryButtonText}>Procesar Pago</Text>
-      </TouchableOpacity>
-
-      <Text style={styles.subsectionTitle}>Items en Carrito</Text>
-      {cartItems.map(item => (
-        <View key={item.id} style={styles.cartItem}>
-          <View style={styles.cartItemIcon}>
-            <Package size={20} color={Colors.primary} />
-          </View>
-          <View style={styles.cartItemContent}>
-            <Text style={styles.cartItemTitle}>{item.service}</Text>
-            <Text style={styles.cartItemProvider}>{item.provider}</Text>
-            <View style={styles.cartItemFooter}>
-              <Text style={styles.cartItemQuantity}>Cantidad: {item.quantity}</Text>
-              <Text style={styles.cartItemPrice}>${item.price * item.quantity}</Text>
+      {cartItems.length > 0 ? (
+        <>
+          <View style={styles.cartSummary}>
+            <View style={styles.cartSummaryRow}>
+              <Text style={styles.cartSummaryLabel}>Subtotal</Text>
+              <Text style={styles.cartSummaryValue}>
+                ${cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)}
+              </Text>
+            </View>
+            <View style={styles.cartSummaryRow}>
+              <Text style={styles.cartSummaryLabel}>Comisión plataforma</Text>
+              <Text style={styles.cartSummaryValue}>
+                -${(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.1).toFixed(0)}
+              </Text>
+            </View>
+            <View style={[styles.cartSummaryRow, styles.cartSummaryTotal]}>
+              <Text style={styles.cartTotalLabel}>Total a recibir</Text>
+              <Text style={styles.cartTotalValue}>
+                ${(cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0) * 0.9).toFixed(0)}
+              </Text>
             </View>
           </View>
-        </View>
-      ))}
 
-      <View style={styles.paymentMethods}>
-        <Text style={styles.subsectionTitle}>Métodos de Pago</Text>
-        <TouchableOpacity style={styles.paymentMethod}>
-          <CreditCard size={20} color={Colors.primary} />
-          <Text style={styles.paymentMethodText}>•••• 4242</Text>
-          <View style={styles.defaultBadge}>
-            <Text style={styles.defaultBadgeText}>Principal</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            style={styles.primaryButton}
+            onPress={() => router.push('/payment')}
+          >
+            <CreditCard size={20} color={Colors.white} />
+            <Text style={styles.primaryButtonText}>Procesar Pago</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.subsectionTitle}>Items en Carrito</Text>
+          {cartItems.map(item => (
+            <View key={item.id} style={styles.cartItem}>
+              <View style={styles.cartItemIcon}>
+                <Package size={20} color={Colors.primary} />
+              </View>
+              <View style={styles.cartItemContent}>
+                <Text style={styles.cartItemTitle}>{item.service}</Text>
+                <Text style={styles.cartItemProvider}>{item.provider}</Text>
+                <View style={styles.cartItemFooter}>
+                  <Text style={styles.cartItemQuantity}>Cantidad: {item.quantity}</Text>
+                  <Text style={styles.cartItemPrice}>${item.price * item.quantity}</Text>
+                </View>
+              </View>
+            </View>
+          ))}
+        </>
+      ) : (
+        <View style={styles.emptyStateContainer}>
+          <ShoppingCart size={64} color={Colors.border} />
+          <Text style={styles.emptyStateTitle}>Carrito vacío</Text>
+          <Text style={styles.emptyStateText}>
+            Los pagos de tus eventos aparecerán aquí cuando los participantes se registren.
+          </Text>
+        </View>
+      )}
     </View>
   );
 
@@ -317,40 +304,48 @@ export default function ServicesScreen() {
       
       <Text style={styles.sectionTitle}>Seguimiento de Clientes</Text>
       
-      <View style={styles.followUpStats}>
-        <View style={styles.followUpStatCard}>
-          <TrendingUp size={20} color={Colors.success} />
-          <Text style={styles.followUpStatValue}>92%</Text>
-          <Text style={styles.followUpStatLabel}>Tasa de retención</Text>
-        </View>
-        <View style={styles.followUpStatCard}>
-          <Users size={20} color={Colors.primary} />
-          <Text style={styles.followUpStatValue}>45</Text>
-          <Text style={styles.followUpStatLabel}>Clientes activos</Text>
-        </View>
-      </View>
-
-      <Text style={styles.subsectionTitle}>Clientes para Contactar</Text>
-      {followUpClients.map(client => (
-        <View key={client.id} style={styles.followUpCard}>
-          <View style={styles.followUpAvatar}>
-            <Text style={styles.followUpAvatarText}>{client.name.split(' ').map((n: string) => n[0]).join('')}</Text>
+      {followUpClients.length > 0 ? (
+        <>
+          <View style={styles.followUpStats}>
+            <View style={styles.followUpStatCard}>
+              <TrendingUp size={20} color={Colors.success} />
+              <Text style={styles.followUpStatValue}>--</Text>
+              <Text style={styles.followUpStatLabel}>Tasa de retención</Text>
+            </View>
+            <View style={styles.followUpStatCard}>
+              <Users size={20} color={Colors.primary} />
+              <Text style={styles.followUpStatValue}>{followUpClients.length}</Text>
+              <Text style={styles.followUpStatLabel}>Clientes activos</Text>
+            </View>
           </View>
-          <View style={styles.followUpContent}>
-            <Text style={styles.followUpName}>{client.name}</Text>
-            <Text style={styles.followUpService}>{client.service}</Text>
-            <Text style={styles.followUpTime}>Última sesión: {client.lastSession}</Text>
-            <Text style={styles.followUpNotes}>{client.notes}</Text>
-          </View>
-          <TouchableOpacity style={styles.followUpAction}>
-            <MessageSquare size={20} color={Colors.primary} />
-          </TouchableOpacity>
-        </View>
-      ))}
 
-      <TouchableOpacity style={styles.secondaryButton}>
-        <Text style={styles.secondaryButtonText}>Ver Todos los Clientes</Text>
-      </TouchableOpacity>
+          <Text style={styles.subsectionTitle}>Clientes para Contactar</Text>
+          {followUpClients.map(client => (
+            <View key={client.id} style={styles.followUpCard}>
+              <View style={styles.followUpAvatar}>
+                <Text style={styles.followUpAvatarText}>{client.name.split(' ').map((n: string) => n[0]).join('')}</Text>
+              </View>
+              <View style={styles.followUpContent}>
+                <Text style={styles.followUpName}>{client.name}</Text>
+                <Text style={styles.followUpService}>{client.service}</Text>
+                <Text style={styles.followUpTime}>Última sesión: {client.lastSession}</Text>
+                <Text style={styles.followUpNotes}>{client.notes}</Text>
+              </View>
+              <TouchableOpacity style={styles.followUpAction}>
+                <MessageSquare size={20} color={Colors.primary} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </>
+      ) : (
+        <View style={styles.emptyStateContainer}>
+          <Users size={64} color={Colors.border} />
+          <Text style={styles.emptyStateTitle}>Sin clientes activos</Text>
+          <Text style={styles.emptyStateText}>
+            Cuando los participantes asistan a tus eventos, podrás hacer seguimiento y mantener contacto con ellos aquí.
+          </Text>
+        </View>
+      )}
     </View>
   );
 
@@ -379,31 +374,43 @@ export default function ServicesScreen() {
         </View>
       </View>
 
-      <Text style={styles.subsectionTitle}>Notificaciones Recientes</Text>
-      {notifications.map(notification => (
-        <TouchableOpacity key={notification.id} style={[styles.notificationCard, notification.unread && styles.notificationUnread]}>
-          <View style={[
-            styles.notificationIcon,
-            notification.type === 'booking' && styles.notificationIconBooking,
-            notification.type === 'payment' && styles.notificationIconPayment,
-            notification.type === 'reminder' && styles.notificationIconReminder,
-            notification.type === 'review' && styles.notificationIconReview,
-          ]}>
-            {notification.type === 'booking' && <Calendar size={20} color={Colors.white} />}
-            {notification.type === 'payment' && <DollarSign size={20} color={Colors.white} />}
-            {notification.type === 'reminder' && <Clock size={20} color={Colors.white} />}
-            {notification.type === 'review' && <Star size={20} color={Colors.white} />}
-          </View>
-          <View style={styles.notificationContent}>
-            <View style={styles.notificationHeader}>
-              <Text style={styles.notificationTitle}>{notification.title}</Text>
-              {notification.unread && <View style={styles.unreadDot} />}
-            </View>
-            <Text style={styles.notificationMessage}>{notification.message}</Text>
-            <Text style={styles.notificationTime}>{notification.time}</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
+      {notifications.length > 0 ? (
+        <>
+          <Text style={styles.subsectionTitle}>Notificaciones Recientes</Text>
+          {notifications.map(notification => (
+            <TouchableOpacity key={notification.id} style={[styles.notificationCard, notification.unread && styles.notificationUnread]}>
+              <View style={[
+                styles.notificationIcon,
+                notification.type === 'booking' && styles.notificationIconBooking,
+                notification.type === 'payment' && styles.notificationIconPayment,
+                notification.type === 'reminder' && styles.notificationIconReminder,
+                notification.type === 'review' && styles.notificationIconReview,
+              ]}>
+                {notification.type === 'booking' && <Calendar size={20} color={Colors.white} />}
+                {notification.type === 'payment' && <DollarSign size={20} color={Colors.white} />}
+                {notification.type === 'reminder' && <Clock size={20} color={Colors.white} />}
+                {notification.type === 'review' && <Star size={20} color={Colors.white} />}
+              </View>
+              <View style={styles.notificationContent}>
+                <View style={styles.notificationHeader}>
+                  <Text style={styles.notificationTitle}>{notification.title}</Text>
+                  {notification.unread && <View style={styles.unreadDot} />}
+                </View>
+                <Text style={styles.notificationMessage}>{notification.message}</Text>
+                <Text style={styles.notificationTime}>{notification.time}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </>
+      ) : (
+        <View style={styles.emptyStateContainer}>
+          <Bell size={64} color={Colors.border} />
+          <Text style={styles.emptyStateTitle}>Sin notificaciones</Text>
+          <Text style={styles.emptyStateText}>
+            Las notificaciones sobre reservas, pagos y mensajes aparecerán aquí.
+          </Text>
+        </View>
+      )}
     </View>
   );
 
@@ -1487,5 +1494,24 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: Colors.textLight,
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
