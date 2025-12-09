@@ -8,6 +8,7 @@ import { Colors } from '@/constants/colors';
 import { useUser } from '@/hooks/user-store';
 import { initSocket, getSocket } from '@/app/services/socket';
 import { getApiBaseUrl } from '@/utils/api-config';
+import { messageEventBus } from '@/utils/messageEventBus';
 
 interface Conversation {
   id: number;
@@ -125,112 +126,115 @@ export default function MessagesScreen() {
           console.log('Socket disconnected for user:', currentUser.id);
           setIsSocketConnected(false);
         });
+      }
+    }
 
-        // Listen for incoming messages (backend emits 'message:new')
-        socket.on('message:new', (message: any) => {
-          console.log('🔔 RECEIVED message:new event for user', currentUser.id, '- Message:', message);
-          
-          // Safety check - backend might return null
-          if (!message || !message.text) {
-            console.warn('❌ Received invalid message from backend:', message);
-            return;
-          }
-          
-          console.log('✅ Message is valid, sender:', message.sender_id, 'receiver:', message.receiver_id, 'current user:', currentUser.id);
-          
-          // Reload conversations list to show new message
-          loadConversations();
+    return () => {
+      // Don't disconnect the global socket, just clean up listeners
+      if (socketRef.current) {
+        socketRef.current.off('connect');
+        socketRef.current.off('disconnect');
+      }
+    };
+  }, [currentUser]);
 
-          // If I received a message (not sent by me), show notification
-          const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
-          const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
-          
-          if (isReceivedByMe && !isSentByMe) {
-            // Check if we're ACTIVELY VIEWING this specific conversation right now
-            // User must be: ON Messages tab AND viewing this specific conversation
-            const isActivelyViewingThisConversation = isFocused && 
-              activeConversation && 
-              message.sender_id === parseInt(activeConversation.userId) &&
-              message.conversation_id === activeConversation.conversationId;
-            
-            console.log('📬 Checking notification conditions:', {
-              isTabFocused: isFocused,
-              hasActiveConversation: !!activeConversation,
-              activeConvoUserId: activeConversation?.userId,
-              activeConvoId: activeConversation?.conversationId,
-              messageSenderId: message.sender_id,
-              messageConvoId: message.conversation_id,
-              isActivelyViewing: isActivelyViewingThisConversation
-            });
-            
-            if (!isActivelyViewingThisConversation) {
-              // Show notification modal - user is NOT actively viewing this conversation
-              console.log('📬 New message from user', message.sender_id, '- showing notification (not actively viewing)');
-              
-              // Use sender info from the message (backend now includes sender_name and sender_avatar)
-              const senderId = message.sender_id;
-              const senderName = message.sender_name || `User ${senderId}`;
-              const senderAvatar = message.sender_avatar || undefined;
-              
-              console.log('📬 Showing notification from:', { senderId, senderName, senderAvatar });
-              
-              // Show notification modal
-              setNewMessageNotification({
-                senderName,
-                senderAvatar,
-                messageText: message.text,
-                senderId,
-                conversationId: message.conversation_id,
-              });
-            } else {
-              console.log('✅ User is actively viewing this conversation - no notification needed');
-            }
-          }
-          
-          // Only add message if it's part of the active conversation
-          setMessages(prev => {
-            // Check if this message belongs to the active conversation
-            if (activeConversation) {
-              const isFromActiveUser = message.sender_id === parseInt(activeConversation.userId);
-              const isToActiveUser = message.receiver_id === parseInt(activeConversation.userId);
-              const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
-              const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
-              
-              // Only add if message is between me and the active conversation user
-              if (!((isSentByMe && isToActiveUser) || (isReceivedByMe && isFromActiveUser))) {
-                console.log('⏭️ Message not for active conversation, ignoring');
-                return prev;
-              }
-            }
-            
-            // Check for duplicate by ID
-            const messageId = message.id?.toString();
-            if (messageId && prev.some(m => m.id === messageId)) {
-              console.log('⏭️ Duplicate message ID, ignoring');
-              return prev;
-            }
-            
-            console.log('💬 Message added to local state');
-            return [...prev, {
-              id: message.id?.toString() || Date.now().toString(),
-              text: message.text,
-              senderId: message.sender_id?.toString() || message.senderId,
-              sender: message.sender_id === parseInt(currentUser.id as string) ? 'me' : 'other',
-              timestamp: new Date(message.created_at || message.timestamp),
-            }];
-          });
-        });
+  // Subscribe to message event bus (replaces duplicate socket handler)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    console.log('📬 [Messages Screen] Subscribing to message event bus');
+
+    const unsubscribe = messageEventBus.onNewMessage((message) => {
+      console.log('📬 [Messages Screen] Received message from event bus:', message);
+      console.log('📬 [Messages Screen] Current user:', currentUser?.id, currentUser?.name);
+      console.log('📬 [Messages Screen] Message sender_id:', message.sender_id, 'receiver_id:', message.receiver_id);
+      
+      // Safety check
+      if (!message || !message.text) {
+        console.warn('❌ Invalid message from event bus:', message);
+        return;
       }
 
-      return () => {
-        if (socket) {
-          socket.off('message:new');
-          socket.off('connect');
-          socket.off('disconnect');
+      // Reload conversations list to show new message
+      loadConversations();
+
+      // Check if this is a message I received (not sent by me)
+      const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
+      const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
+      
+      if (isReceivedByMe && !isSentByMe) {
+        // Check if we're ACTIVELY VIEWING this specific conversation right now
+        const isActivelyViewingThisConversation = isFocused && 
+          activeConversation && 
+          message.sender_id === parseInt(activeConversation.userId) &&
+          message.conversation_id === activeConversation.conversationId;
+        
+        console.log('📬 Notification check:', {
+          isTabFocused: isFocused,
+          hasActiveConversation: !!activeConversation,
+          activeConvoUserId: activeConversation?.userId,
+          activeConvoId: activeConversation?.conversationId,
+          messageSenderId: message.sender_id,
+          messageConvoId: message.conversation_id,
+          isActivelyViewing: isActivelyViewingThisConversation
+        });
+        
+        if (!isActivelyViewingThisConversation) {
+          // Show notification modal - user is NOT actively viewing this conversation
+          console.log('📬 Showing notification from:', message.sender_name || `User ${message.sender_id}`);
+          
+          setNewMessageNotification({
+            senderName: message.sender_name || `User ${message.sender_id}`,
+            senderAvatar: message.sender_avatar,
+            messageText: message.text,
+            senderId: message.sender_id,
+            conversationId: message.conversation_id,
+          });
+          
+          // Return true to stop propagation - we handled the notification
+          return true;
+        } else {
+          console.log('✅ User is actively viewing this conversation - no notification needed');
+          // Return true to stop propagation - actively viewing, no notification needed
+          return true;
         }
-      };
-    }
-  }, [currentUser]);
+      }
+      
+      // Add message to active conversation if applicable
+      setMessages(prev => {
+        if (activeConversation) {
+          const isFromActiveUser = message.sender_id === parseInt(activeConversation.userId);
+          const isToActiveUser = message.receiver_id === parseInt(activeConversation.userId);
+          const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
+          const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
+          
+          // Only add if message is between me and the active conversation user
+          if (!((isSentByMe && isToActiveUser) || (isReceivedByMe && isFromActiveUser))) {
+            console.log('⏭️ Message not for active conversation, ignoring');
+            return prev;
+          }
+        }
+        
+        // Check for duplicate by ID
+        const messageId = message.id?.toString();
+        if (messageId && prev.some(m => m.id === messageId)) {
+          console.log('⏭️ Duplicate message ID, ignoring');
+          return prev;
+        }
+        
+        console.log('💬 Message added to local state');
+        return [...prev, {
+          id: message.id?.toString() || Date.now().toString(),
+          text: message.text,
+          senderId: message.sender_id?.toString(),
+          sender: message.sender_id === parseInt(currentUser.id as string) ? 'me' : 'other',
+          timestamp: new Date(message.created_at),
+        }];
+      });
+    });
+
+    return unsubscribe;
+  }, [currentUser, isFocused, activeConversation]);
 
   // Load message history for active conversation
   const loadConversationMessages = async (conversationId: number) => {
@@ -350,10 +354,18 @@ export default function MessagesScreen() {
       conversationId,
       senderId: currentUser.id,
       receiverId: activeConversation.userId,
-      text: messageText
+      text: messageText,
+      socketConnected: socket?.connected
     });
     
+    if (!socket || !socket.connected) {
+      Alert.alert('Error', 'Socket not connected. Cannot send message.');
+      console.error('❌ Socket not connected!');
+      return;
+    }
+    
     // Emit to server (backend expects 'message:send')
+    console.log('✅ Emitting message:send to backend...');
     socket.emit('message:send', {
       conversationId,
       senderId: parseInt(currentUser.id as string),
