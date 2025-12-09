@@ -16,7 +16,7 @@ const usePostgres = !!process.env.DATABASE_URL;
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../clubsincronica.db');
 
-let eas submit --platform iosdb: Database;
+let db: Database;
 let SQL: any;
 
 // If Postgres is enabled, use the Postgres client
