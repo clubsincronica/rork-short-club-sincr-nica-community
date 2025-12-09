@@ -292,7 +292,7 @@ export const conversationQueries = usePostgres ? {
               (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time,
               (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND receiver_id = $1 AND read = 0) as unread_count
        FROM conversations c
-       LEFT JOIN users u ON u.id = CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END
+       LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
        WHERE c.participant1_id = $1 OR c.participant2_id = $1
        ORDER BY last_message_time DESC`,
       [userId]

@@ -144,6 +144,61 @@ app.post('/api/fix-conversations', async (req, res) => {
   }
 });
 
+// Debug endpoint - show raw database data
+app.get('/api/debug-conversations', async (req, res) => {
+  try {
+    const usePostgres = !!process.env.DATABASE_URL;
+    if (!usePostgres) {
+      return res.status(400).json({ error: 'PostgreSQL only' });
+    }
+    
+    const pgClient = require('./db/postgres-client');
+    
+    // Get all users
+    const users = await pgClient.query('SELECT id, name, email FROM users ORDER BY id');
+    
+    // Get all conversations with names
+    const conversations = await pgClient.query(`
+      SELECT c.id, c.participant1_id, c.participant2_id,
+             u1.name as p1_name, u2.name as p2_name
+      FROM conversations c
+      LEFT JOIN users u1 ON c.participant1_id = u1.id
+      LEFT JOIN users u2 ON c.participant2_id = u2.id
+      ORDER BY c.id
+    `);
+    
+    // Test the query for user 1
+    const user1Convs = await pgClient.query(`
+      SELECT c.id, c.participant1_id, c.participant2_id,
+             CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END as other_user_id,
+             u.id as joined_user_id, u.name as joined_user_name
+      FROM conversations c
+      LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
+      WHERE c.participant1_id = $1 OR c.participant2_id = $1
+    `, [1]);
+    
+    // Test the query for user 2
+    const user2Convs = await pgClient.query(`
+      SELECT c.id, c.participant1_id, c.participant2_id,
+             CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END as other_user_id,
+             u.id as joined_user_id, u.name as joined_user_name
+      FROM conversations c
+      LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
+      WHERE c.participant1_id = $1 OR c.participant2_id = $1
+    `, [2]);
+    
+    res.json({
+      users,
+      conversations,
+      user1Conversations: user1Convs,
+      user2Conversations: user2Convs
+    });
+    
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Socket.IO - Real-time messaging
 const userSockets = new Map<number, string>(); // userId -> socketId
 
