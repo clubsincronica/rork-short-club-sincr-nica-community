@@ -3,12 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Package, Bell, CreditCard, Star, Tag, X } from '../components/SmartIcons';
 import { Colors } from '@/constants/colors';
-import { useFoodCart } from '@/hooks/food-cart-store';
 import { OrderNotification } from '@/types/user';
 
 export default function NotificationsScreen() {
   const router = useRouter();
-  const { notifications, markNotificationAsRead, markAllNotificationsAsRead } = useFoodCart();
+  const notifications: OrderNotification[] = []; // Removed food cart - will be implemented post-beta
+  const markNotificationAsRead = () => {};
+  const markAllNotificationsAsRead = () => {};
   const [refreshing, setRefreshing] = useState(false);
 
   const handleBack = () => {

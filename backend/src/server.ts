@@ -3,11 +3,22 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import jwt from 'jsonwebtoken';
 import userRoutes from './routes/users';
 import messageRoutes from './routes/messages';
 import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
+import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
+import { apiLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
+
+// Validate environment variables before starting server
+try {
+  validateEnvironment();
+} catch (error: any) {
+  console.error('❌ Environment validation failed:', error.message);
+  process.exit(1);
+}
 
 // Helper function to convert row array to object
 function rowToObject(columns: string[], values: any[]): any {
@@ -35,6 +46,12 @@ const io = new Server(httpServer, {
 app.use(cors());
 app.use(express.json());
 
+// Apply rate limiting to all API routes in production
+if (isProduction()) {
+  app.use('/api', apiLimiter);
+  console.log('✅ Rate limiting enabled for production');
+}
+
 // REST API Routes
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
@@ -44,60 +61,61 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Emergency fix endpoint - delete corrupted conversations
-app.post('/api/fix-conversations', async (req, res) => {
-  try {
-    console.log('🔧 Running conversation fix...');
-    
-    // Import pg client if using PostgreSQL
-    const usePostgres = !!process.env.DATABASE_URL;
-    
-    if (!usePostgres) {
-      return res.status(400).json({ error: 'This fix is only for PostgreSQL database' });
-    }
-    
-    const pgClient = require('./db/postgres-client');
-    
-    // Delete corrupted conversations (where both participants are the same)
-    console.log('🗑️  Deleting corrupted conversations...');
-    const deleteMessages = await pgClient.query(
-      'DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE participant1_id = participant2_id)'
-    );
-    console.log(`   Deleted ${deleteMessages.rowCount} messages from corrupted conversations`);
-    
-    const deleteConvs = await pgClient.query(
-      'DELETE FROM conversations WHERE participant1_id = participant2_id'
-    );
-    console.log(`   Deleted ${deleteConvs.rowCount} corrupted conversations`);
-    
-    // Also delete specific bad conversations (2 and 3)
-    const deleteSpecificMessages = await pgClient.query(
-      'DELETE FROM messages WHERE conversation_id IN (2, 3)'
-    );
-    console.log(`   Deleted ${deleteSpecificMessages.rowCount} messages from conversations 2 and 3`);
-    
-    const deleteSpecificConvs = await pgClient.query(
-      'DELETE FROM conversations WHERE id IN (2, 3)'
-    );
-    console.log(`   Deleted ${deleteSpecificConvs.rowCount} specific corrupted conversations`);
-    
-    // Check if conversation 1 is correct (between user 1 and 2)
-    const conv1 = await pgClient.query(
-      'SELECT * FROM conversations WHERE id = 1'
-    );
-    
-    let fixedConversationId;
-    
-    if (conv1.length > 0) {
-      const c = conv1[0];
-      const hasUser1 = c.participant1_id === 1 || c.participant2_id === 1;
-      const hasUser2 = c.participant1_id === 2 || c.participant2_id === 2;
+// Emergency fix endpoint - delete corrupted conversations (DEVELOPMENT ONLY)
+if (!isProduction()) {
+  app.post('/api/fix-conversations', async (req, res) => {
+    try {
+      console.log('🔧 Running conversation fix...');
       
-      if (hasUser1 && hasUser2) {
-        console.log('✅ Conversation 1 is already correct (between users 1 and 2)');
-        fixedConversationId = 1;
-      } else {
-        console.log('❌ Conversation 1 exists but is wrong, deleting it');
+      // Import pg client if using PostgreSQL
+      const usePostgres = !!process.env.DATABASE_URL;
+      
+      if (!usePostgres) {
+        return res.status(400).json({ error: 'This fix is only for PostgreSQL database' });
+      }
+      
+      const pgClient = require('./db/postgres-client');
+      
+      // Delete corrupted conversations (where both participants are the same)
+      console.log('🗑️  Deleting corrupted conversations...');
+      const deleteMessages = await pgClient.query(
+        'DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE participant1_id = participant2_id)'
+      );
+      console.log(`   Deleted ${deleteMessages.rowCount} messages from corrupted conversations`);
+      
+      const deleteConvs = await pgClient.query(
+        'DELETE FROM conversations WHERE participant1_id = participant2_id'
+      );
+      console.log(`   Deleted ${deleteConvs.rowCount} corrupted conversations`);
+      
+      // Also delete specific bad conversations (2 and 3)
+      const deleteSpecificMessages = await pgClient.query(
+        'DELETE FROM messages WHERE conversation_id IN (2, 3)'
+      );
+      console.log(`   Deleted ${deleteSpecificMessages.rowCount} messages from conversations 2 and 3`);
+      
+      const deleteSpecificConvs = await pgClient.query(
+        'DELETE FROM conversations WHERE id IN (2, 3)'
+      );
+      console.log(`   Deleted ${deleteSpecificConvs.rowCount} specific corrupted conversations`);
+      
+      // Check if conversation 1 is correct (between user 1 and 2)
+      const conv1 = await pgClient.query(
+        'SELECT * FROM conversations WHERE id = 1'
+      );
+      
+      let fixedConversationId;
+      
+      if (conv1.length > 0) {
+        const c = conv1[0];
+        const hasUser1 = c.participant1_id === 1 || c.participant2_id === 1;
+        const hasUser2 = c.participant1_id === 2 || c.participant2_id === 2;
+        
+        if (hasUser1 && hasUser2) {
+          console.log('✅ Conversation 1 is already correct (between users 1 and 2)');
+          fixedConversationId = 1;
+        } else {
+          console.log('❌ Conversation 1 exists but is wrong, deleting it');
         await pgClient.query('DELETE FROM messages WHERE conversation_id = 1');
         await pgClient.query('DELETE FROM conversations WHERE id = 1');
         
@@ -142,10 +160,10 @@ app.post('/api/fix-conversations', async (req, res) => {
     console.error('❌ Fix failed:', error);
     res.status(500).json({ error: error.message });
   }
-});
+  });
 
-// Debug endpoint - show raw database data
-app.get('/api/debug-conversations', async (req, res) => {
+  // Debug endpoint - show raw database data (DEVELOPMENT ONLY)
+  app.get('/api/debug-conversations', async (req, res) => {
   try {
     const usePostgres = !!process.env.DATABASE_URL;
     if (!usePostgres) {
@@ -197,25 +215,56 @@ app.get('/api/debug-conversations', async (req, res) => {
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
-});
+  });
+} else {
+  // In production, block debug and fix endpoints
+  app.use(['/api/debug-conversations', '/api/fix-conversations'], (req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+  console.log('✅ Debug endpoints disabled in production');
+}
 
-// Socket.IO - Real-time messaging
+// Socket.IO - Real-time messaging with JWT authentication
 const userSockets = new Map<number, string>(); // userId -> socketId
 
-io.on('connection', (socket) => {
-  console.log('👤 User connected:', socket.id);
+// Socket.IO JWT authentication middleware
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth.token;
+    
+    if (!token) {
+      console.log('❌ Socket connection rejected: No token provided');
+      return next(new Error('Authentication token required'));
+    }
+    
+    const decoded = jwt.verify(token, getJWTSecret()) as any;
+    socket.data.userId = decoded.userId;
+    socket.data.email = decoded.email;
+    
+    console.log(`✅ Socket authenticated for user ${decoded.userId} (${decoded.email})`);
+    next();
+  } catch (error) {
+    console.log('❌ Socket authentication failed:', error);
+    return next(new Error('Invalid or expired token'));
+  }
+});
 
-  // User joins with their ID
-  socket.on('user:join', (userId: number) => {
-    userSockets.set(userId, socket.id);
-    socket.join(`user:${userId}`);
-    console.log(`👤 User ${userId} joined with socket ${socket.id}`);
+io.on('connection', (socket) => {
+  const authenticatedUserId = socket.data.userId;
+  console.log('👤 User connected:', socket.id, 'User ID:', authenticatedUserId);
+
+  // User joins with their authenticated ID
+  socket.on('user:join', () => {
+    userSockets.set(authenticatedUserId, socket.id);
+    socket.join(`user:${authenticatedUserId}`);
+    console.log(`👤 User ${authenticatedUserId} joined with socket ${socket.id}`);
   });
 
-  // Send message
-  socket.on('message:send', async (data: { conversationId: number; senderId: number; receiverId: number; text: string }) => {
+  // Send message - use authenticated sender ID
+  socket.on('message:send', async (data: { conversationId: number; receiverId: number; text: string }) => {
     try {
-      const { conversationId, senderId, receiverId, text } = data;
+      const senderId = authenticatedUserId; // Use authenticated ID, not client data
+      const { conversationId, receiverId, text } = data;
       console.log('💬 Received message:send', { conversationId, senderId, receiverId, text });
 
       // If conversationId is 0 or missing, create or get conversation
@@ -273,10 +322,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Start conversation
-  socket.on('conversation:start', async (data: { user1Id: number; user2Id: number }) => {
+  // Start conversation - use authenticated user ID
+  socket.on('conversation:start', async (data: { otherUserId: number }) => {
     try {
-      const { user1Id, user2Id } = data;
+      const user1Id = authenticatedUserId; // Use authenticated ID
+      const user2Id = data.otherUserId;
 
       // Check if conversation exists
       let conversation: any = await conversationQueries.getConversation(user1Id, user2Id);
@@ -301,20 +351,26 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Typing indicator
-  socket.on('typing:start', (data: { conversationId: number; userId: number; receiverId: number }) => {
-    io.to(`user:${data.receiverId}`).emit('typing:start', { conversationId: data.conversationId, userId: data.userId });
+  // Typing indicator - use authenticated user ID
+  socket.on('typing:start', (data: { conversationId: number; receiverId: number }) => {
+    io.to(`user:${data.receiverId}`).emit('typing:start', { 
+      conversationId: data.conversationId, 
+      userId: authenticatedUserId 
+    });
   });
 
-  socket.on('typing:stop', (data: { conversationId: number; userId: number; receiverId: number }) => {
-    io.to(`user:${data.receiverId}`).emit('typing:stop', { conversationId: data.conversationId, userId: data.userId });
+  socket.on('typing:stop', (data: { conversationId: number; receiverId: number }) => {
+    io.to(`user:${data.receiverId}`).emit('typing:stop', { 
+      conversationId: data.conversationId, 
+      userId: authenticatedUserId 
+    });
   });
 
-  // Mark messages as read
-  socket.on('messages:read', (data: { conversationId: number; userId: number }) => {
+  // Mark messages as read - use authenticated user ID
+  socket.on('messages:read', (data: { conversationId: number }) => {
     try {
-      // markAsRead might be async when using Postgres
-      const maybePromise = messageQueries.markAsRead(data.conversationId, data.userId);
+      // Use authenticated user ID instead of client-provided
+      const maybePromise = messageQueries.markAsRead(data.conversationId, authenticatedUserId);
       if (maybePromise && typeof (maybePromise as any).then === 'function') {
         (maybePromise as Promise<any>).catch((err) => console.error('Mark as read error:', err));
       }
@@ -327,14 +383,9 @@ io.on('connection', (socket) => {
 
   // User disconnect
   socket.on('disconnect', () => {
-    // Remove from userSockets map
-    for (const [userId, socketId] of userSockets.entries()) {
-      if (socketId === socket.id) {
-        userSockets.delete(userId);
-        console.log(`👤 User ${userId} disconnected`);
-        break;
-      }
-    }
+    // Remove from userSockets map using authenticated user ID
+    userSockets.delete(authenticatedUserId);
+    console.log(`👤 User ${authenticatedUserId} disconnected`);
   });
 });
 

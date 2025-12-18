@@ -17,6 +17,30 @@ export default function ServicesScreen() {
   const { events, userEvents, upcomingEvents } = useCalendar();
   const [activeSection, setActiveSection] = useState<ServiceSection>('overview');
 
+  // If no user logged in, show login prompt
+  if (!currentUser) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Mis Servicios</Text>
+        </View>
+        <View style={styles.emptyState}>
+          <Package size={64} color={Colors.textLight} />
+          <Text style={styles.emptyTitle}>Inicia sesión para ver tus servicios</Text>
+          <Text style={styles.emptySubtitle}>
+            Accede a tu cuenta para gestionar reservas, calendario y más
+          </Text>
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={() => router.push('/login')}
+          >
+            <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   // Mock user's services (in real app, this would come from API)
   const userServices = mockServices.filter(service => service.providerId === currentUser?.id);
 
@@ -1555,5 +1579,36 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.text,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: Colors.textLight,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  loginButton: {
+    marginTop: 24,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.white,
   },
 });

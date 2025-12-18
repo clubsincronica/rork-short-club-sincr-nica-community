@@ -14,10 +14,12 @@ export const Colors = {
   goldDark: '#8c9468',     // Darker olive for better contrast
   text: '#1a1a1a',         // Almost black for maximum contrast
   textLight: '#2d3748',    // Much darker gray for better readability (WCAG AA compliant)
+  textSecondary: '#8E8E93', // Secondary text color
   textOnGold: '#000000',   // Pure black text for gold backgrounds
   textOnDark: '#ffffff',   // White text for dark backgrounds
   textOnPrimary: '#ffffff', // White text on primary color
   background: '#fbfbfb',   // Off-white
+  surface: '#F2F2F7',      // Surface color for cards
   white: '#FFFFFF',
   success: '#2d6a4f',      // Darker green for better contrast
   warning: '#b8860b',      // Darker golden for better contrast

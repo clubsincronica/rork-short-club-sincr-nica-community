@@ -13,10 +13,9 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MapPin, Navigation, Users, ShoppingBag, Utensils } from '@/components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
-import { allMockUsers, mockServices, mockFoodProviders } from '@/mocks/data';
-import { User, Service, FoodProvider } from '@/types/user';
+import { allMockUsers, mockServices } from '@/mocks/data';
+import { User, Service } from '@/types/user';
 import { ServiceCard } from '@/components/ServiceCard';
-import { FoodCard } from '@/components/FoodCard';
 
 
 
@@ -29,13 +28,13 @@ interface LocationData {
 
 interface NearbyItem {
   id: string;
-  type: 'user' | 'service' | 'food';
+  type: 'user' | 'service';
   title: string;
   subtitle: string;
   location: string;
   coordinates: LocationData;
   distance?: number;
-  data: User | Service | FoodProvider;
+  data: User | Service;
 }
 
 export default function NearMeScreen() {
@@ -216,16 +215,6 @@ export default function NearMeScreen() {
         <ServiceCard
           key={item.id}
           service={item.data as Service}
-          onPress={() => {}}
-        />
-      );
-    }
-    
-    if (item.type === 'food') {
-      return (
-        <FoodCard
-          key={item.id}
-          foodProvider={item.data as FoodProvider}
           onPress={() => {}}
         />
       );

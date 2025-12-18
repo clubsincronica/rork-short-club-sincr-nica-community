@@ -8,25 +8,27 @@ import { Colors } from '@/constants/colors';
 
 export default function Index() {
   const router = useRouter();
-  const { currentUser, isLoading: userLoading } = useUser();
+  const { currentUser, isLoading: userLoading, logout } = useUser();
   const { settings, isLoading: settingsLoading } = useAppSettings();
+
+  // 🔧 TESTING MODE: Set to true to force logout and show login screen
+  // Change to false after testing login flow
+  const FORCE_LOGOUT_FOR_TESTING = true;
 
   useEffect(() => {
     if (!userLoading && !settingsLoading) {
       console.log('Index - currentUser:', currentUser?.email, 'hasCompletedOnboarding:', settings.hasCompletedOnboarding);
       
-      // Check if we're in a preview environment
-      const isPreview = typeof window !== 'undefined' && (
-        window.location?.hostname?.includes('rork') || 
-        window.location?.hostname?.includes('localhost') ||
-        window.location?.hostname?.includes('expo.dev')
-      );
+      // Force logout during testing if flag is enabled
+      if (FORCE_LOGOUT_FOR_TESTING && currentUser) {
+        console.log('🔧 TESTING MODE: Force logout enabled - clearing session');
+        logout();
+        router.replace('/login');
+        return;
+      }
       
-      if (isPreview) {
-        // In preview mode, go directly to main app
-        console.log('Preview mode detected - going to discover');
-        router.replace('/discover');
-      } else if (!settings.hasCompletedOnboarding) {
+      // Normal navigation flow
+      if (!settings.hasCompletedOnboarding) {
         // First time user - show onboarding
         router.replace('/onboarding');
       } else if (!currentUser) {
@@ -37,7 +39,7 @@ export default function Index() {
         router.replace('/discover');
       }
     }
-  }, [currentUser, userLoading, settings.hasCompletedOnboarding, settingsLoading, router]);
+  }, [currentUser, userLoading, settings.hasCompletedOnboarding, settingsLoading, router, logout]);
 
   // Show loading while determining where to navigate
   return (

@@ -6,7 +6,6 @@ import { StyleSheet, View, Text, Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { UserProvider } from '@/hooks/user-store';
 import { CalendarProvider } from '@/hooks/calendar-store';
-import { FoodCartProvider } from '@/hooks/food-cart-store';
 import { VendorProvider } from '@/hooks/vendor-store';
 import { ProductsProvider } from '@/hooks/products-store';
 import { ServicesProvider } from '@/hooks/services-store';
@@ -82,13 +81,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="calendar" options={{ presentation: 'modal', title: 'Mi Calendario' }} />
       <Stack.Screen name="payment" options={{ presentation: 'modal', title: 'Pago' }} />
-      <Stack.Screen name="restaurant/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="menu-item/[id]" options={{ presentation: 'modal', headerShown: false }} />
-      <Stack.Screen name="cart" options={{ presentation: 'modal', title: 'Carrito' }} />
-      <Stack.Screen name="checkout" options={{ presentation: 'modal', title: 'Checkout' }} />
-      <Stack.Screen name="order-tracking/[id]" options={{ presentation: 'modal', title: 'Seguimiento' }} />
       <Stack.Screen name="notifications" options={{ presentation: 'modal', title: 'Notificaciones' }} />
-      <Stack.Screen name="order-history" options={{ presentation: 'modal', title: 'Mis Pedidos' }} />
       <Stack.Screen name="vendor-dashboard" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       <Stack.Screen name="settings" options={{ presentation: 'modal', title: 'Settings' }} />
@@ -170,13 +163,11 @@ export default function RootLayout() {
             <CalendarProvider>
               <ServicesProvider>
                 <ProductsProvider>
-                  <FoodCartProvider>
-                    <VendorProvider>
-                      <GestureHandlerRootView style={styles.rootContainer}>
-                        <RootLayoutNav />
-                      </GestureHandlerRootView>
-                    </VendorProvider>
-                  </FoodCartProvider>
+                  <VendorProvider>
+                    <GestureHandlerRootView style={styles.rootContainer}>
+                      <RootLayoutNav />
+                    </GestureHandlerRootView>
+                  </VendorProvider>
                 </ProductsProvider>
               </ServicesProvider>
             </CalendarProvider>

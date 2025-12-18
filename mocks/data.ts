@@ -1,8 +1,25 @@
-import { User, Service, Lodging, ServiceCategory, LodgingType, FoodProvider, FoodCategory, CalendarEvent } from '@/types/user';
+import { User, Service, Lodging, ServiceCategory, LodgingType, CalendarEvent } from '@/types/user';
 
 export const mockUsers: User[] = [
   {
-    id: '1',
+    id: '1',  // CORRECTED: Database has Tomas = ID 1
+    name: 'Tomas De La Llosa',
+    email: 'tom_weasley@hotmail.com',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
+    bio: 'Founder & CEO at TechWave Solutions. Passionate about AI and sustainable technology.',
+    location: 'San Francisco, CA',
+    coordinates: { latitude: 37.7749, longitude: -122.4194 },
+    specialties: ['Software Development', 'AI', 'Machine Learning'],
+    isServiceProvider: false,
+    rating: 4.8,
+    reviewCount: 32,
+    joinedDate: '2024-02-20',
+    verified: true,
+    instagram: 'tomasllosa',
+    tiktok: '@tomasllosa',
+  },
+  {
+    id: '2',  // CORRECTED: Database has Matias = ID 2
     name: 'Matias Cazeaux',
     email: 'matias.cazeaux@gmail.com',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
@@ -17,23 +34,6 @@ export const mockUsers: User[] = [
     verified: true,
     instagram: 'matiascazeaux',
     facebook: 'matias.cazeaux',
-  },
-  {
-    id: '2',
-    name: 'Tomas De La Llosa',
-    email: 'tom_weasley@hotmail.com',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-    bio: 'Desarrollador y facilitador de espacios conscientes.',
-    location: 'Mar del Plata, Argentina',
-    coordinates: { latitude: -38.01, longitude: -57.52 },
-    specialties: ['Tecnología', 'Mindfulness', 'Innovación'],
-    isServiceProvider: true,
-    rating: 4.8,
-    reviewCount: 32,
-    joinedDate: '2024-01-15',
-    verified: true,
-    instagram: 'tomasllosa',
-    tiktok: '@tomasllosa',
   },
   {
     id: '3',
@@ -154,140 +154,8 @@ export const mockLodging: Lodging[] = [
   },
 ];
 
-export const mockFoodUsers: User[] = [
-  {
-    id: '4',
-    name: 'Sage Greenleaf',
-    email: 'sage@example.com',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-    bio: 'Chef orgánico especializado en cocina vegana nutritiva y medicina alimentaria.',
-    location: 'Costa Rica',
-    coordinates: { latitude: 9.7489, longitude: -83.7534 },
-    specialties: ['Cocina Vegana', 'Medicina Alimentaria', 'Ingredientes Orgánicos'],
-    isServiceProvider: true,
-    rating: 4.8,
-    reviewCount: 92,
-    joinedDate: '2021-05-10',
-    verified: true,
-  },
-  {
-    id: '5',
-    name: 'Ocean Bluewater',
-    email: 'ocean@example.com',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-    bio: 'Especialista en jugos prensados en frío y superalimentos marinos.',
-    location: 'California',
-    coordinates: { latitude: 36.7783, longitude: -119.4179 },
-    specialties: ['Jugos Prensados', 'Superalimentos', 'Nutrición Holística'],
-    isServiceProvider: true,
-    rating: 4.9,
-    reviewCount: 78,
-    joinedDate: '2022-01-20',
-    verified: true,
-  },
-];
-
-// Export combined users array
-export const allMockUsers = [...mockUsers, ...mockFoodUsers];
-
-export const mockFoodProviders: FoodProvider[] = [
-  {
-    id: '1',
-    providerId: '1',
-    provider: mockUsers[0],
-    businessName: 'Jardín Sagrado Orgánico',
-    description: 'Comidas veganas orgánicas preparadas con amor e intención. Utilizamos ingredientes locales y de temporada para nutrir cuerpo, mente y alma.',
-    category: 'organic' as FoodCategory,
-    cuisine: ['Vegana', 'Mediterránea', 'Ayurvédica'],
-    images: [
-      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=400&h=300&fit=crop',
-    ],
-    location: 'Sedona, AZ',
-    deliveryRadius: 15,
-    isDeliveryAvailable: true,
-    isPickupAvailable: true,
-    rating: 4.9,
-    reviewCount: 87,
-    tags: ['orgánico', 'vegano', 'local', 'sin-gluten', 'ayurvédico'],
-    openingHours: {
-      monday: '8:00 - 18:00',
-      tuesday: '8:00 - 18:00',
-      wednesday: '8:00 - 18:00',
-      thursday: '8:00 - 18:00',
-      friday: '8:00 - 20:00',
-      saturday: '9:00 - 20:00',
-      sunday: '9:00 - 17:00',
-    },
-    specialties: ['Bowls de Quinoa', 'Smoothies Verdes', 'Ensaladas Energéticas', 'Sopas Curativas'],
-    certifications: ['Orgánico Certificado', '100% Vegano', 'Sin Gluten'],
-  },
-  {
-    id: '2',
-    providerId: '4',
-    provider: mockFoodUsers[0],
-    businessName: 'Elixir de Vida',
-    description: 'Bar de jugos y superalimentos especializado en bebidas adaptógenas y comidas crudas que elevan tu vibración y energía vital.',
-    category: 'juice-bar' as FoodCategory,
-    cuisine: ['Cruda', 'Superalimentos', 'Adaptógenos'],
-    images: [
-      'https://images.unsplash.com/photo-1610970881699-44a5587cabec?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1622597467836-f3285f2131b8?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=400&h=300&fit=crop',
-    ],
-    location: 'Costa Rica',
-    deliveryRadius: 10,
-    isDeliveryAvailable: true,
-    isPickupAvailable: true,
-    rating: 4.8,
-    reviewCount: 124,
-    tags: ['jugos-frescos', 'superalimentos', 'adaptógenos', 'crudo', 'detox'],
-    openingHours: {
-      monday: '7:00 - 19:00',
-      tuesday: '7:00 - 19:00',
-      wednesday: '7:00 - 19:00',
-      thursday: '7:00 - 19:00',
-      friday: '7:00 - 20:00',
-      saturday: '8:00 - 20:00',
-      sunday: '8:00 - 18:00',
-    },
-    specialties: ['Jugos Prensados en Frío', 'Leches de Nueces', 'Shots de Jengibre', 'Bowls de Açaí'],
-    certifications: ['Ingredientes Orgánicos', 'Prensado en Frío', 'Sin Azúcar Añadido'],
-  },
-  {
-    id: '3',
-    providerId: '5',
-    provider: mockFoodUsers[1],
-    businessName: 'Cocina Consciente Bali',
-    description: 'Restaurante macrobiótico que honra la filosofía del equilibrio yin-yang en cada plato. Comida como medicina para el alma.',
-    category: 'macrobiotic' as FoodCategory,
-    cuisine: ['Macrobiótica', 'Asiática', 'Medicina Tradicional'],
-    images: [
-      'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=400&h=300&fit=crop',
-    ],
-    location: 'California',
-    deliveryRadius: 8,
-    isDeliveryAvailable: false,
-    isPickupAvailable: true,
-    rating: 4.9,
-    reviewCount: 156,
-    tags: ['macrobiótico', 'equilibrio', 'medicina-alimentaria', 'granos-integrales'],
-    openingHours: {
-      monday: '11:00 - 21:00',
-      tuesday: '11:00 - 21:00',
-      wednesday: '11:00 - 21:00',
-      thursday: '11:00 - 21:00',
-      friday: '11:00 - 22:00',
-      saturday: '11:00 - 22:00',
-      sunday: 'Cerrado',
-    },
-    specialties: ['Miso Ramen', 'Tempeh Marinado', 'Arroz Integral con Verduras', 'Té de Hierbas Medicinales'],
-    certifications: ['Ingredientes Locales', 'Sin Químicos', 'Preparación Tradicional'],
-  },
-];
+// Export users array (food users removed for post-beta)
+export const allMockUsers = mockUsers;
 
 // Mock Calendar Events for testing "ON Today" feature
 // Using fixed times that will always be in the future for the current day

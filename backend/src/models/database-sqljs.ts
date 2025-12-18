@@ -1,3 +1,4 @@
+
 import initSqlJs, { Database } from 'sql.js';
 import fs from 'fs';
 import path from 'path';
@@ -87,7 +88,73 @@ export async function initializeDatabase() {
         )
       `);
 
-      console.log('Postgres database initialized');
+      // Create indexes for better query performance
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation 
+        ON messages(conversation_id, created_at DESC)
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread 
+        ON messages(receiver_id, read)
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_participants 
+        ON conversations(participant1_id, participant2_id)
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_participant1 
+        ON conversations(participant1_id)
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_participant2 
+        ON conversations(participant2_id)
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_users_location 
+        ON users(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+      `);
+
+      console.log('Postgres database initialized with indexes');
+
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS events (
+          id SERIAL PRIMARY KEY,
+          provider_id INTEGER NOT NULL,
+          title TEXT NOT NULL,
+          description TEXT,
+          category TEXT NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          date TEXT NOT NULL,
+          location TEXT,
+          is_online BOOLEAN DEFAULT FALSE,
+          max_participants INTEGER DEFAULT 0,
+          current_participants INTEGER DEFAULT 0,
+          price DOUBLE PRECISION DEFAULT 0,
+          image TEXT,
+          tags TEXT,
+          status TEXT DEFAULT 'upcoming',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_events_provider 
+        ON events(provider_id)
+      `);
+
+      await pgClient.query(`
+        CREATE INDEX IF NOT EXISTS idx_events_date 
+        ON events(date)
+      `);
+
+      console.log('Postgres events table initialized');
     } else {
       // Use sql.js
       console.log('Using SQL.js database');
@@ -144,6 +211,15 @@ export async function initializeDatabase() {
           )
         `);
 
+        // Create indexes for better query performance (SQLite)
+        db.run(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at DESC)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread ON messages(receiver_id, read)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_conversations_participants ON conversations(participant1_id, participant2_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_conversations_participant1 ON conversations(participant1_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_conversations_participant2 ON conversations(participant2_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_users_location ON users(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL`);
+
+        console.log('SQLite database created with indexes');
         saveDatabase();
       }
     }
@@ -170,6 +246,11 @@ export const userQueries = usePostgres ? {
     );
     return { lastID: res[0]?.id ?? null };
   },
+  // Returns all users (for geocoding and admin scripts)
+  getAllUsers: async () => {
+    const rows = await pgClient.query('SELECT * FROM users');
+    return rows || [];
+  },
 
   getUserByEmail: async (email: string) => {
     const rows = await pgClient.query(`SELECT * FROM users WHERE email = $1 LIMIT 1`, [email]);
@@ -190,13 +271,22 @@ export const userQueries = usePostgres ? {
 
   getNearbyUsers: async (latitude: number, longitude: number, radiusKm: number, limit: number) => {
     const rows = await pgClient.query(
-      `SELECT id, email, name, avatar, bio, location, latitude, longitude, services, is_host,
-        (6371 * acos(cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) AS distance
-       FROM users
-       WHERE latitude IS NOT NULL AND longitude IS NOT NULL
-       HAVING (6371 * acos(cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2)) + sin(radians($1)) * sin(radians(latitude)))) < $3
-       ORDER BY distance
-       LIMIT $4`,
+      `
+      SELECT * FROM (
+        SELECT
+          id, email, name, avatar, bio, location, latitude, longitude, services, is_host,
+          (6371 * acos(
+            cos(radians($1)) * cos(radians(latitude)) *
+            cos(radians(longitude) - radians($2)) +
+            sin(radians($1)) * sin(radians(latitude))
+          )) AS distance
+        FROM users
+        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+      ) AS sub
+      WHERE distance < $3
+      ORDER BY distance
+      LIMIT $4
+      `,
       [latitude, longitude, radiusKm, limit]
     );
     return rows || [];
@@ -211,6 +301,11 @@ export const userQueries = usePostgres ? {
     return rows || [];
   }
 } : {
+  // Returns all users (for geocoding and admin scripts)
+  getAllUsers: () => {
+    const result = db.exec('SELECT * FROM users');
+    return result[0]?.values.map((row: any) => rowToObject(result[0].columns, row)) || [];
+  },
   createUser: (email: string, passwordHash: string | null, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number) => {
     db.run(
       `INSERT INTO users (email, password_hash, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host)
@@ -220,12 +315,12 @@ export const userQueries = usePostgres ? {
     saveDatabase();
     return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
   },
-  
+
   getUserByEmail: (email: string) => {
     const result = db.exec(`SELECT * FROM users WHERE email = ?`, [email]);
     return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
   },
-  
+
   getUserById: (id: number) => {
     const result = db.exec(
       `SELECT id, email, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, created_at, updated_at
@@ -234,7 +329,7 @@ export const userQueries = usePostgres ? {
     );
     return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
   },
-  
+
   updateUser: (id: number, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number) => {
     db.run(
       `UPDATE users SET name = ?, avatar = ?, bio = ?, location = ?, latitude = ?, longitude = ?, phone = ?, website = ?, interests = ?, services = ?, is_host = ?, updated_at = CURRENT_TIMESTAMP
@@ -243,7 +338,7 @@ export const userQueries = usePostgres ? {
     );
     saveDatabase();
   },
-  
+
   getNearbyUsers: (latitude: number, longitude: number, radiusKm: number, limit: number) => {
     const result = db.exec(
       `SELECT id, email, name, avatar, bio, location, latitude, longitude, services, is_host,
@@ -257,7 +352,7 @@ export const userQueries = usePostgres ? {
     );
     return result[0]?.values.map((row: any) => rowToObject(result[0].columns, row)) || [];
   },
-  
+
   searchUsers: (query: string) => {
     const searchTerm = `%${query}%`;
     const result = db.exec(
@@ -315,7 +410,7 @@ export const conversationQueries = usePostgres ? {
     saveDatabase();
     return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
   },
-  
+
   getConversation: (user1Id: number, user2Id: number) => {
     const result = db.exec(
       `SELECT * FROM conversations
@@ -324,7 +419,7 @@ export const conversationQueries = usePostgres ? {
     );
     return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
   },
-  
+
   getUserConversations: (userId: number) => {
     const result = db.exec(
       `SELECT c.id, c.created_at, c.updated_at,
@@ -368,7 +463,7 @@ export const messageQueries = usePostgres ? {
       `SELECT m.*, u.name as sender_name, u.avatar as sender_avatar 
        FROM messages m 
        LEFT JOIN users u ON m.sender_id = u.id 
-       WHERE m.id = $1 LIMIT 1`, 
+       WHERE m.id = $1 LIMIT 1`,
       [id]
     );
     return rows[0] ?? null;
@@ -391,7 +486,7 @@ export const messageQueries = usePostgres ? {
     saveDatabase();
     return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
   },
-  
+
   getConversationMessages: (conversationId: number) => {
     const result = db.exec(
       `SELECT m.*, u.name as sender_name, u.avatar as sender_avatar
@@ -409,12 +504,12 @@ export const messageQueries = usePostgres ? {
       `SELECT m.*, u.name as sender_name, u.avatar as sender_avatar 
        FROM messages m 
        LEFT JOIN users u ON m.sender_id = u.id 
-       WHERE m.id = ? LIMIT 1`, 
+       WHERE m.id = ? LIMIT 1`,
       [id]
     );
     return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
   },
-  
+
   markAsRead: (conversationId: number, receiverId: number) => {
     db.run(
       `UPDATE messages SET read = 1 WHERE conversation_id = ? AND receiver_id = ?`,
@@ -422,12 +517,141 @@ export const messageQueries = usePostgres ? {
     );
     saveDatabase();
   },
-  
+
   getUnreadCount: (userId: number) => {
     const result = db.exec(
       `SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND read = 0`,
       [userId]
     );
-    return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : { count: 0 };
   }
+};
+
+// Event queries
+export const eventQueries = usePostgres ? {
+  createEvent: async (event: any) => {
+    const res = await pgClient.query(
+      `INSERT INTO events (
+        provider_id, title, description, category, start_time, end_time, date, 
+        location, is_online, max_participants, current_participants, price, image, tags, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
+      RETURNING id`,
+      [
+        event.providerId, event.title, event.description, event.category, event.startTime, event.endTime, event.date,
+        event.location, event.isOnline, event.maxParticipants, event.currentParticipants, event.price, event.image,
+        JSON.stringify(event.tags), event.status
+      ]
+    );
+    return { lastID: res[0]?.id ?? null };
+  },
+
+  getEvents: async () => {
+    const rows = await pgClient.query(`
+      SELECT e.*, u.name as provider_name, u.avatar as provider_avatar, u.email as provider_email
+      FROM events e
+      LEFT JOIN users u ON u.id = e.provider_id
+      ORDER BY date ASC, start_time ASC
+    `);
+
+    // Map snake_case to camelCase and parse tags
+    return rows.map((row: any) => ({
+      ...row,
+      providerId: row.provider_id,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      isOnline: row.is_online,
+      maxParticipants: row.max_participants,
+      currentParticipants: row.current_participants,
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      provider: {
+        id: row.provider_id,
+        name: row.provider_name,
+        avatar: row.provider_avatar,
+        email: row.provider_email,
+        // Add other minimal user fields to satisfy type
+        isServiceProvider: true,
+        rating: 0,
+        reviewCount: 0,
+        specialties: [],
+        joinedDate: '',
+        verified: false
+      }
+    }));
+  },
+
+  getEventsByProvider: async (providerId: number) => {
+    const rows = await pgClient.query(`
+      SELECT * FROM events WHERE provider_id = $1 ORDER BY date ASC, start_time ASC
+    `, [providerId]);
+    return rows.map((row: any) => ({
+      ...row,
+      providerId: row.provider_id,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      isOnline: row.is_online,
+      maxParticipants: row.max_participants,
+      currentParticipants: row.current_participants,
+      tags: row.tags ? JSON.parse(row.tags) : []
+    }));
+  },
+
+  getEventById: async (id: number) => {
+    const rows = await pgClient.query(`
+      SELECT e.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM events e
+      LEFT JOIN users u ON u.id = e.provider_id
+      WHERE e.id = $1
+    `, [id]);
+
+    if (!rows[0]) return null;
+
+    const row = rows[0];
+    return {
+      ...row,
+      providerId: row.provider_id,
+      startTime: row.start_time,
+      endTime: row.end_time,
+      isOnline: row.is_online,
+      maxParticipants: row.max_participants,
+      currentParticipants: row.current_participants,
+      tags: row.tags ? JSON.parse(row.tags) : []
+    };
+  },
+
+  deleteEvent: async (id: number) => {
+    await pgClient.query(`DELETE FROM events WHERE id = $1`, [id]);
+  },
+
+  updateEvent: async (id: number, event: any) => {
+    // Only update fields that are provided
+    await pgClient.query(`
+      UPDATE events SET 
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        category = COALESCE($3, category),
+        start_time = COALESCE($4, start_time),
+        end_time = COALESCE($5, end_time),
+        date = COALESCE($6, date),
+        location = COALESCE($7, location),
+        is_online = COALESCE($8, is_online),
+        max_participants = COALESCE($9, max_participants),
+        price = COALESCE($10, price),
+        image = COALESCE($11, image),
+        tags = COALESCE($12, tags),
+        status = COALESCE($13, status),
+        updated_at = NOW()
+      WHERE id = $14
+    `, [
+      event.title, event.description, event.category, event.startTime, event.endTime, event.date,
+      event.location, event.isOnline, event.maxParticipants, event.price, event.image,
+      event.tags ? JSON.stringify(event.tags) : null, event.status, id
+    ]);
+  }
+} : {
+  // SQLite fallback (minimal implementation for compilation, but we are using Postgres)
+  createEvent: (event: any) => { return { lastID: 0 }; },
+  getEvents: () => [],
+  getEventsByProvider: (id: number) => [],
+  getEventById: (id: number) => null,
+  deleteEvent: (id: number) => { },
+  updateEvent: (id: number, event: any) => { }
 };

@@ -4,20 +4,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Filter } from '@/components/SmartIcons';
 import { ServiceCard } from '@/components/ServiceCard';
 import { LodgingCard } from '@/components/LodgingCard';
-import { FoodCard } from '@/components/FoodCard';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { OnTodayBoard } from '@/components/OnTodayBoard';
 import { TouchableScale } from '@/components/TouchableScale';
 import { AccessibleText, Heading } from '@/components/AccessibleText';
 import { SkeletonCard } from '@/components/SkeletonLoader';
 import { useDebounce } from '@/hooks/useDebounce';
-import { mockServices, mockLodging, mockFoodProviders } from '@/mocks/data';
+import { mockServices, mockLodging } from '@/mocks/data';
 import { ServiceCategory } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
 
-type ViewMode = 'services' | 'lodging' | 'food';
+type ViewMode = 'services' | 'lodging';
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -99,24 +98,6 @@ export default function DiscoverScreen() {
     return filtered;
   }, [debouncedSearchQuery]);
 
-  const filteredFoodProviders = useMemo(() => {
-    let filtered = mockFoodProviders;
-    
-    if (debouncedSearchQuery.trim()) {
-      const query = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(provider => 
-        provider.businessName.toLowerCase().includes(query) ||
-        provider.description.toLowerCase().includes(query) ||
-        provider.provider.name.toLowerCase().includes(query) ||
-        provider.tags.some(tag => tag.toLowerCase().includes(query)) ||
-        provider.cuisine.some(cuisine => cuisine.toLowerCase().includes(query)) ||
-        provider.specialties.some(specialty => specialty.toLowerCase().includes(query))
-      );
-    }
-    
-    return filtered;
-  }, [debouncedSearchQuery]);
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -173,17 +154,6 @@ export default function DiscoverScreen() {
                   Alojamiento
                 </AccessibleText>
               </TouchableScale>
-              <TouchableScale
-                style={[styles.viewModeButton, viewMode === 'food' && styles.activeViewMode]}
-                onPress={() => setViewMode('food')}
-                testID="food-tab"
-                accessibilityLabel="Ver alimentación"
-                accessibilityState={{ selected: viewMode === 'food' }}
-              >
-                <AccessibleText style={[styles.viewModeText, viewMode === 'food' && styles.activeViewModeText]}>
-                  Alimentación
-                </AccessibleText>
-              </TouchableScale>
             </View>
           </View>
         </View>
@@ -208,9 +178,7 @@ export default function DiscoverScreen() {
             >
               {viewMode === 'services' 
                 ? `${filteredServices.length} servicios encontrados`
-                : viewMode === 'lodging'
-                ? `${filteredLodging.length} lugares encontrados`
-                : `${filteredFoodProviders.length} proveedores encontrados`
+                : `${filteredLodging.length} lugares encontrados`
               }
             </AccessibleText>
           </View>
@@ -231,22 +199,12 @@ export default function DiscoverScreen() {
                 />
               ))}
             </View>
-          ) : viewMode === 'lodging' ? (
+          ) : (
             <View style={styles.lodgingContainer}>
               {filteredLodging.map((lodging) => (
                 <LodgingCard
                   key={lodging.id}
                   lodging={lodging}
-                  onPress={() => {}}
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={styles.foodContainer}>
-              {filteredFoodProviders.map((foodProvider) => (
-                <FoodCard
-                  key={foodProvider.id}
-                  foodProvider={foodProvider}
                   onPress={() => {}}
                 />
               ))}

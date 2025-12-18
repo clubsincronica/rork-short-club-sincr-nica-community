@@ -1,12 +1,20 @@
 import express, { Request, Response } from 'express';
 import { conversationQueries, messageQueries } from '../models/database-sqljs';
+import { parseIntSafe } from '../middleware/security';
+import {
+  validateConversationId,
+  validateCreateConversation,
+  validateMarkAsRead,
+  validateMessagePagination,
+  handleValidationErrors,
+} from '../middleware/validation';
 
 const router = express.Router();
 
 // Get user's conversations
 router.get('/conversations/user/:userId', async (req: Request, res: Response) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseIntSafe(req.params.userId, 'user ID');
     console.log('📬 Fetching conversations for user:', userId);
     const conversations: any[] = await conversationQueries.getUserConversations(userId);
     
@@ -42,11 +50,27 @@ router.get('/conversations/user/:userId', async (req: Request, res: Response) =>
   }
 });
 
-// Get conversation messages
-router.get('/conversations/:conversationId/messages', async (req: Request, res: Response) => {
+// Get conversation messages (with pagination)
+router.get('/conversations/:conversationId/messages', validateConversationId, validateMessagePagination, handleValidationErrors, async (req: Request, res: Response) => {
   try {
-    const messages = await messageQueries.getConversationMessages(parseInt(req.params.conversationId));
-    res.json(messages);
+    const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
+    const page = req.query.page ? parseIntSafe(req.query.page, 'page', 1) : 1;
+    const limit = req.query.limit ? parseIntSafe(req.query.limit, 'limit', 1, 100) : 50;
+    
+    const messages = await messageQueries.getConversationMessages(conversationId);
+    
+    // Apply pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedMessages = messages.slice(startIndex, endIndex);
+    
+    res.json({
+      messages: paginatedMessages,
+      page,
+      limit,
+      total: messages.length,
+      hasMore: endIndex < messages.length
+    });
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Failed to get messages' });
@@ -54,13 +78,10 @@ router.get('/conversations/:conversationId/messages', async (req: Request, res: 
 });
 
 // Create or get conversation between two users
-router.post('/conversations', async (req: Request, res: Response) => {
+router.post('/conversations', validateCreateConversation, handleValidationErrors, async (req: Request, res: Response) => {
   try {
-    const { user1Id, user2Id } = req.body;
-
-    if (!user1Id || !user2Id) {
-      return res.status(400).json({ error: 'Both user IDs are required' });
-    }
+    const user1Id = parseIntSafe(req.body.user1Id, 'user1Id');
+    const user2Id = parseIntSafe(req.body.user2Id, 'user2Id');
 
     // Check if conversation already exists
     let conversation: any = await conversationQueries.getConversation(user1Id, user2Id);
@@ -82,10 +103,11 @@ router.post('/conversations', async (req: Request, res: Response) => {
 });
 
 // Mark messages as read
-router.post('/conversations/:conversationId/read', async (req: Request, res: Response) => {
+router.post('/conversations/:conversationId/read', validateConversationId, validateMarkAsRead, handleValidationErrors, async (req: Request, res: Response) => {
   try {
-    const { userId } = req.body;
-    await messageQueries.markAsRead(parseInt(req.params.conversationId), userId);
+    const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
+    const userId = parseIntSafe(req.body.userId, 'user ID');
+    await messageQueries.markAsRead(conversationId, userId);
     res.json({ success: true });
   } catch (error) {
     console.error('Mark as read error:', error);
@@ -96,7 +118,8 @@ router.post('/conversations/:conversationId/read', async (req: Request, res: Res
 // Get unread message count
 router.get('/messages/unread/:userId', async (req: Request, res: Response) => {
   try {
-    const result: any = await messageQueries.getUnreadCount(parseInt(req.params.userId));
+    const userId = parseIntSafe(req.params.userId, 'user ID');
+    const result: any = await messageQueries.getUnreadCount(userId);
     res.json({ count: result.count });
   } catch (error) {
     console.error('Get unread count error:', error);

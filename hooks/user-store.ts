@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { User, PaymentMethod, UserPreferences } from '@/types/user';
 import { mockUsers } from '@/mocks/data';
+import { getApiBaseUrl } from '@/utils/api-config';
 
 // Create the context manually for better React 19 compatibility
 const UserContext = createContext<ReturnType<typeof useUserStore> | null>(null);
@@ -78,7 +79,16 @@ const useUserStore = () => {
         const foundUser = mockUsers.find(u => u.email === userData.email);
         user = foundUser || mockUsers[0];
         
-        // Check if user already has stored data in AsyncStorage (preserve avatar, social media, etc.)
+        // Restore saved profile data (avatar, social links) from persistent storage
+        const profileDataJson = await AsyncStorage.getItem(`userProfile_${userData.email}`);
+        if (profileDataJson) {
+          const profileData = JSON.parse(profileDataJson);
+          // Merge profile data with mock data (profile data takes precedence)
+          user = { ...user, ...profileData };
+          console.log('✅ Restored user profile data from persistent storage:', profileData.avatar ? 'with custom avatar' : 'no avatar');
+        }
+        
+        // Also check for current session data (if user didn't logout)
         const storedUserJson = await AsyncStorage.getItem('currentUser');
         if (storedUserJson) {
           const storedUser = JSON.parse(storedUserJson);
@@ -137,6 +147,20 @@ const useUserStore = () => {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      // Save profile data (avatar, social links) to persistent storage before logout
+      const currentUserJson = await AsyncStorage.getItem('currentUser');
+      if (currentUserJson) {
+        const user = JSON.parse(currentUserJson);
+        const profileData = {
+          id: user.id,
+          email: user.email,
+          avatar: user.avatar,
+          instagram: user.instagram,
+          tiktok: user.tiktok,
+          facebook: user.facebook,
+        };
+        await AsyncStorage.setItem(`userProfile_${user.email}`, JSON.stringify(profileData));
+      }
       await AsyncStorage.removeItem('currentUser');
       await AsyncStorage.removeItem('paymentMethods');
       return null;
@@ -153,7 +177,51 @@ const useUserStore = () => {
     mutationFn: async (updates: Partial<User>) => {
       if (!currentUser) throw new Error('No user logged in');
       const updatedUser = { ...currentUser, ...updates };
+      
+      // Save to backend database so changes sync across devices
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/users/${currentUser.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: updatedUser.name,
+            avatar: updatedUser.avatar,
+            bio: updatedUser.bio,
+            location: updatedUser.location,
+            latitude: updatedUser.coordinates?.latitude,
+            longitude: updatedUser.coordinates?.longitude,
+            phone: updatedUser.phone,
+            website: '', // Not in User type, send empty string
+            interests: updatedUser.specialties,
+            services: updatedUser.specialties,
+            isHost: updatedUser.isServiceProvider,
+          }),
+        });
+        
+        if (response.ok) {
+          console.log('✅ Profile updated in backend database');
+        } else {
+          console.warn('⚠️ Failed to update backend, status:', response.status);
+        }
+      } catch (error) {
+        console.warn('⚠️ Failed to sync profile to backend:', error);
+        // Continue anyway - at least save locally
+      }
+      
       await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      
+      // Also save to persistent profile storage (survives logout)
+      const profileData = {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        avatar: updatedUser.avatar,
+        instagram: updatedUser.instagram,
+        tiktok: updatedUser.tiktok,
+        facebook: updatedUser.facebook,
+      };
+      await AsyncStorage.setItem(`userProfile_${updatedUser.email}`, JSON.stringify(profileData));
+      console.log('✅ Saved profile data to persistent storage');
+      
       return updatedUser;
     },
     onSuccess: (user) => {

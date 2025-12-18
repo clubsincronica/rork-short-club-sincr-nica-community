@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
+import { usePathname } from 'expo-router';
 import { useUser } from '@/hooks/user-store';
 import { initSocket, getSocket } from '@/app/services/socket';
 import { messageEventBus } from '@/utils/messageEventBus';
@@ -11,6 +12,7 @@ import { messageEventBus } from '@/utils/messageEventBus';
  */
 export function useGlobalSocketConnection() {
   const { currentUser } = useUser();
+  const pathname = usePathname();
   const socketRef = useRef<ReturnType<typeof initSocket> | null>(null);
   const messageHandlerSet = useRef(false);
   const globalNotificationHandlerSet = useRef(false);
@@ -122,25 +124,34 @@ export function useGlobalSocketConnection() {
   }, [currentUser?.id]);
 
   // Set up global event bus subscriber for fallback notifications (Alert)
+  // This shows Alert when user is NOT on Messages tab
   useEffect(() => {
     if (!currentUser || globalNotificationHandlerSet.current) return;
 
-    console.log('🌐 [GLOBAL] Setting up fallback notification handler');
+    console.log('🌐 [GLOBAL] Setting up message event bus subscription with Alert fallback');
 
     const unsubscribe = messageEventBus.onNewMessage((message) => {
-      // Show a simple Alert as fallback notification
-      // The Messages screen will suppress this if user is actively viewing the conversation
+      // Check if user is currently on Messages tab
+      const isOnMessagesTab = pathname?.includes('/messages');
+      
+      // Show Alert as fallback notification ONLY when user is NOT on Messages tab
+      // Messages screen will handle notifications when tab is active
       const isForMe = message.receiver_id === parseInt(currentUser.id as string);
       const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
 
-      if (isForMe && !isSentByMe) {
-        console.log('🌐 [GLOBAL] Showing Alert notification for message from:', message.sender_name);
+      if (isForMe && !isSentByMe && !isOnMessagesTab) {
+        console.log('🌐 [GLOBAL] User NOT on Messages tab - showing Alert fallback');
         Alert.alert(
-          `New message from ${message.sender_name || 'Unknown'} (ID: ${message.sender_id})`,
+          `Nuevo mensaje de ${message.sender_name || 'Usuario'}`,
           message.text,
           [{ text: 'OK' }]
         );
+      } else if (isOnMessagesTab) {
+        console.log('🌐 [GLOBAL] User IS on Messages tab - skipping Alert, letting Messages screen handle it');
       }
+      
+      // Don't return true - this is a fallback handler, it should always run last
+      return false;
     });
 
     globalNotificationHandlerSet.current = true;
@@ -149,7 +160,7 @@ export function useGlobalSocketConnection() {
       unsubscribe();
       globalNotificationHandlerSet.current = false;
     };
-  }, [currentUser]);
+  }, [currentUser, pathname]);
 
   return socketRef.current;
 }

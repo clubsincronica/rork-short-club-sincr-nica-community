@@ -174,6 +174,9 @@ export interface Reservation {
   paymentMethod?: string;
   createdAt: string;
   notes?: string;
+  isCheckedIn?: boolean;
+  checkInTime?: string;
+  ticketQRCode?: string;
 }
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'cancelled' | 'waitlist';
@@ -197,13 +200,16 @@ export interface UserCalendarSettings {
 
 export interface PaymentMethod {
   id: string;
-  type: 'card' | 'paypal' | 'bank';
+  type: 'card' | 'paypal' | 'bank' | 'mercadopago' | 'bizum';
   last4?: string;
   brand?: string;
   expiryMonth?: number;
   expiryYear?: number;
   isDefault: boolean;
   holderName?: string;
+  nickname?: string;
+  email?: string;
+  phone?: string;
 }
 
 export interface MenuItem {
@@ -379,4 +385,24 @@ export interface UserPreferences {
   emailNotifications?: boolean;
   pushNotifications?: boolean;
   smsNotifications?: boolean;
+}
+
+export interface EventTicket {
+  id: string;
+  reservation: Reservation;
+  qrData: string;
+  validationStatus: 'valid' | 'used' | 'expired' | 'invalid';
+  generatedAt: string;
+  usedAt?: string;
+}
+
+export interface BankAccount {
+  id: string;
+  accountNumber: string;
+  bankName: string;
+  accountType: 'checking' | 'savings';
+  holderName: string;
+  isDefault: boolean;
+  isVerified: boolean;
+  createdAt: string;
 }

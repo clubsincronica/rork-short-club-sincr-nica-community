@@ -1,12 +1,23 @@
 import express, { Request, Response } from 'express';
 import { userQueries } from '../models/database-sqljs';
+import { getJWTSecret } from '../config/env';
+import { authLimiter, strictLimiter } from '../middleware/rateLimiter';
+import { parseIntSafe, parseFloatSafe } from '../middleware/security';
+import {
+  validateAuth,
+  validateUserId,
+  validateUpdateUser,
+  validateNearbyUsers,
+  validateSearch,
+  handleValidationErrors,
+} from '../middleware/validation';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Register/Login - Create or get user
-router.post('/auth', async (req: Request, res: Response) => {
+// Register/Login - Create or get user (with rate limiting and validation)
+router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
 
@@ -49,8 +60,9 @@ router.post('/auth', async (req: Request, res: Response) => {
     if (user.services) user.services = JSON.parse(user.services);
     user.isHost = user.is_host === 1;
 
-    // Generate JWT token
-    const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
+    // Generate JWT token with proper secret
+    const jwtSecret = getJWTSecret();
+    const token = jwt.sign({ userId: user.id, email: user.email }, jwtSecret, { expiresIn: '30d' });
 
     res.json({ user, token });
   } catch (error) {
@@ -60,9 +72,10 @@ router.post('/auth', async (req: Request, res: Response) => {
 });
 
 // Get user profile
-router.get('/users/:id', async (req: Request, res: Response) => {
+router.get('/users/:id', validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
   try {
-    const user: any = await userQueries.getUserById(parseInt(req.params.id));
+    const userId = parseIntSafe(req.params.id, 'user ID');
+    const user: any = await userQueries.getUserById(userId);
 
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -80,12 +93,13 @@ router.get('/users/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Update user profile
-router.put('/users/:id', async (req: Request, res: Response) => {
+// Update user profile (with stricter rate limiting for security)
+router.put('/users/:id', strictLimiter, validateUserId, validateUpdateUser, handleValidationErrors, async (req: Request, res: Response) => {
   try {
+    const userId = parseIntSafe(req.params.id, 'user ID');
     const { name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
     await userQueries.updateUser(
-      parseInt(req.params.id),
+      userId,
       name,
       avatar,
       bio,
@@ -99,7 +113,7 @@ router.put('/users/:id', async (req: Request, res: Response) => {
       isHost ? 1 : 0
     );
 
-    const user: any = await userQueries.getUserById(parseInt(req.params.id));
+    const user: any = await userQueries.getUserById(userId);
     
     // Parse JSON fields
     if (user.interests) user.interests = JSON.parse(user.interests);
@@ -114,15 +128,16 @@ router.put('/users/:id', async (req: Request, res: Response) => {
 });
 
 // Get nearby users
-router.get('/users/nearby/:latitude/:longitude', async (req: Request, res: Response) => {
+router.get('/users/nearby/:latitude/:longitude', validateNearbyUsers, handleValidationErrors, async (req: Request, res: Response) => {
   try {
-    const { latitude, longitude } = req.params;
-    const radius = parseFloat(req.query.radius as string) || 50; // Default 50km
-    const limit = parseInt(req.query.limit as string) || 20;
+    const latitude = parseFloatSafe(req.params.latitude, 'latitude', -90, 90);
+    const longitude = parseFloatSafe(req.params.longitude, 'longitude', -180, 180);
+    const radius = req.query.radius ? parseFloatSafe(req.query.radius, 'radius', 0.1, 10000) : 50;
+    const limit = req.query.limit ? parseIntSafe(req.query.limit, 'limit', 1, 100) : 20;
 
     const users: any[] = await userQueries.getNearbyUsers(
-      parseFloat(latitude),
-      parseFloat(longitude),
+      latitude,
+      longitude,
       radius,
       limit
     );
@@ -142,7 +157,7 @@ router.get('/users/nearby/:latitude/:longitude', async (req: Request, res: Respo
 });
 
 // Search users
-router.get('/users/search/:query', async (req: Request, res: Response) => {
+router.get('/users/search/:query', validateSearch, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const users: any[] = await userQueries.searchUsers(req.params.query);
 

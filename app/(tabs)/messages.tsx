@@ -9,6 +9,7 @@ import { useUser } from '@/hooks/user-store';
 import { initSocket, getSocket } from '@/app/services/socket';
 import { getApiBaseUrl } from '@/utils/api-config';
 import { messageEventBus } from '@/utils/messageEventBus';
+import { logger } from '@/utils/logger';
 
 interface Conversation {
   id: number;
@@ -66,29 +67,33 @@ export default function MessagesScreen() {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('📬 Loaded conversations for user', currentUser.id, ':', data);
-        console.log('📬 Current user name:', currentUser.name, 'ID:', currentUser.id);
-        // Debug each conversation
-        data.forEach((conv: any) => {
-          console.log(`  📬 Conversation ${conv.id}:`);
-          console.log(`     - name: "${conv.name}" (should be OTHER user's name)`);
-          console.log(`     - other_user_id: ${conv.other_user_id}`);
-          console.log(`     - avatar: ${conv.avatar}`);
-          console.log(`     - ⚠️  ISSUE CHECK: Is name "${conv.name}" same as current user "${currentUser.name}"? ${conv.name === currentUser.name ? 'YES - BUG!' : 'No - OK'}`);
-        });
+        if (__DEV__) {
+          logger.debug('📬 Loaded conversations for user', currentUser.id, ':', data);
+          logger.debug('📬 Current user name:', currentUser.name, 'ID:', currentUser.id);
+          // Debug each conversation
+          data.forEach((conv: any) => {
+            logger.debug(`  📬 Conversation ${conv.id}:`);
+            logger.debug(`     - name: "${conv.name}" (should be OTHER user's name)`);
+            logger.debug(`     - other_user_id: ${conv.other_user_id}`);
+            logger.debug(`     - avatar: ${conv.avatar}`);
+            logger.debug(`     - ⚠️  ISSUE CHECK: Is name "${conv.name}" same as current user "${currentUser.name}"? ${conv.name === currentUser.name ? 'YES - BUG!' : 'No - OK'}`);
+          });
+        }
         setConversations(data);
       }
     } catch (error) {
-      console.error('Failed to load conversations:', error);
+      logger.error('Failed to load conversations:', error);
     } finally {
       setIsLoadingConversations(false);
     }
   };
 
-  // Load conversations on mount and when new messages arrive
+  // Load conversations on mount and when user changes or tab becomes focused
   useEffect(() => {
-    loadConversations();
-  }, [currentUser]);
+    if (isFocused && currentUser) {
+      loadConversations();
+    }
+  }, [currentUser?.id, isFocused]);
 
   // Initialize socket connection - use existing global socket
   useEffect(() => {
@@ -152,7 +157,7 @@ export default function MessagesScreen() {
       // Safety check
       if (!message || !message.text) {
         console.warn('❌ Invalid message from event bus:', message);
-        return;
+        return false; // Let other handlers try
       }
 
       // Reload conversations list to show new message
@@ -162,45 +167,66 @@ export default function MessagesScreen() {
       const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
       const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
       
+      // Determine if we should handle this message (stop propagation)
+      let shouldStopPropagation = false;
+      
       if (isReceivedByMe && !isSentByMe) {
-        // Check if we're ACTIVELY VIEWING this specific conversation right now
-        const isActivelyViewingThisConversation = isFocused && 
-          activeConversation && 
-          message.sender_id === parseInt(activeConversation.userId) &&
-          message.conversation_id === activeConversation.conversationId;
-        
-        console.log('📬 Notification check:', {
-          isTabFocused: isFocused,
-          hasActiveConversation: !!activeConversation,
-          activeConvoUserId: activeConversation?.userId,
-          activeConvoId: activeConversation?.conversationId,
-          messageSenderId: message.sender_id,
-          messageConvoId: message.conversation_id,
-          isActivelyViewing: isActivelyViewingThisConversation
-        });
-        
-        if (!isActivelyViewingThisConversation) {
-          // Show notification modal - user is NOT actively viewing this conversation
-          console.log('📬 Showing notification from:', message.sender_name || `User ${message.sender_id}`);
+        // Messages tab is focused - we handle all notifications
+        if (isFocused) {
+          shouldStopPropagation = true;
           
-          setNewMessageNotification({
-            senderName: message.sender_name || `User ${message.sender_id}`,
-            senderAvatar: message.sender_avatar,
-            messageText: message.text,
-            senderId: message.sender_id,
-            conversationId: message.conversation_id,
+          // Check if we're ACTIVELY VIEWING this specific conversation right now
+          const activeUserId = activeConversation ? parseInt(activeConversation.userId) : null;
+          const activeConvoId = activeConversation ? activeConversation.conversationId : null;
+          
+          const isActivelyViewingThisConversation = 
+            activeConversation && 
+            activeUserId !== null &&
+            activeConvoId !== null &&
+            message.sender_id === activeUserId &&
+            message.conversation_id === activeConvoId;
+          
+          console.log('📬 Notification check:', {
+            isTabFocused: isFocused,
+            hasActiveConversation: !!activeConversation,
+            activeConvoUserId: activeUserId,
+            activeConvoId: activeConvoId,
+            messageSenderId: message.sender_id,
+            messageConvoId: message.conversation_id,
+            isActivelyViewing: isActivelyViewingThisConversation,
+            senderName: message.sender_name,
+            senderIdMatch: activeUserId !== null && message.sender_id === activeUserId,
+            convoIdMatch: activeConvoId !== null && message.conversation_id === activeConvoId
           });
           
-          // Return true to stop propagation - we handled the notification
-          return true;
+          if (!isActivelyViewingThisConversation) {
+            // Show notification modal - user is NOT actively viewing this conversation
+            console.log('📬 Showing notification from:', message.sender_name);
+            
+            setNewMessageNotification({
+              senderName: message.sender_name || 'Usuario',
+              senderAvatar: message.sender_avatar,
+              messageText: message.text,
+              senderId: message.sender_id,
+              conversationId: message.conversation_id,
+            });
+          } else {
+            console.log('✅ User is actively viewing this conversation - NO modal, message will be added to chat');
+          }
         } else {
-          console.log('✅ User is actively viewing this conversation - no notification needed');
-          // Return true to stop propagation - actively viewing, no notification needed
-          return true;
+          // Messages tab NOT focused - let global Alert handle it
+          console.log('⏩ Messages tab not focused, let global Alert handle notification');
+          shouldStopPropagation = false;
         }
       }
       
-      // Add message to active conversation if applicable
+      if (isSentByMe) {
+        // Always handle messages sent by me
+        console.log('✅ Message sent by me, updating conversation list');
+        shouldStopPropagation = true;
+      }
+      
+      // Add message to active conversation if applicable (always, regardless of notification)
       setMessages(prev => {
         if (activeConversation) {
           const isFromActiveUser = message.sender_id === parseInt(activeConversation.userId);
@@ -231,6 +257,15 @@ export default function MessagesScreen() {
           timestamp: new Date(message.created_at),
         }];
       });
+      
+      // Return early based on whether we handled the message
+      if (shouldStopPropagation) {
+        console.log('🚫 Stopping propagation - Messages screen handled this message');
+        return true;
+      }
+      
+      console.log('⏩ Continuing propagation - Messages screen did not handle this message');
+      return false;
     });
 
     return unsubscribe;
@@ -310,6 +345,13 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (activeConversation?.conversationId) {
       loadConversationMessages(activeConversation.conversationId);
+      
+      // Clear any pending notification for this conversation
+      if (newMessageNotification && 
+          newMessageNotification.conversationId === activeConversation.conversationId) {
+        console.log('🧹 Clearing notification - conversation now open');
+        setNewMessageNotification(null);
+      }
     }
   }, [activeConversation?.conversationId]);
 
@@ -538,7 +580,37 @@ export default function MessagesScreen() {
     </View>
   );
 
-  const renderNewMessageModal = () => (
+  const renderNewMessageModal = () => {
+    // Safety check: Don't show modal if we're actively viewing a conversation
+    if (newMessageNotification) {
+      // Don't show modal if actively viewing this specific conversation
+      if (activeConversation) {
+        const isForActiveConvo = 
+          newMessageNotification.conversationId === activeConversation.conversationId ||
+          newMessageNotification.senderId === parseInt(activeConversation.userId);
+        
+        if (isForActiveConvo) {
+          console.log('⚠️ Suppressing modal - already viewing this conversation', {
+            notificationConvoId: newMessageNotification.conversationId,
+            activeConvoId: activeConversation.conversationId,
+            notificationSenderId: newMessageNotification.senderId,
+            activeUserId: parseInt(activeConversation.userId)
+          });
+          // Clear the notification without showing modal
+          setNewMessageNotification(null);
+          return null;
+        }
+      }
+      
+      // Don't show modal if tab is not focused (user on another screen)
+      if (!isFocused) {
+        console.log('⚠️ Suppressing modal - Messages tab not focused');
+        // Don't clear - just don't render
+        return null;
+      }
+    }
+    
+    return (
     <Modal
       visible={newMessageNotification !== null}
       transparent
@@ -549,7 +621,10 @@ export default function MessagesScreen() {
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Nuevo Mensaje</Text>
-            <TouchableOpacity onPress={() => setNewMessageNotification(null)}>
+            <TouchableOpacity onPress={() => {
+              console.log('❌ Modal X button pressed');
+              setNewMessageNotification(null);
+            }}>
               <X size={24} color={Colors.text} />
             </TouchableOpacity>
           </View>
@@ -568,7 +643,11 @@ export default function MessagesScreen() {
               <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonSecondary]}
-                  onPress={() => setNewMessageNotification(null)}
+                  onPress={() => {
+                    setNewMessageNotification(null);
+                    // Force refresh conversations to ensure UI is updated
+                    loadConversations();
+                  }}
                 >
                   <Text style={styles.modalButtonTextSecondary}>Cerrar</Text>
                 </TouchableOpacity>
@@ -600,7 +679,8 @@ export default function MessagesScreen() {
         </View>
       </View>
     </Modal>
-  );
+    );
+  };
 
   // Show conversation view if active
   if (activeConversation) {

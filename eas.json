@@ -17,6 +17,16 @@
     "preview": {
       "distribution": "internal",
       "ios": {
+        "resourceClass": "m-medium",
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "simulator": {
+      "ios": {
+        "simulator": true,
         "resourceClass": "m-medium"
       },
       "android": {
