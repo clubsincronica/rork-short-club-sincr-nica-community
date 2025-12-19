@@ -1,22 +1,36 @@
 import { io, Socket } from 'socket.io-client';
-import { SOCKET_URL } from '../../utils/api-config';
+import { SOCKET_URL } from './api-config';
 
 let socket: Socket | null = null;
 
 export const initSocket = (opts?: { token?: string; userId?: number }) => {
-  // Return existing socket if already connected
-  if (socket && socket.connected) {
-    console.log('♻️ Reusing existing socket connection');
-    return socket;
+  // If socket exists, update its auth payload
+  if (socket) {
+    socket.auth = { token: opts?.token };
+
+    if (socket.connected) {
+      console.log('♻️ Reusing existing socket connection (updated auth)');
+      return socket;
+    }
+
+    // If we have a socket but it's not connected, close it explicitly before creating a new one
+    // to avoid zombie connections or manager reuse issues
+    console.log('♻️ Closing disconnected socket before creating new one');
+    socket.close();
+    socket = null;
   }
 
   const query: any = {};
-  if (opts?.token) query.token = opts.token;
+  // userId can stay in query for initial connection logging (optional)
   if (opts?.userId) query.userId = opts.userId;
 
   console.log('🔌 Creating new socket connection with userId:', opts?.userId);
+  if (__DEV__) console.log('🔑 Socket Token provided:', opts?.token ? 'Yes' : 'No');
 
   socket = io(SOCKET_URL, {
+    auth: {
+      token: opts?.token, // CORRECT: Send token in auth object
+    },
     transports: ['polling', 'websocket'],
     upgrade: true,
     autoConnect: true,
@@ -26,7 +40,7 @@ export const initSocket = (opts?: { token?: string; userId?: number }) => {
     reconnectionDelayMax: 5000,
     timeout: 20000,
     path: '/socket.io/',
-    forceNew: false, // Changed to false to allow socket reuse
+    forceNew: true, // Force new connection to ensure auth is applied
     query,
   });
 
@@ -44,6 +58,9 @@ export const initSocket = (opts?: { token?: string; userId?: number }) => {
   socket.on('connect_error', (err) => {
     // eslint-disable-next-line no-console
     console.warn('⚠️ Socket connect_error:', err.message);
+    if (err.message.includes('token')) {
+      console.warn('❗ Auth Error: Token was rejected or missing.');
+    }
     console.log('🔄 Will retry with polling...');
   });
 

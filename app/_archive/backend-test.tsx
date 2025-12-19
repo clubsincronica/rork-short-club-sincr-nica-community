@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
-import { API_BASE_URL, API_ENDPOINTS } from '../utils/api-config';
+import { API_BASE_URL, API_ENDPOINTS } from '../../utils/api-config';
 
 export default function BackendTestScreen() {
   const [status, setStatus] = useState<string>('Not tested');
@@ -10,18 +10,18 @@ export default function BackendTestScreen() {
   const testConnection = async () => {
     setLoading(true);
     setStatus('Testing...');
-    
+
     try {
       const url = `${API_BASE_URL}${API_ENDPOINTS.HEALTH}`;
       console.log('Testing URL:', url);
-      
+
       const res = await fetch(url, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (res.ok) {
         const data = await res.json();
         setResponse(data);
@@ -42,7 +42,7 @@ export default function BackendTestScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.title}>Backend Connection Test</Text>
-        
+
         <View style={styles.infoBox}>
           <Text style={styles.label}>Server URL:</Text>
           <Text style={styles.value}>{API_BASE_URL}</Text>

@@ -7,17 +7,16 @@ import {
   TouchableOpacity,
   Platform,
   Image,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MapPin, Navigation, Users, ShoppingBag, Utensils } from '@/components/SmartIcons';
+import { MapPin, Navigation, Users, ShoppingBag, Search } from '@/components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
-import { allMockUsers, mockServices } from '@/mocks/data';
 import { User, Service } from '@/types/user';
 import { ServiceCard } from '@/components/ServiceCard';
-
-
+import { getApiBaseUrl } from '@/utils/api-config'; // Ensure we use the correct API URL
 
 type FilterType = 'all' | 'services' | 'users';
 
@@ -26,165 +25,141 @@ interface LocationData {
   longitude: number;
 }
 
-interface NearbyItem {
+interface FeedItem {
   id: string;
   type: 'user' | 'service';
   title: string;
   subtitle: string;
   location: string;
-  coordinates: LocationData;
+  coordinates?: LocationData;
   distance?: number;
   data: User | Service;
 }
 
-export default function NearMeScreen() {
+export default function CommunityScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [filter, setFilter] = useState<FilterType>('all');
+  const [searchText, setSearchText] = useState('');
   const [userLocation, setUserLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
 
+  // Optional: Get location for distance calculation, but don't block UI
   useEffect(() => {
-    requestLocationPermission();
-  }, []);
-
-  const requestLocationPermission = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        // Web geolocation API
-        if ('geolocation' in navigator) {
+    const getLocation = async () => {
+      try {
+        // Simple location attempt - silent fail if not granted
+        if (Platform.OS === 'web' && 'geolocation' in navigator) {
           navigator.geolocation.getCurrentPosition(
-            (position) => {
-              setUserLocation({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-              });
-              setLocationPermission(true);
-              setLoading(false);
-            },
-            () => {
-              // Use default location (San Francisco)
-              setUserLocation({ latitude: 37.7749, longitude: -122.4194 });
-              setLocationPermission(false);
-              setLoading(false);
-            }
+            (pos) => setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+            () => console.log('Location access denied or error')
           );
         } else {
-          // Fallback location
-          setUserLocation({ latitude: 37.7749, longitude: -122.4194 });
-          setLocationPermission(false);
-          setLoading(false);
-        }
-      } else {
-        // For native platforms, try to use expo-location
-        try {
-          const Location = await import('expo-location');
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          
-          if (status !== 'granted') {
-            // Use default location
-            setUserLocation({ latitude: 37.7749, longitude: -122.4194 });
-            setLocationPermission(false);
-            setLoading(false);
-            return;
+          try {
+            const Location = await import('expo-location');
+            const { status } = await Location.getForegroundPermissionsAsync();
+            if (status === 'granted') {
+              const loc = await Location.getCurrentPositionAsync({});
+              setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+            }
+          } catch (e) {
+            console.log('Expo location error', e);
           }
-
-          setLocationPermission(true);
-          const location = await Location.getCurrentPositionAsync({});
-          setUserLocation({
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          });
-          setLoading(false);
-        } catch {
-          // Use default location
-          setUserLocation({ latitude: 37.7749, longitude: -122.4194 });
-          setLocationPermission(false);
-          setLoading(false);
         }
+      } catch (err) {
+        console.log('Location check failed', err);
       }
-    } catch {
-      // Use default location
-      setUserLocation({ latitude: 37.7749, longitude: -122.4194 });
-      setLocationPermission(false);
-      setLoading(false);
-    }
-  };
+    };
+    getLocation();
+  }, []);
+
+  // Fetch ALL users
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        // Use the configured API URL
+        const response = await fetch(`${getApiBaseUrl()}/api/users`);
+        if (response.ok) {
+          const data = await response.json();
+          setAllUsers(data);
+        } else {
+          console.error('Failed to fetch users', response.status);
+        }
+      } catch (err) {
+        console.error('Failed to fetch community users:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, []);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in km
+    const R = 6371; // km
     const dLat = (lat2 - lat1) * (Math.PI / 180);
     const dLon = (lon2 - lon1) * (Math.PI / 180);
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(lat1 * (Math.PI / 180)) *
-        Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
 
-  const nearbyItems = useMemo(() => {
-    if (!userLocation) return [];
+  const filteredItems = useMemo(() => {
+    let items: FeedItem[] = [];
 
-    const items: NearbyItem[] = [];
-
-    // Add users if filter allows
+    // 1. Convert users to FeedItems
     if (filter === 'all' || filter === 'users') {
-      allMockUsers.forEach((user) => {
-        if (user.coordinates && user.isServiceProvider) {
-          const distance = calculateDistance(
+      allUsers.forEach((user) => {
+        let distance: number | undefined;
+        if (userLocation && user.coordinates?.latitude && user.coordinates?.longitude) {
+          distance = calculateDistance(
             userLocation.latitude,
             userLocation.longitude,
             user.coordinates.latitude,
             user.coordinates.longitude
           );
-          items.push({
-            id: `user-${user.id}`,
-            type: 'user',
-            title: user.name,
-            subtitle: user.specialties.join(', '),
-            location: user.location || '',
-            coordinates: user.coordinates,
-            distance,
-            data: user,
-          });
         }
+
+        items.push({
+          id: `user-${user.id}`,
+          type: 'user',
+          title: user.name,
+          subtitle: user.bio || '',
+          location: user.location || '',
+          coordinates: user.coordinates,
+          distance: distance,
+          data: user,
+        });
       });
     }
 
-    // Add services if filter allows
-    if (filter === 'all' || filter === 'services') {
-      mockServices.forEach((service) => {
-        if (service.provider.coordinates && !service.isOnline) {
-          const distance = calculateDistance(
-            userLocation.latitude,
-            userLocation.longitude,
-            service.provider.coordinates.latitude,
-            service.provider.coordinates.longitude
-          );
-          items.push({
-            id: `service-${service.id}`,
-            type: 'service',
-            title: service.title,
-            subtitle: `${service.provider.name} • ${service.price}`,
-            location: service.location || '',
-            coordinates: service.provider.coordinates,
-            distance,
-            data: service,
-          });
-        }
-      });
+    // 2. Filter by Search Text
+    if (searchText) {
+      const lowerSearch = searchText.toLowerCase();
+      items = items.filter(item =>
+        item.title.toLowerCase().includes(lowerSearch) ||
+        item.subtitle.toLowerCase().includes(lowerSearch) ||
+        item.location.toLowerCase().includes(lowerSearch)
+      );
     }
 
-    // Food providers removed - using dedicated food/restaurant discovery instead
+    // 3. Sort (Optional - maybe by name or distance if available)
+    // currently sorting by distance if available, else name
+    items.sort((a, b) => {
+      if (a.distance !== undefined && b.distance !== undefined) {
+        return a.distance - b.distance;
+      }
+      return a.title.localeCompare(b.title);
+    });
 
-    // Sort by distance
-    items.sort((a, b) => (a.distance || 0) - (b.distance || 0));
     return items;
-  }, [userLocation, filter]);
+  }, [allUsers, userLocation, filter, searchText]);
 
   const renderFilterButton = (filterType: FilterType, label: string, IconComponent: React.ComponentType<{ size: number; color: string }>) => (
     <TouchableOpacity
@@ -209,13 +184,13 @@ export default function NearMeScreen() {
     </TouchableOpacity>
   );
 
-  const renderListItem = (item: NearbyItem) => {
+  const renderListItem = (item: FeedItem) => {
     if (item.type === 'service') {
       return (
         <ServiceCard
           key={item.id}
           service={item.data as Service}
-          onPress={() => {}}
+          onPress={() => { }}
         />
       );
     }
@@ -223,8 +198,8 @@ export default function NearMeScreen() {
     // User card
     const user = item.data as User;
     return (
-      <TouchableOpacity 
-        key={item.id} 
+      <TouchableOpacity
+        key={item.id}
         style={styles.userCard}
         onPress={() => router.push({
           pathname: '/user-profile',
@@ -237,102 +212,93 @@ export default function NearMeScreen() {
         })}
       >
         <View style={styles.userCardContent}>
-          <Image source={{ uri: user.avatar }} style={styles.userAvatar} />
+          <Image
+            source={{ uri: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'User')}&background=random` }}
+            style={styles.userAvatar}
+          />
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{user.name}</Text>
-            <Text style={styles.userSpecialties}>{user.specialties.join(', ')}</Text>
+            <Text style={styles.userSpecialties} numberOfLines={1}>{user.specialties?.join(', ') || 'Miembro'}</Text>
             <View style={styles.locationRow}>
               <MapPin size={12} color={Colors.textLight} />
               <Text style={styles.userLocation}>
-                {user.location}
-                {item.distance && ` • ${item.distance.toFixed(1)} km`}
+                {user.location || 'Ubicación no especificada'}
+                {item.distance !== undefined && ` • ${item.distance.toFixed(1)} km`}
               </Text>
             </View>
           </View>
           <View style={styles.userRating}>
-            <Text style={styles.ratingText}>⭐ {user.rating}</Text>
-            <Text style={styles.reviewCount}>({user.reviewCount})</Text>
+            {/* Use conditional rendering in case rating is missing */}
+            <Text style={styles.ratingText}>⭐ {user.rating || '-'}</Text>
+            <Text style={styles.reviewCount}>({user.reviewCount || 0})</Text>
           </View>
         </View>
       </TouchableOpacity>
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Navigation size={48} color={Colors.primary} />
-          <Text style={styles.loadingText}>Getting your location...</Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        {/* Header with Gradient */}
-        <LinearGradient 
-          colors={Gradients.primary || ['#4f8497', '#549ab4']} 
-          style={[styles.header, { paddingTop: insets.top }]}
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={Gradients.primary || ['#4f8497', '#549ab4']}
+        style={[styles.header, { paddingTop: insets.top }]}
+      >
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Comunidad</Text>
+          <Text style={styles.subtitle}>Conecta con todos los miembros</Text>
+
+          <View style={styles.searchContainer}>
+            <Search size={20} color={Colors.textLight} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar personas o servicios..."
+              placeholderTextColor={Colors.textLight}
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Filters */}
+      <View style={styles.filtersSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersContent}
         >
-          <View style={styles.headerContent}>
-            <Text style={styles.title}>Near Me</Text>
-            <Text style={styles.subtitle}>Descubre personas y servicios cerca de ti</Text>
-            <View style={styles.locationInfo}>
-              <MapPin size={16} color={Colors.white} />
-              <Text style={styles.locationText}>
-                {locationPermission ? 'Ubicaci\u00f3n activa' : 'Ubicaci\u00f3n aproximada'}
-              </Text>
+          {renderFilterButton('all', 'Todos', Navigation)}
+          {renderFilterButton('services', 'Servicios', ShoppingBag)}
+          {renderFilterButton('users', 'Personas', Users)}
+        </ScrollView>
+      </View>
+
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Cargando comunidad...</Text>
+          </View>
+        ) : (
+          <View style={styles.listContainer}>
+            <View style={styles.listContent}>
+              {filteredItems.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Users size={48} color={Colors.textLight} />
+                  <Text style={styles.emptyStateText}>No se encontraron resultados</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Prueba con otra búsqueda o filtro
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.resultsCount}>
+                    {filteredItems.length} {filteredItems.length === 1 ? 'miembro' : 'miembros'}
+                  </Text>
+                  {filteredItems.map(renderListItem)}
+                </>
+              )}
             </View>
-          </View>
-        </LinearGradient>
-
-        {/* Filters */}
-        <View style={styles.filtersSection}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filtersContent}
-          >
-            {renderFilterButton('all', 'Todos', Navigation)}
-            {renderFilterButton('services', 'Servicios', ShoppingBag)}
-            {renderFilterButton('users', 'Personas', Users)}
-          </ScrollView>
-        </View>
-
-        {/* Content */}
-        <View style={styles.listContainer}>
-          <View style={styles.listContent}>
-            {nearbyItems.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Navigation size={48} color={Colors.textLight} />
-                <Text style={styles.emptyStateText}>No se encontraron servicios cercanos</Text>
-                <Text style={styles.emptyStateSubtext}>
-                  Intenta cambiar los filtros o verificar tu ubicaci\u00f3n
-                </Text>
-              </View>
-            ) : (
-              <>
-                <Text style={styles.resultsCount}>
-                  {nearbyItems.length} {nearbyItems.length === 1 ? 'resultado' : 'resultados'} encontrado{nearbyItems.length === 1 ? '' : 's'}
-                </Text>
-                {nearbyItems.map(renderListItem)}
-              </>
-            )}
-          </View>
-        </View>
-
-        {/* Location permission notice */}
-        {!locationPermission && (
-          <View style={styles.permissionNotice}>
-            <Text style={styles.permissionText}>
-              \ud83d\udccd Activa la ubicaci\u00f3n para resultados m\u00e1s precisos
-            </Text>
-            <TouchableOpacity onPress={requestLocationPermission}>
-              <Text style={styles.permissionAction}>Activar</Text>
-            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -349,22 +315,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 40,
     alignItems: 'center',
-    gap: 16,
   },
   loadingText: {
     fontSize: 16,
     color: Colors.text,
-    fontWeight: '500',
   },
   header: {
-    paddingBottom: 30,
+    paddingBottom: 20,
     paddingHorizontal: 20,
   },
   headerContent: {
-    paddingTop: 20,
+    paddingTop: 10,
   },
   title: {
     fontSize: 32,
@@ -376,38 +339,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.white,
     opacity: 0.9,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  locationInfo: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: Colors.white,
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    gap: 8,
   },
-  locationText: {
-    fontSize: 13,
-    color: Colors.white,
-    fontWeight: '500',
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: Colors.text,
   },
   filtersSection: {
     backgroundColor: Colors.white,
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    marginTop: -10,
   },
   filtersContent: {
     paddingHorizontal: 20,
     gap: 8,
   },
   filterButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.border,
     backgroundColor: Colors.white,
@@ -420,7 +381,7 @@ const styles = StyleSheet.create({
   filterButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   filterButtonText: {
     fontSize: 14,
@@ -431,7 +392,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   listContainer: {
-    flex: 1,
     backgroundColor: Colors.background,
   },
   listContent: {
@@ -518,24 +478,5 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 40,
   },
-  permissionNotice: {
-    backgroundColor: Colors.accent,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  permissionText: {
-    fontSize: 14,
-    color: Colors.white,
-    fontWeight: '500',
-    flex: 1,
-  },
-  permissionAction: {
-    fontSize: 14,
-    color: Colors.white,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
 });
+

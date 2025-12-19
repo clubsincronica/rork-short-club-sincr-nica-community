@@ -68,7 +68,7 @@ export default function AddEventScreen() {
   
   // Check if we're editing an existing event
   const editingEventId = params.eventId as string;
-  const editingEvent = editingEventId ? events.find(e => e.id === editingEventId) : null;
+  const editingEvent = editingEventId ? events.find((e: CalendarEvent) => e.id === editingEventId) : null;
   const isEditing = !!editingEvent;
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -194,6 +194,11 @@ export default function AddEventScreen() {
     setIsSubmitting(true);
 
     try {
+      if (!currentUser) {
+        Alert.alert('Iniciar Sesión', 'Por favor inicia sesión para crear un evento.');
+        setIsSubmitting(false);
+        return;
+      }
       const endTime = calculateEndTime(eventForm.startTime, eventForm.duration);
       const eventData = {
         providerId: currentUser.id,

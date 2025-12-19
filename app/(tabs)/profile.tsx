@@ -4,17 +4,17 @@ import { TouchableScale } from '@/components/TouchableScale';
 import { AccessibleText, Heading } from '@/components/AccessibleText';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  Edit3, 
-  Star, 
-  MapPin, 
-  Calendar, 
-  Award, 
-  Settings, 
-  CreditCard, 
-  Bell, 
-  Shield, 
-  HelpCircle, 
+import {
+  Edit3,
+  Star,
+  MapPin,
+  Calendar,
+  Award,
+  Settings,
+  CreditCard,
+  Bell,
+  Shield,
+  HelpCircle,
   LogOut,
   ChevronRight,
   X,
@@ -81,10 +81,10 @@ export default function ProfileScreen() {
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'activity' | 'achievements'>('activity');
   const [isMiCuentaExpanded, setIsMiCuentaExpanded] = useState(false);
-  
+
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
-  
+
   const [editedProfile, setEditedProfile] = useState({
     name: currentUser?.name || '',
     email: currentUser?.email || '',
@@ -146,7 +146,7 @@ export default function ProfileScreen() {
       return;
     }
     login({
-      id: '1',
+      id: 1,
       name: 'Usuario Demo',
       email: loginForm.email,
       avatar: 'https://i.pravatar.cc/150?img=3',
@@ -173,7 +173,7 @@ export default function ProfileScreen() {
       return;
     }
     login({
-      id: '1',
+      id: 1,
       name: signupForm.name,
       email: signupForm.email,
       avatar: 'https://i.pravatar.cc/150?img=5',
@@ -224,15 +224,15 @@ export default function ProfileScreen() {
             <Text style={styles.loginDescription}>
               Únete a nuestra comunidad de bienestar holístico y conecta con practicantes conscientes.
             </Text>
-            <TouchableScale 
-              style={styles.primaryButton} 
+            <TouchableScale
+              style={styles.primaryButton}
               onPress={() => setIsLoginModalVisible(true)}
               testID="login-button"
               accessibilityLabel="Iniciar sesión en tu cuenta"
             >
               <AccessibleText style={styles.primaryButtonText}>Iniciar Sesión</AccessibleText>
             </TouchableScale>
-            <TouchableScale 
+            <TouchableScale
               style={styles.secondaryButton}
               onPress={() => setIsSignupModalVisible(true)}
               testID="signup-button"
@@ -366,293 +366,293 @@ export default function ProfileScreen() {
   return (
     <ConstellationBackground intensity="light">
       <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <LinearGradient colors={Gradients.primary || ['#4f8497', '#549ab4']} style={[styles.header, { paddingTop: insets.top }]}>
-          <View style={styles.profileSection}>
-            <View style={styles.avatarContainer}>
-              <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
-              {currentUser.verified && (
-                <View style={styles.verifiedBadge}>
-                  <CheckCircle size={16} color={Colors.white} />
-                </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <LinearGradient colors={Gradients.primary || ['#4f8497', '#549ab4']} style={[styles.header, { paddingTop: insets.top }]}>
+            <View style={styles.profileSection}>
+              <View style={styles.avatarContainer}>
+                <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
+                {currentUser.verified && (
+                  <View style={styles.verifiedBadge}>
+                    <CheckCircle size={16} color={Colors.white} />
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={styles.editAvatarButton}
+                  onPress={() => setIsEditModalVisible(true)}
+                >
+                  <Camera size={16} color={Colors.white} />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.userName}>{currentUser.name}</Text>
+              <Text style={styles.userEmail}>{currentUser.email}</Text>
+
+              {currentUser.bio && (
+                <Text style={styles.userBio}>{currentUser.bio}</Text>
               )}
-              <TouchableOpacity 
-                style={styles.editAvatarButton}
-                onPress={() => setIsEditModalVisible(true)}
-              >
-                <Camera size={16} color={Colors.white} />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.userName}>{currentUser.name}</Text>
-            <Text style={styles.userEmail}>{currentUser.email}</Text>
-            
-            {currentUser.bio && (
-              <Text style={styles.userBio}>{currentUser.bio}</Text>
-            )}
-            
-            <View style={styles.userDetails}>
-              {currentUser.location && (
+
+              <View style={styles.userDetails}>
+                {currentUser.location && (
+                  <View style={styles.detailItem}>
+                    <MapPin size={14} color={Colors.white} />
+                    <Text style={styles.detailText}>{currentUser.location}</Text>
+                  </View>
+                )}
                 <View style={styles.detailItem}>
-                  <MapPin size={14} color={Colors.white} />
-                  <Text style={styles.detailText}>{currentUser.location}</Text>
+                  <Calendar size={14} color={Colors.white} />
+                  <Text style={styles.detailText}>
+                    Se unió {new Date(currentUser.joinedDate).toLocaleDateString('es-ES', {
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </Text>
                 </View>
-              )}
-              <View style={styles.detailItem}>
-                <Calendar size={14} color={Colors.white} />
-                <Text style={styles.detailText}>
-                  Se unió {new Date(currentUser.joinedDate).toLocaleDateString('es-ES', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
-                </Text>
               </View>
             </View>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{currentUser.rating}</Text>
-            <View style={styles.statLabel}>
-              <Star size={14} color={Colors.warning} fill={Colors.warning} />
-              <Text style={styles.statText}>Calificación</Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{currentUser.rating}</Text>
+              <View style={styles.statLabel}>
+                <Star size={14} color={Colors.warning} fill={Colors.warning} />
+                <Text style={styles.statText}>Calificación</Text>
+              </View>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{currentUser.reviewCount}</Text>
+              <Text style={styles.statText}>Reseñas</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{currentUser.specialties?.length || 0}</Text>
+              <Text style={styles.statText}>Especialidades</Text>
             </View>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{currentUser.reviewCount}</Text>
-            <Text style={styles.statText}>Reseñas</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{currentUser.specialties.length}</Text>
-            <Text style={styles.statText}>Especialidades</Text>
-          </View>
-        </View>
 
-        {currentUser.specialties.length > 0 && (
-          <View style={styles.specialtiesContainer}>
-            <Text style={styles.sectionTitle}>Especialidades</Text>
-            <View style={styles.specialtiesList}>
-              {currentUser.specialties.map((specialty, index) => (
-                <View key={index} style={styles.specialtyTag}>
-                  <Text style={styles.specialtyText}>{specialty}</Text>
-                </View>
-              ))}
+          {(currentUser.specialties?.length || 0) > 0 && (
+            <View style={styles.specialtiesContainer}>
+              <Text style={styles.sectionTitle}>Especialidades</Text>
+              <View style={styles.specialtiesList}>
+                {(currentUser.specialties || []).map((specialty, index) => (
+                  <View key={index} style={styles.specialtyTag}>
+                    <Text style={styles.specialtyText}>{specialty}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        <View style={styles.tabContainer}>
-          <View style={styles.tabButtons}>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'activity' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('activity')}
-            >
-              <Activity size={18} color={activeTab === 'activity' ? Colors.primary : Colors.textLight} />
-              <Text style={[styles.tabButtonText, activeTab === 'activity' && styles.tabButtonTextActive]}>
-                Actividad
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'achievements' && styles.tabButtonActive]}
-              onPress={() => setActiveTab('achievements')}
-            >
-              <Trophy size={18} color={activeTab === 'achievements' ? Colors.primary : Colors.textLight} />
-              <Text style={[styles.tabButtonText, activeTab === 'achievements' && styles.tabButtonTextActive]}>
-                Logros
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <View style={styles.tabContainer}>
+            <View style={styles.tabButtons}>
+              <TouchableOpacity
+                style={[styles.tabButton, activeTab === 'activity' && styles.tabButtonActive]}
+                onPress={() => setActiveTab('activity')}
+              >
+                <Activity size={18} color={activeTab === 'activity' ? Colors.primary : Colors.textLight} />
+                <Text style={[styles.tabButtonText, activeTab === 'activity' && styles.tabButtonTextActive]}>
+                  Actividad
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabButton, activeTab === 'achievements' && styles.tabButtonActive]}
+                onPress={() => setActiveTab('achievements')}
+              >
+                <Trophy size={18} color={activeTab === 'achievements' ? Colors.primary : Colors.textLight} />
+                <Text style={[styles.tabButtonText, activeTab === 'achievements' && styles.tabButtonTextActive]}>
+                  Logros
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-          {activeTab === 'activity' ? (
-            <View style={styles.activityList}>
-              {activities.length > 0 ? (
-                activities.map((activity) => (
-                  <View key={activity.id} style={styles.activityItem}>
-                    <View style={[styles.activityIcon, activity.type === 'achievement' && styles.activityIconHighlight]}>
-                      <activity.icon size={20} color={activity.type === 'achievement' ? Colors.gold : Colors.primary} />
+            {activeTab === 'activity' ? (
+              <View style={styles.activityList}>
+                {activities.length > 0 ? (
+                  activities.map((activity) => (
+                    <View key={activity.id} style={styles.activityItem}>
+                      <View style={[styles.activityIcon, activity.type === 'achievement' && styles.activityIconHighlight]}>
+                        <activity.icon size={20} color={activity.type === 'achievement' ? Colors.gold : Colors.primary} />
+                      </View>
+                      <View style={styles.activityContent}>
+                        <Text style={styles.activityTitle}>{activity.title}</Text>
+                        <Text style={styles.activityDescription}>{activity.description}</Text>
+                        <View style={styles.activityDate}>
+                          <Clock size={12} color={Colors.textLight} />
+                          <Text style={styles.activityDateText}>
+                            {new Date(activity.date).toLocaleDateString('es-ES', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </Text>
+                        </View>
+                      </View>
                     </View>
-                    <View style={styles.activityContent}>
-                      <Text style={styles.activityTitle}>{activity.title}</Text>
-                      <Text style={styles.activityDescription}>{activity.description}</Text>
-                      <View style={styles.activityDate}>
-                        <Clock size={12} color={Colors.textLight} />
-                        <Text style={styles.activityDateText}>
-                          {new Date(activity.date).toLocaleDateString('es-ES', { 
-                            day: 'numeric',
+                  ))
+                ) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Activity size={48} color={Colors.textLight} />
+                    <Text style={styles.emptyStateTitle}>Sin Actividad</Text>
+                    <Text style={styles.emptyStateText}>
+                      Tu actividad reciente aparecerá aquí
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : (
+              <View style={styles.achievementGrid}>
+                {achievements.length > 0 ? (
+                  achievements.map((achievement) => (
+                    <View
+                      key={achievement.id}
+                      style={[styles.achievementCard, achievement.earned && styles.achievementCardEarned]}
+                    >
+                      <View style={[styles.achievementIcon, achievement.earned && styles.achievementIconEarned]}>
+                        <achievement.icon
+                          size={24}
+                          color={achievement.earned ? Colors.gold : Colors.textLight}
+                        />
+                      </View>
+                      <Text style={[styles.achievementTitle, achievement.earned && styles.achievementTitleEarned]}>
+                        {achievement.title}
+                      </Text>
+                      <Text style={styles.achievementDescription}>
+                        {achievement.description}
+                      </Text>
+                      {achievement.earned && achievement.earnedDate && (
+                        <Text style={styles.achievementDate}>
+                          {new Date(achievement.earnedDate).toLocaleDateString('es-ES', {
                             month: 'short',
                             year: 'numeric'
                           })}
                         </Text>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyStateContainer}>
+                    <Trophy size={48} color={Colors.textLight} />
+                    <Text style={styles.emptyStateTitle}>Sin Logros</Text>
+                    <Text style={styles.emptyStateText}>
+                      Completa actividades para desbloquear logros
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.menuContainer}>
+            <Text style={styles.sectionTitle}>Cuenta</Text>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.menuItem, item.highlight && styles.menuItemHighlight]}
+                onPress={item.onPress}
+                testID={item.testId}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.menuIcon, item.highlight && styles.menuIconHighlight]}>
+                    <item.icon size={20} color={item.highlight ? Colors.white : Colors.primary} />
+                  </View>
+                  <View style={styles.menuContent}>
+                    <Text style={[styles.menuTitle, item.highlight && styles.menuTitleHighlight]}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                  </View>
+                </View>
+                <ChevronRight size={20} color={Colors.textLight} />
+              </TouchableOpacity>
+            ))}
+
+            {/* Mi Cuenta Collapsible Section */}
+            <TouchableOpacity
+              style={[styles.menuItem, styles.miCuentaButton]}
+              onPress={() => setIsMiCuentaExpanded(!isMiCuentaExpanded)}
+              testID="mi-cuenta-toggle"
+            >
+              <View style={styles.menuItemLeft}>
+                <View style={[styles.menuIcon, styles.miCuentaIcon]}>
+                  <User size={20} color={Colors.gold} />
+                </View>
+                <View style={styles.menuContent}>
+                  <Text style={[styles.menuTitle, styles.miCuentaTitle]}>Mi Cuenta</Text>
+                  <Text style={styles.menuSubtitle}>Ajustes de perfil y seguridad</Text>
+                </View>
+              </View>
+              {isMiCuentaExpanded ? (
+                <ChevronUp size={20} color={Colors.gold} />
+              ) : (
+                <ChevronDown size={20} color={Colors.gold} />
+              )}
+            </TouchableOpacity>
+
+            {/* Mi Cuenta Submenu Items */}
+            {isMiCuentaExpanded && (
+              <View style={styles.submenuContainer}>
+                {miCuentaItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.submenuItem}
+                    onPress={item.onPress}
+                    testID={item.testId}
+                  >
+                    <View style={styles.menuItemLeft}>
+                      <View style={styles.submenuIcon}>
+                        <item.icon size={18} color={Colors.primary} />
+                      </View>
+                      <View style={styles.menuContent}>
+                        <Text style={styles.submenuTitle}>{item.title}</Text>
+                        <Text style={styles.submenuSubtitle}>{item.subtitle}</Text>
                       </View>
                     </View>
-                  </View>
-                ))
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Activity size={48} color={Colors.textLight} />
-                  <Text style={styles.emptyStateTitle}>Sin Actividad</Text>
-                  <Text style={styles.emptyStateText}>
-                    Tu actividad reciente aparecerá aquí
-                  </Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.achievementGrid}>
-              {achievements.length > 0 ? (
-                achievements.map((achievement) => (
-                  <View 
-                    key={achievement.id} 
-                    style={[styles.achievementCard, achievement.earned && styles.achievementCardEarned]}
-                  >
-                    <View style={[styles.achievementIcon, achievement.earned && styles.achievementIconEarned]}>
-                      <achievement.icon 
-                        size={24} 
-                        color={achievement.earned ? Colors.gold : Colors.textLight} 
-                      />
-                    </View>
-                    <Text style={[styles.achievementTitle, achievement.earned && styles.achievementTitleEarned]}>
-                      {achievement.title}
-                    </Text>
-                    <Text style={styles.achievementDescription}>
-                      {achievement.description}
-                    </Text>
-                    {achievement.earned && achievement.earnedDate && (
-                      <Text style={styles.achievementDate}>
-                        {new Date(achievement.earnedDate).toLocaleDateString('es-ES', { 
-                          month: 'short',
-                          year: 'numeric'
-                        })}
-                      </Text>
-                    )}
-                  </View>
-                ))
-              ) : (
-                <View style={styles.emptyStateContainer}>
-                  <Trophy size={48} color={Colors.textLight} />
-                  <Text style={styles.emptyStateTitle}>Sin Logros</Text>
-                  <Text style={styles.emptyStateText}>
-                    Completa actividades para desbloquear logros
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.menuContainer}>
-          <Text style={styles.sectionTitle}>Cuenta</Text>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.menuItem, item.highlight && styles.menuItemHighlight]}
-              onPress={item.onPress}
-              testID={item.testId}
-            >
-              <View style={styles.menuItemLeft}>
-                <View style={[styles.menuIcon, item.highlight && styles.menuIconHighlight]}>
-                  <item.icon size={20} color={item.highlight ? Colors.white : Colors.primary} />
-                </View>
-                <View style={styles.menuContent}>
-                  <Text style={[styles.menuTitle, item.highlight && styles.menuTitleHighlight]}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                </View>
+                    {item.rightComponent || <ChevronRight size={18} color={Colors.textLight} />}
+                  </TouchableOpacity>
+                ))}
               </View>
-              <ChevronRight size={20} color={Colors.textLight} />
-            </TouchableOpacity>
-          ))}
-
-          {/* Mi Cuenta Collapsible Section */}
-          <TouchableOpacity
-            style={[styles.menuItem, styles.miCuentaButton]}
-            onPress={() => setIsMiCuentaExpanded(!isMiCuentaExpanded)}
-            testID="mi-cuenta-toggle"
-          >
-            <View style={styles.menuItemLeft}>
-              <View style={[styles.menuIcon, styles.miCuentaIcon]}>
-                <User size={20} color={Colors.gold} />
-              </View>
-              <View style={styles.menuContent}>
-                <Text style={[styles.menuTitle, styles.miCuentaTitle]}>Mi Cuenta</Text>
-                <Text style={styles.menuSubtitle}>Ajustes de perfil y seguridad</Text>
-              </View>
-            </View>
-            {isMiCuentaExpanded ? (
-              <ChevronUp size={20} color={Colors.gold} />
-            ) : (
-              <ChevronDown size={20} color={Colors.gold} />
             )}
-          </TouchableOpacity>
 
-          {/* Mi Cuenta Submenu Items */}
-          {isMiCuentaExpanded && (
-            <View style={styles.submenuContainer}>
-              {miCuentaItems.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.submenuItem}
-                  onPress={item.onPress}
-                  testID={item.testId}
-                >
-                  <View style={styles.menuItemLeft}>
-                    <View style={styles.submenuIcon}>
-                      <item.icon size={18} color={Colors.primary} />
-                    </View>
-                    <View style={styles.menuContent}>
-                      <Text style={styles.submenuTitle}>{item.title}</Text>
-                      <Text style={styles.submenuSubtitle}>{item.subtitle}</Text>
-                    </View>
+            {/* Additional Menu Items */}
+            {additionalMenuItems.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.menuItem, item.highlight && styles.menuItemHighlight]}
+                onPress={item.onPress}
+                testID={item.testId}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={[styles.menuIcon, item.highlight && styles.menuIconHighlight]}>
+                    <item.icon size={20} color={item.highlight ? Colors.primary : Colors.primary} />
                   </View>
-                  {item.rightComponent || <ChevronRight size={18} color={Colors.textLight} />}
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                  <View style={styles.menuContent}>
+                    <Text style={[styles.menuTitle, item.highlight && styles.menuTitleHighlight]}>{item.title}</Text>
+                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                  </View>
+                </View>
+                <ChevronRight size={20} color={Colors.textLight} />
+              </TouchableOpacity>
+            ))}
+          </View>
 
-          {/* Additional Menu Items */}
-          {additionalMenuItems.map((item, index) => (
+          <View style={styles.logoutContainer}>
             <TouchableOpacity
-              key={index}
-              style={[styles.menuItem, item.highlight && styles.menuItemHighlight]}
-              onPress={item.onPress}
-              testID={item.testId}
+              style={styles.logoutButton}
+              onPress={() => {
+                logout();
+                router.replace('/login');
+              }}
+              testID="logout-button"
             >
-              <View style={styles.menuItemLeft}>
-                <View style={[styles.menuIcon, item.highlight && styles.menuIconHighlight]}>
-                  <item.icon size={20} color={item.highlight ? Colors.primary : Colors.primary} />
-                </View>
-                <View style={styles.menuContent}>
-                  <Text style={[styles.menuTitle, item.highlight && styles.menuTitleHighlight]}>{item.title}</Text>
-                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-                </View>
-              </View>
-              <ChevronRight size={20} color={Colors.textLight} />
+              <LogOut size={20} color={Colors.error} />
+              <Text style={styles.logoutText}>Cerrar Sesión</Text>
             </TouchableOpacity>
-          ))}
-        </View>
+          </View>
 
-        <View style={styles.logoutContainer}>
-          <TouchableOpacity 
-            style={styles.logoutButton} 
-            onPress={() => {
-              logout();
-              router.replace('/login');
-            }}
-            testID="logout-button"
-          >
-            <LogOut size={20} color={Colors.error} />
-            <Text style={styles.logoutText}>Cerrar Sesión</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Club Sincrónica v1.0.0</Text>
-          <Text style={styles.footerSubtext}>Hecho con ❤️ para el bienestar holístico</Text>
-        </View>
-      </ScrollView>
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Club Sincrónica v1.0.0</Text>
+            <Text style={styles.footerSubtext}>Hecho con ❤️ para el bienestar holístico</Text>
+          </View>
+        </ScrollView>
       </View>
 
       <Modal
@@ -683,7 +683,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.name}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, name: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, name: text })}
                   placeholder="Tu nombre completo"
                   placeholderTextColor={Colors.textLight}
                 />
@@ -694,7 +694,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.email}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, email: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, email: text })}
                   placeholder="tu@email.com"
                   keyboardType="email-address"
                 />
@@ -705,7 +705,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   value={editedProfile.bio}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, bio: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, bio: text })}
                   placeholder="Cuéntanos sobre ti..."
                   multiline
                   numberOfLines={4}
@@ -717,7 +717,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.location}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, location: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, location: text })}
                   placeholder="Ciudad, País"
                 />
               </View>
@@ -749,13 +749,13 @@ export default function ProfileScreen() {
               </View>
 
               <Text style={[styles.inputLabel, { marginTop: 20, marginBottom: 12 }]}>Redes Sociales</Text>
-              
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Instagram</Text>
                 <TextInput
                   style={styles.input}
                   value={editedProfile.instagram}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, instagram: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, instagram: text })}
                   placeholder="@usuario"
                   autoCapitalize="none"
                 />
@@ -766,7 +766,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.facebook}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, facebook: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, facebook: text })}
                   placeholder="nombre.usuario"
                   autoCapitalize="none"
                 />
@@ -777,7 +777,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.tiktok}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, tiktok: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, tiktok: text })}
                   placeholder="@usuario"
                   autoCapitalize="none"
                 />
@@ -788,7 +788,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.twitter}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, twitter: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, twitter: text })}
                   placeholder="@usuario"
                   autoCapitalize="none"
                 />
@@ -799,7 +799,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.input}
                   value={editedProfile.linkedin}
-                  onChangeText={(text) => setEditedProfile({...editedProfile, linkedin: text})}
+                  onChangeText={(text) => setEditedProfile({ ...editedProfile, linkedin: text })}
                   placeholder="nombre-usuario"
                   autoCapitalize="none"
                 />
@@ -836,7 +836,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.inputWithIcon}
                   value={loginForm.email}
-                  onChangeText={(text) => setLoginForm({...loginForm, email: text})}
+                  onChangeText={(text) => setLoginForm({ ...loginForm, email: text })}
                   placeholder="Email"
                   placeholderTextColor={Colors.textLight}
                   keyboardType="email-address"
@@ -851,7 +851,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.inputWithIcon}
                   value={loginForm.password}
-                  onChangeText={(text) => setLoginForm({...loginForm, password: text})}
+                  onChangeText={(text) => setLoginForm({ ...loginForm, password: text })}
                   placeholder="Contraseña"
                   placeholderTextColor={Colors.textLight}
                   secureTextEntry
@@ -902,7 +902,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.inputWithIcon}
                   value={signupForm.name}
-                  onChangeText={(text) => setSignupForm({...signupForm, name: text})}
+                  onChangeText={(text) => setSignupForm({ ...signupForm, name: text })}
                   placeholder="Nombre completo"
                   placeholderTextColor={Colors.textLight}
                 />
@@ -915,7 +915,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.inputWithIcon}
                   value={signupForm.email}
-                  onChangeText={(text) => setSignupForm({...signupForm, email: text})}
+                  onChangeText={(text) => setSignupForm({ ...signupForm, email: text })}
                   placeholder="Email"
                   placeholderTextColor={Colors.textLight}
                   keyboardType="email-address"
@@ -930,7 +930,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.inputWithIcon}
                   value={signupForm.password}
-                  onChangeText={(text) => setSignupForm({...signupForm, password: text})}
+                  onChangeText={(text) => setSignupForm({ ...signupForm, password: text })}
                   placeholder="Contraseña"
                   placeholderTextColor={Colors.textLight}
                   secureTextEntry
@@ -944,7 +944,7 @@ export default function ProfileScreen() {
                 <TextInput
                   style={styles.inputWithIcon}
                   value={signupForm.confirmPassword}
-                  onChangeText={(text) => setSignupForm({...signupForm, confirmPassword: text})}
+                  onChangeText={(text) => setSignupForm({ ...signupForm, confirmPassword: text })}
                   placeholder="Confirmar contraseña"
                   placeholderTextColor={Colors.textLight}
                   secureTextEntry

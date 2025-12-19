@@ -1,3 +1,7 @@
+// Helper for explicit Reservation type in filter
+function isActiveReservation(r: Reservation): boolean {
+  return r.status !== 'cancelled';
+}
 import React, { useState, useMemo } from 'react';
 import {
   View,
@@ -39,7 +43,7 @@ import { useCalendar, useEventsForDate } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
 import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CalendarEvent, ServiceCategory } from '@/types/user';
+import { CalendarEvent, ServiceCategory, Reservation, CartItem } from '@/types/user';
 import { router } from 'expo-router';
 
 const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -80,7 +84,25 @@ export default function CalendarScreen() {
     cancelReservation,
     updateSettings,
     checkoutCart,
-  } = useCalendar();
+  } = useCalendar() as {
+    events: CalendarEvent[];
+    userEvents: CalendarEvent[];
+    userReservations: Reservation[];
+    cart: CartItem[];
+    cartTotal: number;
+    settings: any;
+    isLoading: boolean;
+    addEvent: any;
+    updateEvent: any;
+    deleteEvent: any;
+    addToCart: any;
+    removeFromCart: any;
+    clearCart: any;
+    createReservation: any;
+    cancelReservation: any;
+    updateSettings: any;
+    checkoutCart: any;
+  };
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -114,7 +136,7 @@ export default function CalendarScreen() {
     const startDate = new Date(firstDay);
     startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-    const days = [];
+    const days: Date[] = [];
     const current = new Date(startDate);
 
     while (current <= lastDay || current.getDay() !== 0) {
@@ -139,6 +161,10 @@ export default function CalendarScreen() {
       return;
     }
 
+    if (!currentUser) {
+      Alert.alert('Iniciar Sesión', 'Por favor inicia sesión para crear un evento.');
+      return;
+    }
     const newEvent = await addEvent({
       providerId: currentUser.id,
       title: eventForm.title,
@@ -275,7 +301,7 @@ export default function CalendarScreen() {
 
   const renderCalendarDay = (date: Date) => {
     const dateString = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-    const dayEvents = events.filter(e => e.date === dateString);
+    const dayEvents = events.filter((e: CalendarEvent) => e.date === dateString);
     const isToday = date.toDateString() === new Date().toDateString();
     const isSelected = date.toDateString() === selectedDate.toDateString();
     const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
@@ -309,8 +335,8 @@ export default function CalendarScreen() {
   };
 
   const renderEvent = ({ item }: { item: CalendarEvent }) => {
-    const isMyEvent = currentUser?.id === item.providerId;
-    const hasReservation = userReservations.some(r => r.eventId === item.id && r.status !== 'cancelled');
+    const isMyEvent = currentUser?.id?.toString() === item.providerId.toString();
+    const hasReservation = userReservations.some((r: Reservation) => r.eventId === item.id && r.status !== 'cancelled');
     const availableSpots = item.maxParticipants - item.currentParticipants;
 
     return (
@@ -493,7 +519,7 @@ export default function CalendarScreen() {
 
             {eventsForSelectedDate.length > 0 ? (
               <View>
-                {eventsForSelectedDate.map(event => (
+                {eventsForSelectedDate.map((event: CalendarEvent) => (
                   <View key={event.id}>
                     {renderEvent({ item: event })}
                   </View>
@@ -515,7 +541,7 @@ export default function CalendarScreen() {
             <Text style={styles.sectionTitle}>Mis Eventos Creados</Text>
             {userEvents.length > 0 ? (
               <View>
-                {userEvents.map(event => (
+                {userEvents.map((event: CalendarEvent) => (
                   <View key={event.id}>
                     {renderEvent({ item: event })}
                   </View>
@@ -541,10 +567,10 @@ export default function CalendarScreen() {
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Mis Reservas</Text>
-            {userReservations.filter(r => r.status !== 'cancelled').length > 0 ? (
+            {userReservations.filter(isActiveReservation).length > 0 ? (
               userReservations
-                .filter(r => r.status !== 'cancelled')
-                .map(reservation => (
+                .filter(isActiveReservation)
+                .map((reservation: Reservation) => (
                   <View key={reservation.id} style={styles.reservationCard}>
                     <View style={styles.reservationHeader}>
                       <Text style={styles.reservationTitle}>{reservation.event.title}</Text>
@@ -859,7 +885,7 @@ export default function CalendarScreen() {
             </View>
 
             <ScrollView style={styles.modalBody}>
-              {cart.map(item => (
+              {cart.map((item: CartItem) => (
                 <View key={item.eventId} style={styles.cartItem}>
                   <View style={styles.cartItemInfo}>
                     <Text style={styles.cartItemTitle}>{item.event.title}</Text>

@@ -2,7 +2,7 @@ import { User, Service, Lodging, ServiceCategory, LodgingType, CalendarEvent } f
 
 export const mockUsers: User[] = [
   {
-    id: '1',  // CORRECTED: Database has Tomas = ID 1
+    id: 1,  // CORRECTED: Database has Tomas = ID 1
     name: 'Tomas De La Llosa',
     email: 'tom_weasley@hotmail.com',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
@@ -19,7 +19,7 @@ export const mockUsers: User[] = [
     tiktok: '@tomasllosa',
   },
   {
-    id: '2',  // CORRECTED: Database has Matias = ID 2
+    id: 2,  // CORRECTED: Database has Matias = ID 2
     name: 'Matias Cazeaux',
     email: 'matias.cazeaux@gmail.com',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
@@ -36,7 +36,7 @@ export const mockUsers: User[] = [
     facebook: 'matias.cazeaux',
   },
   {
-    id: '3',
+    id: 3,
     name: 'Luna Moonwhisper',
     email: 'luna@example.com',
     avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',

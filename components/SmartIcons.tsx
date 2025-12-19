@@ -27,6 +27,7 @@ export const Eye = createIcon('eye');
 export const EyeOff = createIcon('eye-off');
 export const Globe = createIcon('globe');
 export const DollarSign = createIcon('logo-usd');
+export const Euro = createIcon('logo-euro');
 export const Check = createIcon('checkmark');
 export const CheckCircle = createIcon('checkmark-circle');
 export const Package = createIcon('cube');

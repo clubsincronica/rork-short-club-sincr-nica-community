@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { User, PaymentMethod, UserPreferences } from '@/types/user';
-import { mockUsers } from '@/mocks/data';
+// import { mockUsers } from '@/mocks/data';
 import { getApiBaseUrl } from '@/utils/api-config';
 
 // Create the context manually for better React 19 compatibility
@@ -21,7 +21,7 @@ const useUserStore = () => {
   // Development mode: Use mock data for UI testing, but allow real login
   // Set to true to test UI features, false to test backend integration
   const isDevelopment = false;  // Using Railway backend with PostgreSQL
-  
+
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [preferences, setPreferences] = useState<UserPreferences>({
@@ -68,66 +68,93 @@ const useUserStore = () => {
       if (__DEV__) {
         console.log('Login mutation called with:', 'id' in userData ? 'User object' : userData.email);
       }
-      
+
       let user: User;
-      
+      let token: string | null = null;
+
       // If full user object is provided, use it directly (for signup or backend login)
       if ('id' in userData) {
         user = userData;
-      } else {
-        // Try to find in mock users (supports both test emails and example emails)
-        const foundUser = mockUsers.find(u => u.email === userData.email);
-        user = foundUser || mockUsers[0];
-        
-        // Restore saved profile data (avatar, social links) from persistent storage
-        const profileDataJson = await AsyncStorage.getItem(`userProfile_${userData.email}`);
-        if (profileDataJson) {
-          const profileData = JSON.parse(profileDataJson);
-          // Merge profile data with mock data (profile data takes precedence)
-          user = { ...user, ...profileData };
-          console.log('✅ Restored user profile data from persistent storage:', profileData.avatar ? 'with custom avatar' : 'no avatar');
+        // If user object is provided directly, block if not numeric id
+        if (typeof user.id !== 'number') {
+          throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
         }
-        
-        // Also check for current session data (if user didn't logout)
-        const storedUserJson = await AsyncStorage.getItem('currentUser');
-        if (storedUserJson) {
-          const storedUser = JSON.parse(storedUserJson);
-          // If same user, merge stored data with mock data (stored data takes precedence)
-          if (storedUser.id === user.id || storedUser.email === user.email) {
-            user = { ...user, ...storedUser };
+      } else {
+        // Try backend auth only
+        try {
+          const apiUrl = `${getApiBaseUrl()}/api/auth`;
+          if (__DEV__) {
+            console.log('🔐 Attempting backend auth to:', apiUrl);
           }
+          // Only include password if it's actually provided (not empty/undefined)
+          const authPayload: any = {
+            email: userData.email,
+            name: userData.email.split('@')[0] // Provide name for user creation
+          };
+          if (userData.password && userData.password.trim().length > 0) {
+            authPayload.password = userData.password;
+          }
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(authPayload)
+          });
+          if (__DEV__) {
+            console.log('📡 Auth response status:', response.status);
+          }
+          if (response.ok) {
+            const data = await response.json();
+            user = data.user;
+            token = data.token;
+            if (__DEV__) {
+              console.log('✅ Backend auth successful, got token:', token?.substring(0, 20) + '...');
+              console.log('✅ User from backend:', user.email, user.id);
+            }
+            // Block if user id is not numeric
+            if (typeof user.id !== 'number') {
+              throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
+            }
+          } else {
+            const errorText = await response.text();
+            if (__DEV__) {
+              console.warn('❌ Backend auth failed with status', response.status, ':', errorText);
+            }
+            throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
+          }
+        } catch (error) {
+          if (__DEV__) {
+            console.warn('❌ Backend auth error, blocking fallback:', error);
+          }
+          throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
         }
       }
-      
+
       if (__DEV__) {
         console.log('User to login:', user.email, user.name);
+        console.log('🔑 Token available:', !!token);
+        if (token) {
+          console.log('🔑 Token preview:', token.substring(0, 30) + '...');
+        }
       }
       await AsyncStorage.setItem('currentUser', JSON.stringify(user));
-      
-      // Load mock payment methods for testing
-      const mockPaymentMethods: PaymentMethod[] = [
-        {
-          id: '1',
-          type: 'card',
-          last4: '4242',
-          brand: 'Visa',
-          expiryMonth: 12,
-          expiryYear: 2025,
-          isDefault: true,
-        },
-        {
-          id: '2',
-          type: 'card',
-          last4: '5555',
-          brand: 'Mastercard',
-          expiryMonth: 6,
-          expiryYear: 2024,
-          isDefault: false,
-        },
-      ];
-      await AsyncStorage.setItem('paymentMethods', JSON.stringify(mockPaymentMethods));
-      
-      return { user, paymentMethods: mockPaymentMethods };
+
+      // Store token if we got one
+      if (token) {
+        await AsyncStorage.setItem('authToken', token);
+        if (__DEV__) {
+          console.log('✅ Stored auth token to AsyncStorage');
+        }
+      } else {
+        if (__DEV__) {
+          console.warn('⚠️ No token to store - will not be able to use socket authentication');
+        }
+      }
+
+      // Load payment methods - try storage first, but DO NOT inject mocks
+      const storedMethods = await AsyncStorage.getItem('paymentMethods');
+      const realPaymentMethods = storedMethods ? JSON.parse(storedMethods) : [];
+
+      return { user, paymentMethods: realPaymentMethods };
     },
     onSuccess: ({ user, paymentMethods }) => {
       if (__DEV__) {
@@ -163,6 +190,7 @@ const useUserStore = () => {
       }
       await AsyncStorage.removeItem('currentUser');
       await AsyncStorage.removeItem('paymentMethods');
+      await AsyncStorage.removeItem('authToken'); // Clear token on logout
       return null;
     },
     onSuccess: () => {
@@ -177,7 +205,7 @@ const useUserStore = () => {
     mutationFn: async (updates: Partial<User>) => {
       if (!currentUser) throw new Error('No user logged in');
       const updatedUser = { ...currentUser, ...updates };
-      
+
       // Save to backend database so changes sync across devices
       try {
         const response = await fetch(`${getApiBaseUrl()}/api/users/${currentUser.id}`, {
@@ -197,7 +225,7 @@ const useUserStore = () => {
             isHost: updatedUser.isServiceProvider,
           }),
         });
-        
+
         if (response.ok) {
           console.log('✅ Profile updated in backend database');
         } else {
@@ -207,9 +235,9 @@ const useUserStore = () => {
         console.warn('⚠️ Failed to sync profile to backend:', error);
         // Continue anyway - at least save locally
       }
-      
+
       await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      
+
       // Also save to persistent profile storage (survives logout)
       const profileData = {
         id: updatedUser.id,
@@ -221,7 +249,7 @@ const useUserStore = () => {
       };
       await AsyncStorage.setItem(`userProfile_${updatedUser.email}`, JSON.stringify(profileData));
       console.log('✅ Saved profile data to persistent storage');
-      
+
       return updatedUser;
     },
     onSuccess: (user) => {
@@ -318,13 +346,13 @@ const useUserStore = () => {
     setDefaultPaymentMethod: setDefaultPaymentMethodMutation.mutate,
     isLoginLoading: loginMutation.isPending,
   }), [
-    currentUser, 
-    paymentMethods, 
+    currentUser,
+    paymentMethods,
     preferences,
-    userQuery.isLoading, 
-    loginMutation.mutateAsync, 
-    logoutMutation.mutate, 
-    updateProfileMutation.mutate, 
+    userQuery.isLoading,
+    loginMutation.mutateAsync,
+    logoutMutation.mutate,
+    updateProfileMutation.mutate,
     updatePreferencesMutation.mutate,
     addPaymentMethodMutation.mutate,
     removePaymentMethodMutation.mutate,

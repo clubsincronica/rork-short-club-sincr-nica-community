@@ -13,12 +13,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Star, 
-  MessageCircle, 
-  Phone, 
+import {
+  ArrowLeft,
+  MapPin,
+  Star,
+  MessageCircle,
+  Phone,
   Mail,
   Calendar,
   Clock,
@@ -33,7 +33,7 @@ import {
 } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { TouchableScale } from '@/components/TouchableScale';
-import { mockServices, allMockUsers } from '@/mocks/data';
+// import { mockServices, allMockUsers } from '@/mocks/data';
 import { Service } from '@/types/user';
 import { ServiceReservationModal } from '@/components/ServiceReservationModal';
 import { useCalendar } from '@/hooks/calendar-store';
@@ -62,58 +62,38 @@ export default function ServiceDetailScreen() {
   const loadServiceDetail = () => {
     try {
       setLoading(true);
-      
+
       const serviceId = params.serviceId as string;
       const serviceName = params.serviceName as string;
-      
+
       console.log('Service Detail: Loading service with ID:', serviceId, 'Name:', serviceName);
-      
+
       // First, check real services from the store
       let foundService: any = realServices.find(s => s.id === serviceId);
-      
+
       if (foundService) {
         console.log('Service Detail: ✅ Found real service:', foundService.title, foundService.id);
-      } else {
-        // Fall back to mock services
-        foundService = mockServices.find(s => 
-          s.id === serviceId || 
-          s.title === serviceName ||
-          s.title.toLowerCase().includes(serviceName?.toLowerCase() || '')
-        );
-
-        if (!foundService && serviceName) {
-          foundService = mockServices.find(s => 
-            s.title.toLowerCase().includes(serviceName.toLowerCase())
-          );
-        }
-        
-        if (foundService) {
-          console.log('Service Detail: ✅ Found mock service:', foundService.title, foundService.id);
-        }
       }
 
       if (foundService) {
         setService(foundService);
-        
+
         // Find the service provider
         let serviceProvider;
-        
+
         // For real services, find the actual user
+        // In a real app we'd fetch the user from API if we only have ID
         if (foundService.providerId) {
-          serviceProvider = allMockUsers.find(user => user.id === foundService.providerId);
-          
-          // If not found in mock users and it's the current user
-          if (!serviceProvider && currentUser && foundService.providerId === currentUser.id) {
+          if (currentUser && foundService.providerId === currentUser.id) {
             serviceProvider = currentUser;
           }
-        } else {
-          // For mock services, find by provider name
-          serviceProvider = allMockUsers.find(user => 
-            user.name.toLowerCase().includes(foundService!.provider.name?.toLowerCase() || '') ||
-            user.id === foundService!.providerId
-          );
         }
-        
+
+        // If we have an embedded provider object, use it
+        if (!serviceProvider && foundService.provider) {
+          serviceProvider = foundService.provider;
+        }
+
         if (serviceProvider) {
           console.log('Service Detail: ✅ Found provider:', serviceProvider.name, serviceProvider.id);
           setProvider(serviceProvider);
@@ -143,9 +123,9 @@ export default function ServiceDetailScreen() {
     if (provider) {
       router.push({
         pathname: '/user-profile',
-        params: { 
+        params: {
           userId: provider.id,
-          userName: provider.name 
+          userName: provider.name
         }
       });
     } else {
@@ -175,8 +155,8 @@ export default function ServiceDetailScreen() {
     setIsFavorite(!isFavorite);
     Alert.alert(
       'Favoritos',
-      isFavorite ? 
-        'Servicio eliminado de favoritos' : 
+      isFavorite ?
+        'Servicio eliminado de favoritos' :
         'Servicio agregado a favoritos'
     );
   };
@@ -194,13 +174,13 @@ export default function ServiceDetailScreen() {
   if (!service) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <TouchableScale 
+        <TouchableScale
           style={styles.backButton}
           onPress={() => router.back()}
         >
           <ArrowLeft size={24} color={Colors.primary} />
         </TouchableScale>
-        
+
         <View style={styles.notFoundContainer}>
           <Text style={styles.notFoundTitle}>Servicio no encontrado</Text>
           <Text style={styles.notFoundText}>
@@ -225,210 +205,192 @@ export default function ServiceDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <ScrollView 
+      <ScrollView
         style={{ paddingTop: insets.top, flex: 1 }}
         showsVerticalScrollIndicator={false}
       >
-      {/* Header with Back Button */}
-      <View style={styles.header}>
-        <TouchableScale 
-          style={styles.headerButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color={Colors.white} />
-        </TouchableScale>
-        
-        <View style={styles.headerActions}>
-          <TouchableScale 
+        {/* Header with Back Button */}
+        <View style={styles.header}>
+          <TouchableScale
             style={styles.headerButton}
-            onPress={handleFavorite}
+            onPress={() => router.back()}
           >
-            <Heart size={24} color={Colors.white} fill={isFavorite} />
+            <ArrowLeft size={24} color={Colors.white} />
           </TouchableScale>
-          
-          <TouchableScale 
-            style={styles.headerButton}
-            onPress={handleShare}
-          >
-            <Share size={24} color={Colors.white} />
-          </TouchableScale>
-        </View>
-      </View>
 
-      {/* Service Images */}
-      <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: serviceImages[selectedImage] }}
-          style={styles.mainImage}
-        />
-        
-        <View style={styles.imageIndicator}>
-          {serviceImages.map((_, index) => (
+          <View style={styles.headerActions}>
             <TouchableScale
-              key={index}
-              style={[
-                styles.imageIndicatorDot,
-                selectedImage === index && styles.imageIndicatorDotActive
-              ]}
-              onPress={() => setSelectedImage(index)}
+              style={styles.headerButton}
+              onPress={handleFavorite}
             >
-              <View />
+              <Heart size={24} color={Colors.white} fill={isFavorite} />
             </TouchableScale>
-          ))}
-        </View>
-        
-        <TouchableScale style={styles.cameraButton}>
-          <Camera size={20} color={Colors.white} />
-        </TouchableScale>
-      </View>
 
-      {/* Service Info Card */}
-      <View style={styles.infoCard}>
-        {/* Title and Price */}
-        <View style={styles.titleSection}>
-          <Text style={styles.serviceTitle}>{service.title}</Text>
-          <View style={styles.priceContainer}>
-            <Euro size={20} color={Colors.success} />
-            <Text style={styles.servicePrice}>{service.price}</Text>
-            <Text style={styles.pricePeriod}>/hora</Text>
+            <TouchableScale
+              style={styles.headerButton}
+              onPress={handleShare}
+            >
+              <Share size={24} color={Colors.white} />
+            </TouchableScale>
           </View>
         </View>
 
-        {/* Provider Info */}
-        <TouchableScale 
-          style={styles.providerSection}
-          onPress={handleContactProvider}
-        >
-          <Image 
-            source={{ uri: provider?.avatar || 'https://via.placeholder.com/50' }}
-            style={styles.providerAvatar}
+        {/* Service Images */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: serviceImages[selectedImage] }}
+            style={styles.mainImage}
           />
-          <View style={styles.providerInfo}>
-            <Text style={styles.providerName}>{provider?.name || service.provider.name}</Text>
-            <View style={styles.providerRating}>
-              <Star size={16} color={Colors.gold} />
-              <Text style={styles.ratingText}>4.{Math.floor(Math.random() * 9) + 1}</Text>
-              <Text style={styles.reviewCount}>({Math.floor(Math.random() * 50) + 10} reseñas)</Text>
-            </View>
-          </View>
-          <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
-        </TouchableScale>
 
-        {/* Service Details */}
-        <View style={styles.detailsSection}>
-          <View style={styles.detailItem}>
-            <Clock size={18} color={Colors.primary} />
-            <Text style={styles.detailText}>Duración: 1-2 horas</Text>
+          <View style={styles.imageIndicator}>
+            {serviceImages.map((_, index) => (
+              <TouchableScale
+                key={index}
+                style={[
+                  styles.imageIndicatorDot,
+                  selectedImage === index && styles.imageIndicatorDotActive
+                ]}
+                onPress={() => setSelectedImage(index)}
+              >
+                <View />
+              </TouchableScale>
+            ))}
           </View>
-          
-          <View style={styles.detailItem}>
-            <MapPin size={18} color={Colors.primary} />
-            <Text style={styles.detailText}>
-              {service.location || params.serviceLocation || 'Madrid, España'}
-            </Text>
-            {params.distance && (
-              <Text style={styles.distanceText}>• {params.distance} km</Text>
-            )}
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Users size={18} color={Colors.primary} />
-            <Text style={styles.detailText}>Disponible para grupos pequeños</Text>
-          </View>
+
+          <TouchableScale style={styles.cameraButton}>
+            <Camera size={20} color={Colors.white} />
+          </TouchableScale>
         </View>
 
-        {/* Features */}
-        <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Incluido en el servicio</Text>
-          <View style={styles.featuresList}>
-            <View style={styles.featureItem}>
-              <CheckCircle size={16} color={Colors.success} />
-              <Text style={styles.featureText}>Consulta personalizada</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <CheckCircle size={16} color={Colors.success} />
-              <Text style={styles.featureText}>Material incluido</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <CheckCircle size={16} color={Colors.success} />
-              <Text style={styles.featureText}>Seguimiento post-servicio</Text>
-            </View>
-            <View style={styles.featureItem}>
-              <CheckCircle size={16} color={Colors.success} />
-              <Text style={styles.featureText}>Garantía de satisfacción</Text>
+        {/* Service Info Card */}
+        <View style={styles.infoCard}>
+          {/* Title and Price */}
+          <View style={styles.titleSection}>
+            <Text style={styles.serviceTitle}>{service.title}</Text>
+            <View style={styles.priceContainer}>
+              <Euro size={20} color={Colors.success} />
+              <Text style={styles.servicePrice}>{service.price}</Text>
+              <Text style={styles.pricePeriod}>/hora</Text>
             </View>
           </View>
-        </View>
 
-        {/* Description */}
-        <View style={styles.descriptionSection}>
-          <Text style={styles.sectionTitle}>Descripción</Text>
-          <Text style={styles.descriptionText}>
-                        {service.description || `Servicio profesional de ${service.title.toLowerCase()} con años de experiencia. Ofrecemos un servicio personalizado y de alta calidad, adaptado a las necesidades especiales de cada cliente.`}
-          </Text>
-        </View>
-
-        {/* Reviews Section */}
-        <View style={styles.reviewsSection}>
-          <View style={styles.reviewsHeader}>
-            <Text style={styles.sectionTitle}>Reseñas</Text>
-            <TouchableScale style={styles.seeAllButton}>
-              <Text style={styles.seeAllText}>Ver todas</Text>
-            </TouchableScale>
-          </View>
-          
-          <View style={styles.reviewItem}>
-            <View style={styles.reviewHeader}>
-              <Image 
-                source={{ uri: 'https://via.placeholder.com/40' }}
-                style={styles.reviewAvatar}
-              />
-              <View style={styles.reviewInfo}>
-                <Text style={styles.reviewerName}>María García</Text>
-                <View style={styles.reviewRating}>
-                  {[1,2,3,4,5].map((star) => (
-                    <Star key={star} size={12} color={Colors.gold} />
-                  ))}
-                </View>
+          {/* Provider Info */}
+          <TouchableScale
+            style={styles.providerSection}
+            onPress={handleContactProvider}
+          >
+            <Image
+              source={{ uri: provider?.avatar || 'https://via.placeholder.com/50' }}
+              style={styles.providerAvatar}
+            />
+            <View style={styles.providerInfo}>
+              <Text style={styles.providerName}>{provider?.name || service.provider.name}</Text>
+              <View style={styles.providerRating}>
+                <Star size={16} color={Colors.gold} />
+                <Text style={styles.ratingText}>0.0</Text>
+                <Text style={styles.reviewCount}>(0 reseñas)</Text>
               </View>
-              <Text style={styles.reviewDate}>Hace 2 días</Text>
             </View>
-            <Text style={styles.reviewText}>
-              Excelente servicio, muy profesional y puntual. Lo recomiendo totalmente.
+            <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableScale>
+
+          {/* Service Details */}
+          <View style={styles.detailsSection}>
+            <View style={styles.detailItem}>
+              <Clock size={18} color={Colors.primary} />
+              <Text style={styles.detailText}>Duración: 1-2 horas</Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <MapPin size={18} color={Colors.primary} />
+              <Text style={styles.detailText}>
+                {service.location || params.serviceLocation || 'Madrid, España'}
+              </Text>
+              {params.distance && (
+                <Text style={styles.distanceText}>• {params.distance} km</Text>
+              )}
+            </View>
+
+            <View style={styles.detailItem}>
+              <Users size={18} color={Colors.primary} />
+              <Text style={styles.detailText}>Disponible para grupos pequeños</Text>
+            </View>
+          </View>
+
+          {/* Features */}
+          <View style={styles.featuresSection}>
+            <Text style={styles.sectionTitle}>Incluido en el servicio</Text>
+            <View style={styles.featuresList}>
+              <View style={styles.featureItem}>
+                <CheckCircle size={16} color={Colors.success} />
+                <Text style={styles.featureText}>Consulta personalizada</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <CheckCircle size={16} color={Colors.success} />
+                <Text style={styles.featureText}>Material incluido</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <CheckCircle size={16} color={Colors.success} />
+                <Text style={styles.featureText}>Seguimiento post-servicio</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <CheckCircle size={16} color={Colors.success} />
+                <Text style={styles.featureText}>Garantía de satisfacción</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Description */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>Descripción</Text>
+            <Text style={styles.descriptionText}>
+              {service.description || `Servicio profesional de ${service.title.toLowerCase()} con años de experiencia. Ofrecemos un servicio personalizado y de alta calidad, adaptado a las necesidades especiales de cada cliente.`}
             </Text>
           </View>
+
+          {/* Reviews Section */}
+          <View style={styles.reviewsSection}>
+            <View style={styles.reviewsHeader}>
+              <Text style={styles.sectionTitle}>Reseñas</Text>
+            </View>
+
+            <View style={styles.reviewItem}>
+              <Text style={[styles.reviewText, { textAlign: 'center', fontStyle: 'italic' }]}>
+                No hay reseñas todavía.
+              </Text>
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableScale
-          style={styles.contactButton}
-          onPress={handleContactProvider}
-        >
-          <MessageCircle size={20} color={Colors.primary} />
-          <Text style={styles.contactButtonText}>Contactar</Text>
-        </TouchableScale>
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableScale
+            style={styles.contactButton}
+            onPress={handleContactProvider}
+          >
+            <MessageCircle size={20} color={Colors.primary} />
+            <Text style={styles.contactButtonText}>Contactar</Text>
+          </TouchableScale>
 
-        <TouchableScale
-          style={styles.bookButton}
-          onPress={handleBookService}
-        >
-          <Calendar size={20} color={Colors.white} />
-          <Text style={styles.bookButtonText}>Reservar</Text>
-        </TouchableScale>
-      </View>
+          <TouchableScale
+            style={styles.bookButton}
+            onPress={handleBookService}
+          >
+            <Calendar size={20} color={Colors.white} />
+            <Text style={styles.bookButtonText}>Reservar</Text>
+          </TouchableScale>
+        </View>
 
-      <View style={styles.bottomPadding} />
-    </ScrollView>
-    
-    <ServiceReservationModal
-      visible={showReservationModal}
-      onClose={() => {
-        setShowReservationModal(false);
-      }}
-      service={service}
-    />
+        <View style={styles.bottomPadding} />
+      </ScrollView>
+
+      <ServiceReservationModal
+        visible={showReservationModal}
+        onClose={() => {
+          setShowReservationModal(false);
+        }}
+        service={service}
+      />
     </View>
   );
 }

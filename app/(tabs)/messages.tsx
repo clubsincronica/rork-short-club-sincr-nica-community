@@ -6,7 +6,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { Search, MessageCircle, Send, ArrowLeft, X } from '../../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useUser } from '@/hooks/user-store';
-import { initSocket, getSocket } from '@/app/services/socket';
+import { initSocket, getSocket } from '@/utils/socket';
 import { getApiBaseUrl } from '@/utils/api-config';
 import { messageEventBus } from '@/utils/messageEventBus';
 import { logger } from '@/utils/logger';
@@ -61,7 +61,7 @@ export default function MessagesScreen() {
   // Load conversations from backend
   const loadConversations = async () => {
     if (!currentUser) return;
-    
+
     setIsLoadingConversations(true);
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
@@ -100,47 +100,71 @@ export default function MessagesScreen() {
     if (currentUser) {
       // Get the existing global socket instead of creating a new one
       const socket = getSocket();
-      
+
       if (!socket) {
         console.warn('⚠️ Global socket not initialized, creating fallback socket');
-        socketRef.current = initSocket({ userId: parseInt(currentUser.id as string) });
+        // Retrieve token for fallback connection
+        import('@react-native-async-storage/async-storage').then(module => {
+          module.default.getItem('authToken').then(token => {
+            if (token) {
+              socketRef.current = initSocket({ userId: currentUser.id, token });
+            } else {
+              console.warn('❌ No token found for fallback socket connection');
+            }
+          });
+        });
       } else {
         console.log('✅ Using global socket connection for Messages screen');
         socketRef.current = socket;
       }
-      
+
       if (socket) {
-        // Update connection status
-        setIsSocketConnected(socket.connected);
-        
-        // If already connected, join immediately
-        if (socket.connected) {
-          console.log('Socket already connected, joining room for user:', currentUser.id);
-          socket.emit('user:join', parseInt(currentUser.id as string));
+        // Update connection status immediately
+        const currentConnectionState = socket.connected;
+        setIsSocketConnected(currentConnectionState);
+        if (__DEV__) {
+          console.log('📡 Messages screen: Socket connection state:', currentConnectionState);
         }
-        
-        socket.on('connect', () => {
+
+        // If already connected, join immediately
+        if (currentConnectionState) {
+          console.log('Socket already connected, joining room for user:', currentUser.id);
+          socket.emit('user:join', currentUser.id);
+        }
+
+        // Set up connection event handlers
+        const handleConnect = () => {
           console.log('Socket connected for messaging, user:', currentUser.id);
           setIsSocketConnected(true);
           // Join user room
           console.log('Emitting user:join for user:', currentUser.id);
-          socket.emit('user:join', parseInt(currentUser.id as string));
-        });
+          socket.emit('user:join', currentUser.id);
+        };
 
-        socket.on('disconnect', () => {
+        const handleDisconnect = () => {
           console.log('Socket disconnected for user:', currentUser.id);
           setIsSocketConnected(false);
+        };
+
+        // Always remove previous listeners before adding new ones
+        socket.off('connect', handleConnect);
+        socket.off('disconnect', handleDisconnect);
+        socket.on('connect', handleConnect);
+        socket.on('disconnect', handleDisconnect);
+
+        // Extra: log socket events for debugging
+        socket.on('connect_error', (err) => {
+          console.error('Socket connect_error:', err);
         });
+
+        // Cleanup function will remove these specific handlers
+        return () => {
+          socket.off('connect', handleConnect);
+          socket.off('disconnect', handleDisconnect);
+          socket.off('connect_error');
+        };
       }
     }
-
-    return () => {
-      // Don't disconnect the global socket, just clean up listeners
-      if (socketRef.current) {
-        socketRef.current.off('connect');
-        socketRef.current.off('disconnect');
-      }
-    };
   }, [currentUser]);
 
   // Subscribe to message event bus (replaces duplicate socket handler)
@@ -153,39 +177,49 @@ export default function MessagesScreen() {
       console.log('📬 [Messages Screen] Received message from event bus:', message);
       console.log('📬 [Messages Screen] Current user:', currentUser?.id, currentUser?.name);
       console.log('📬 [Messages Screen] Message sender_id:', message.sender_id, 'receiver_id:', message.receiver_id);
-      
+
       // Safety check
       if (!message || !message.text) {
         console.warn('❌ Invalid message from event bus:', message);
         return false; // Let other handlers try
       }
 
-      // Reload conversations list to show new message
+      // Always reload conversations list to show new message
       loadConversations();
 
+      // Always reload messages if the active conversation matches
+      if (activeConversation && message.conversation_id === activeConversation.conversationId) {
+        console.log('🔄 Reloading messages for active conversation:', activeConversation.conversationId);
+        loadConversationMessages(activeConversation.conversationId);
+      } else {
+        // If not the active conversation, clear messages to force reload when user opens it
+        setMessages([]);
+      }
+
       // Check if this is a message I received (not sent by me)
-      const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
-      const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
-      
+      const isReceivedByMe = message.receiver_id === currentUser.id;
+      const isSentByMe = message.sender_id === currentUser.id;
+
+      // Compute activeUserId and activeConvoId once for this message
+      const activeUserId = activeConversation ? parseInt(activeConversation.userId) : null;
+      const activeConvoId = activeConversation ? activeConversation.conversationId : null;
+
       // Determine if we should handle this message (stop propagation)
       let shouldStopPropagation = false;
-      
+
       if (isReceivedByMe && !isSentByMe) {
         // Messages tab is focused - we handle all notifications
         if (isFocused) {
           shouldStopPropagation = true;
-          
+
           // Check if we're ACTIVELY VIEWING this specific conversation right now
-          const activeUserId = activeConversation ? parseInt(activeConversation.userId) : null;
-          const activeConvoId = activeConversation ? activeConversation.conversationId : null;
-          
-          const isActivelyViewingThisConversation = 
-            activeConversation && 
+          const isActivelyViewingThisConversation =
+            activeConversation &&
             activeUserId !== null &&
             activeConvoId !== null &&
             message.sender_id === activeUserId &&
             message.conversation_id === activeConvoId;
-          
+
           console.log('📬 Notification check:', {
             isTabFocused: isFocused,
             hasActiveConversation: !!activeConversation,
@@ -198,11 +232,11 @@ export default function MessagesScreen() {
             senderIdMatch: activeUserId !== null && message.sender_id === activeUserId,
             convoIdMatch: activeConvoId !== null && message.conversation_id === activeConvoId
           });
-          
+
           if (!isActivelyViewingThisConversation) {
             // Show notification modal - user is NOT actively viewing this conversation
             console.log('📬 Showing notification from:', message.sender_name);
-            
+
             setNewMessageNotification({
               senderName: message.sender_name || 'Usuario',
               senderAvatar: message.sender_avatar,
@@ -219,51 +253,51 @@ export default function MessagesScreen() {
           shouldStopPropagation = false;
         }
       }
-      
+
       if (isSentByMe) {
         // Always handle messages sent by me
         console.log('✅ Message sent by me, updating conversation list');
         shouldStopPropagation = true;
       }
-      
+
       // Add message to active conversation if applicable (always, regardless of notification)
       setMessages(prev => {
         if (activeConversation) {
-          const isFromActiveUser = message.sender_id === parseInt(activeConversation.userId);
-          const isToActiveUser = message.receiver_id === parseInt(activeConversation.userId);
-          const isSentByMe = message.sender_id === parseInt(currentUser.id as string);
-          const isReceivedByMe = message.receiver_id === parseInt(currentUser.id as string);
-          
+          const isFromActiveUser = message.sender_id === activeUserId;
+          const isToActiveUser = message.receiver_id === activeUserId;
+          const isSentByMe = message.sender_id === currentUser.id;
+          const isReceivedByMe = message.receiver_id === currentUser.id;
+
           // Only add if message is between me and the active conversation user
           if (!((isSentByMe && isToActiveUser) || (isReceivedByMe && isFromActiveUser))) {
             console.log('⏭️ Message not for active conversation, ignoring');
             return prev;
           }
         }
-        
+
         // Check for duplicate by ID
         const messageId = message.id?.toString();
         if (messageId && prev.some(m => m.id === messageId)) {
           console.log('⏭️ Duplicate message ID, ignoring');
           return prev;
         }
-        
+
         console.log('💬 Message added to local state');
         return [...prev, {
           id: message.id?.toString() || Date.now().toString(),
           text: message.text,
           senderId: message.sender_id?.toString(),
-          sender: message.sender_id === parseInt(currentUser.id as string) ? 'me' : 'other',
+          sender: message.sender_id === currentUser.id ? 'me' : 'other',
           timestamp: new Date(message.created_at),
         }];
       });
-      
+
       // Return early based on whether we handled the message
       if (shouldStopPropagation) {
         console.log('🚫 Stopping propagation - Messages screen handled this message');
         return true;
       }
-      
+
       console.log('⏩ Continuing propagation - Messages screen did not handle this message');
       return false;
     });
@@ -278,12 +312,14 @@ export default function MessagesScreen() {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversationId}/messages`);
       if (response.ok) {
         const data = await response.json();
-        console.log('💬 Loaded messages:', data.length);
-        setMessages(data.map((msg: any) => ({
+        // Backend returns { messages: [], page, limit, total }
+        const messagesList = data.messages || [];
+        console.log('💬 Loaded messages:', messagesList.length);
+        setMessages(messagesList.map((msg: any) => ({
           id: msg.id.toString(),
           text: msg.text,
           senderId: msg.sender_id.toString(),
-          sender: msg.sender_id === parseInt(currentUser?.id as string) ? 'me' : 'other',
+          sender: msg.sender_id === currentUser?.id ? 'me' : 'other',
           timestamp: new Date(msg.created_at),
         })));
       }
@@ -297,18 +333,28 @@ export default function MessagesScreen() {
   // Create or get conversation ID
   const getOrCreateConversation = async (userId1: number, userId2: number): Promise<number | null> => {
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/conversations`, {
+      console.log('💬 Creating conversation between:', userId1, 'and', userId2);
+      const url = `${getApiBaseUrl()}/api/conversations`;
+      console.log('💬 POST URL:', url);
+
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user1Id: userId1, user2Id: userId2 }),
       });
+
+      console.log('💬 Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
-        console.log('💬 Conversation ID:', data.id);
+        console.log('💬 Conversation created/found:', data);
         return data.id;
+      } else {
+        const errorText = await response.text();
+        console.error('💬 Server error:', response.status, errorText);
       }
     } catch (error) {
-      console.error('Failed to get/create conversation:', error);
+      console.error('💬 Network error creating conversation:', error);
     }
     return null;
   };
@@ -317,18 +363,36 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (params.startConversationWith && params.userName && currentUser) {
       const initConversation = async () => {
-        const conversationId = await getOrCreateConversation(
-          parseInt(currentUser.id as string),
-          parseInt(params.startConversationWith as string)
-        );
-        
+        const otherUserId = parseInt(params.startConversationWith as string);
+        const myUserId = currentUser.id;
+
+        console.log('🔍 Starting conversation:');
+        console.log('   My ID:', myUserId, '(type:', typeof currentUser.id, ')');
+        console.log('   Other user ID:', otherUserId, '(type:', typeof params.startConversationWith, ')');
+        console.log('   Other user name:', params.userName);
+
+        // Validate IDs before making API call
+        if (isNaN(myUserId) || myUserId > 2147483647) {
+          console.error('❌ Invalid current user ID:', currentUser.id);
+          Alert.alert('Error', 'Tu sesión es inválida. Por favor, cierra sesión y vuelve a iniciar.');
+          return;
+        }
+
+        if (isNaN(otherUserId) || otherUserId > 2147483647) {
+          console.error('❌ Invalid other user ID:', params.startConversationWith);
+          Alert.alert('Error', 'El usuario seleccionado tiene un ID inválido. Por favor, actualiza la lista de usuarios.');
+          return;
+        }
+
+        const conversationId = await getOrCreateConversation(myUserId, otherUserId);
+
         setActiveConversation({
           userId: params.startConversationWith as string,
           userName: params.userName as string,
           userAvatar: params.userAvatar as string | undefined,
           conversationId: conversationId || undefined,
         });
-        
+
         // Load conversation history if we have a conversation ID
         if (conversationId) {
           await loadConversationMessages(conversationId);
@@ -336,7 +400,7 @@ export default function MessagesScreen() {
           setMessages([]);
         }
       };
-      
+
       initConversation();
     }
   }, [params.startConversationWith, params.userName, params.userAvatar, currentUser]);
@@ -345,10 +409,10 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (activeConversation?.conversationId) {
       loadConversationMessages(activeConversation.conversationId);
-      
+
       // Clear any pending notification for this conversation
-      if (newMessageNotification && 
-          newMessageNotification.conversationId === activeConversation.conversationId) {
+      if (newMessageNotification &&
+        newMessageNotification.conversationId === activeConversation.conversationId) {
         console.log('🧹 Clearing notification - conversation now open');
         setNewMessageNotification(null);
       }
@@ -366,7 +430,7 @@ export default function MessagesScreen() {
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !activeConversation || !currentUser) return;
-    
+
     const socket = getSocket();
     if (!socket || !socket.connected) {
       console.warn('Socket not connected');
@@ -379,15 +443,15 @@ export default function MessagesScreen() {
     if (!conversationId) {
       console.log('Creating conversation...');
       conversationId = await getOrCreateConversation(
-        parseInt(currentUser.id as string),
+        currentUser.id,
         parseInt(activeConversation.userId)
       ) || undefined;
-      
+
       if (!conversationId) {
         Alert.alert('Error', 'No se pudo crear la conversación');
         return;
       }
-      
+
       // Update active conversation with the new ID
       setActiveConversation(prev => prev ? { ...prev, conversationId } : null);
     }
@@ -399,22 +463,22 @@ export default function MessagesScreen() {
       text: messageText,
       socketConnected: socket?.connected
     });
-    
+
     if (!socket || !socket.connected) {
       Alert.alert('Error', 'Socket not connected. Cannot send message.');
       console.error('❌ Socket not connected!');
       return;
     }
-    
+
     // Emit to server (backend expects 'message:send')
     console.log('✅ Emitting message:send to backend...');
     socket.emit('message:send', {
       conversationId,
-      senderId: parseInt(currentUser.id as string),
+      senderId: currentUser.id,
       receiverId: parseInt(activeConversation.userId),
       text: messageText,
     });
-    
+
     // Clear input immediately for better UX
     setMessageText('');
   };
@@ -426,7 +490,7 @@ export default function MessagesScreen() {
   };
 
   const renderConversation = () => (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.conversationContainer}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={100}
@@ -438,8 +502,8 @@ export default function MessagesScreen() {
         </TouchableOpacity>
         <View style={styles.conversationHeaderInfo}>
           {activeConversation?.userAvatar && (
-            <Image 
-              source={{ uri: activeConversation.userAvatar }} 
+            <Image
+              source={{ uri: activeConversation.userAvatar }}
               style={styles.conversationAvatar}
             />
           )}
@@ -459,7 +523,7 @@ export default function MessagesScreen() {
       </View>
 
       {/* Messages List */}
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContent}
@@ -508,7 +572,7 @@ export default function MessagesScreen() {
           multiline
           maxLength={500}
         />
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.sendButton, !messageText.trim() && styles.sendButtonDisabled]}
           onPress={handleSendMessage}
           disabled={!messageText.trim()}
@@ -585,10 +649,10 @@ export default function MessagesScreen() {
     if (newMessageNotification) {
       // Don't show modal if actively viewing this specific conversation
       if (activeConversation) {
-        const isForActiveConvo = 
+        const isForActiveConvo =
           newMessageNotification.conversationId === activeConversation.conversationId ||
           newMessageNotification.senderId === parseInt(activeConversation.userId);
-        
+
         if (isForActiveConvo) {
           console.log('⚠️ Suppressing modal - already viewing this conversation', {
             notificationConvoId: newMessageNotification.conversationId,
@@ -601,7 +665,7 @@ export default function MessagesScreen() {
           return null;
         }
       }
-      
+
       // Don't show modal if tab is not focused (user on another screen)
       if (!isFocused) {
         console.log('⚠️ Suppressing modal - Messages tab not focused');
@@ -609,76 +673,76 @@ export default function MessagesScreen() {
         return null;
       }
     }
-    
+
     return (
-    <Modal
-      visible={newMessageNotification !== null}
-      transparent
-      animationType="slide"
-      onRequestClose={() => setNewMessageNotification(null)}
-    >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Nuevo Mensaje</Text>
-            <TouchableOpacity onPress={() => {
-              console.log('❌ Modal X button pressed');
-              setNewMessageNotification(null);
-            }}>
-              <X size={24} color={Colors.text} />
-            </TouchableOpacity>
+      <Modal
+        visible={newMessageNotification !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNewMessageNotification(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Nuevo Mensaje</Text>
+              <TouchableOpacity onPress={() => {
+                console.log('❌ Modal X button pressed');
+                setNewMessageNotification(null);
+              }}>
+                <X size={24} color={Colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            {newMessageNotification && (
+              <>
+                <View style={styles.modalBody}>
+                  <Image
+                    source={{ uri: newMessageNotification.senderAvatar || 'https://via.placeholder.com/60' }}
+                    style={styles.modalAvatar}
+                  />
+                  <Text style={styles.modalSenderName}>{newMessageNotification.senderName}</Text>
+                  <Text style={styles.modalMessageText}>{newMessageNotification.messageText}</Text>
+                </View>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonSecondary]}
+                    onPress={() => {
+                      setNewMessageNotification(null);
+                      // Force refresh conversations to ensure UI is updated
+                      loadConversations();
+                    }}
+                  >
+                    <Text style={styles.modalButtonTextSecondary}>Cerrar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.modalButtonPrimary]}
+                    onPress={() => {
+                      // Open conversation
+                      const convo = conversations.find(c => c.id === newMessageNotification.conversationId);
+                      if (convo) {
+                        handleOpenConversation(convo);
+                      } else {
+                        // If conversation not in list yet, create it manually
+                        setActiveConversation({
+                          userId: newMessageNotification.senderId.toString(),
+                          userName: newMessageNotification.senderName,
+                          userAvatar: newMessageNotification.senderAvatar,
+                          conversationId: newMessageNotification.conversationId,
+                        });
+                        loadConversationMessages(newMessageNotification.conversationId);
+                      }
+                      setNewMessageNotification(null);
+                    }}
+                  >
+                    <Text style={styles.modalButtonTextPrimary}>Abrir</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
-          
-          {newMessageNotification && (
-            <>
-              <View style={styles.modalBody}>
-                <Image
-                  source={{ uri: newMessageNotification.senderAvatar || 'https://via.placeholder.com/60' }}
-                  style={styles.modalAvatar}
-                />
-                <Text style={styles.modalSenderName}>{newMessageNotification.senderName}</Text>
-                <Text style={styles.modalMessageText}>{newMessageNotification.messageText}</Text>
-              </View>
-              
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonSecondary]}
-                  onPress={() => {
-                    setNewMessageNotification(null);
-                    // Force refresh conversations to ensure UI is updated
-                    loadConversations();
-                  }}
-                >
-                  <Text style={styles.modalButtonTextSecondary}>Cerrar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.modalButtonPrimary]}
-                  onPress={() => {
-                    // Open conversation
-                    const convo = conversations.find(c => c.id === newMessageNotification.conversationId);
-                    if (convo) {
-                      handleOpenConversation(convo);
-                    } else {
-                      // If conversation not in list yet, create it manually
-                      setActiveConversation({
-                        userId: newMessageNotification.senderId.toString(),
-                        userName: newMessageNotification.senderName,
-                        userAvatar: newMessageNotification.senderAvatar,
-                        conversationId: newMessageNotification.conversationId,
-                      });
-                      loadConversationMessages(newMessageNotification.conversationId);
-                    }
-                    setNewMessageNotification(null);
-                  }}
-                >
-                  <Text style={styles.modalButtonTextPrimary}>Abrir</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
         </View>
-      </View>
-    </Modal>
+      </Modal>
     );
   };
 
@@ -697,7 +761,7 @@ export default function MessagesScreen() {
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Mensajes</Text>
           <Text style={styles.headerSubtitle}>Conecta con tu comunidad</Text>
-          
+
           <View style={styles.searchContainer}>
             <Search size={20} color={Colors.textLight} />
             <TextInput
@@ -745,7 +809,7 @@ export default function MessagesScreen() {
           </ScrollView>
         )}
       </View>
-      
+
       {/* New message notification modal */}
       {renderNewMessageModal()}
     </View>

@@ -43,30 +43,7 @@ const deriveSocketUrlFromHttp = (httpUrl: string) => {
 };
 
 export const getApiBaseUrl = (): string => {
-  // 1) Build-time override (e.g. via babel/env in EAS builds)
-  if (typeof process !== 'undefined' && process.env && process.env.API_BASE_URL) {
-    return process.env.API_BASE_URL;
-  }
-
-  // 2) Runtime global override (useful for quick testing)
-  // e.g. set global.__API_BASE_URL__ = 'https://abc.ngrok.io' in debugger
-  // @ts-ignore
-  if (typeof global !== 'undefined' && (global as any).__API_BASE_URL__) {
-    // @ts-ignore
-    return (global as any).__API_BASE_URL__;
-  }
-
-  // 3) Expo constants (app config 'extra')
-  const fromExpo = getFromExpoExtra('API_BASE_URL') || getFromExpoExtra('api_base_url') || getFromExpoExtra('apiBaseUrl');
-  if (fromExpo) return fromExpo;
-
-  // 4) Local dev (physical device using Expo Go)
-  // TEMPORARILY DISABLED - Force Railway in dev mode for testing
-  // if (typeof __DEV__ !== 'undefined' && __DEV__) {
-  //   return `http://${API_CONFIG.LOCAL_IP}:${API_CONFIG.PORT}`;
-  // }
-
-  // 5) Fallback production URL (Railway backend)
+  // Always use the deployed Railway backend URL for all environments
   return 'https://rork-short-club-sincr-nica-community-production.up.railway.app';
 };
 

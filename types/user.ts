@@ -1,7 +1,8 @@
 export interface User {
-  id: string;
+  id: number;
   name: string;
   email: string;
+  role?: string;
   avatar?: string;
   bio?: string;
   location?: string;
@@ -19,6 +20,7 @@ export interface User {
   tiktok?: string;
   twitter?: string;
   linkedin?: string;
+  bankAccounts?: BankAccount[];
 }
 
 export interface Service {
@@ -55,7 +57,7 @@ export interface Lodging {
   availableDates: string[];
 }
 
-export type ServiceCategory = 
+export type ServiceCategory =
   | 'healing'
   | 'coaching'
   | 'meditation'
@@ -65,7 +67,7 @@ export type ServiceCategory =
   | 'therapy'
   | 'spiritual-guidance';
 
-export type LodgingType = 
+export type LodgingType =
   | 'retreat-center'
   | 'healing-space'
   | 'eco-lodge'
@@ -119,7 +121,7 @@ export interface OpeningHours {
   sunday: string;
 }
 
-export type FoodCategory = 
+export type FoodCategory =
   | 'organic'
   | 'vegan'
   | 'vegetarian'
@@ -259,7 +261,7 @@ export interface NutritionalInfo {
   sodium?: number;
 }
 
-export type MenuCategory = 
+export type MenuCategory =
   | 'appetizers'
   | 'salads'
   | 'soups'
@@ -314,7 +316,7 @@ export interface SelectedCustomization {
   additionalPrice: number;
 }
 
-export type OrderStatus = 
+export type OrderStatus =
   | 'pending'
   | 'confirmed'
   | 'preparing'
@@ -364,7 +366,7 @@ export interface OrderNotification {
   data?: any;
 }
 
-export type NotificationType = 
+export type NotificationType =
   | 'order-confirmed'
   | 'order-preparing'
   | 'order-ready'
@@ -401,7 +403,9 @@ export interface BankAccount {
   accountNumber: string;
   bankName: string;
   accountType: 'checking' | 'savings';
-  holderName: string;
+  accountHolderName: string;
+  percentage: number;
+  nickname?: string;
   isDefault: boolean;
   isVerified: boolean;
   createdAt: string;

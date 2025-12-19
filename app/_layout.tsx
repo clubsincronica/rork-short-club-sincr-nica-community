@@ -53,15 +53,15 @@ function RootLayoutNav() {
       if (!isLoading && !settings.hasCompletedOnboarding) {
         // Check if we're in a preview environment (like Rork)
         const isPreview = Platform.OS === 'web' && typeof window !== 'undefined' && (
-          window.location?.hostname?.includes('rork') || 
+          window.location?.hostname?.includes('rork') ||
           window.location?.hostname?.includes('localhost') ||
           window.location?.hostname?.includes('expo.dev')
         );
-        
+
         if (__DEV__) {
           console.log('Preview environment detected:', isPreview);
         }
-        
+
         if (!isPreview) {
           router.replace('/onboarding');
         }
@@ -83,7 +83,7 @@ function RootLayoutNav() {
       <Stack.Screen name="payment" options={{ presentation: 'modal', title: 'Pago' }} />
       <Stack.Screen name="notifications" options={{ presentation: 'modal', title: 'Notificaciones' }} />
       <Stack.Screen name="vendor-dashboard" options={{ headerShown: false }} />
-      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+
       <Stack.Screen name="settings" options={{ presentation: 'modal', title: 'Settings' }} />
       <Stack.Screen name="privacy" options={{ presentation: 'modal', title: 'Privacy Policy' }} />
       <Stack.Screen name="help" options={{ presentation: 'modal', title: 'Help & Support' }} />
@@ -98,26 +98,26 @@ export default function RootLayout() {
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
-    
+
     const initializeApp = async () => {
       try {
         if (__DEV__) {
           console.log('Initializing app...');
         }
         await SplashScreen.hideAsync();
-        
+
         // Reduce splash time for preview environments
         const isPreview = Platform.OS === 'web' && typeof window !== 'undefined' && (
-          window.location?.hostname?.includes('rork') || 
+          window.location?.hostname?.includes('rork') ||
           window.location?.hostname?.includes('localhost') ||
           window.location?.hostname?.includes('expo.dev')
         );
-        
+
         const splashDuration = isPreview ? 500 : 2000;
         if (__DEV__) {
           console.log('Splash duration:', splashDuration, 'Preview:', isPreview);
         }
-        
+
         timeoutId = setTimeout(() => {
           if (__DEV__) {
             console.log('App ready!');
@@ -134,7 +134,7 @@ export default function RootLayout() {
     };
 
     initializeApp();
-    
+
     return () => {
       if (timeoutId) {
         clearTimeout(timeoutId);

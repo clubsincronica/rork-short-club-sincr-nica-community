@@ -1,10 +1,20 @@
+// ...existing imports...
+// ...existing imports...
+
+interface UpcomingReservation {
+  id: string;
+  service: string;
+  client: string;
+  date: string;
+  price: number;
+  status: string;
+}
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Star, Calendar, DollarSign, Users, ShoppingCart, Bell, MessageSquare, Clock, CreditCard, ChevronRight, Package, TrendingUp, AlertCircle, CheckCircle, Plus, QrCode } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
-import { mockServices } from '@/mocks/data';
 import { Colors } from '@/constants/colors';
 
 import { router } from 'expo-router';
@@ -27,10 +37,10 @@ export default function ServicesScreen() {
         <View style={styles.emptyState}>
           <Package size={64} color={Colors.textLight} />
           <Text style={styles.emptyTitle}>Inicia sesión para ver tus servicios</Text>
-          <Text style={styles.emptySubtitle}>
+          <Text style={styles.loginEmptySubtitle}>
             Accede a tu cuenta para gestionar reservas, calendario y más
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.loginButton}
             onPress={() => router.push('/login')}
           >
@@ -41,29 +51,34 @@ export default function ServicesScreen() {
     );
   }
 
-  // Mock user's services (in real app, this would come from API)
-  const userServices = mockServices.filter(service => service.providerId === currentUser?.id);
+  // Calculated user stats from calendar events
 
   // Calculate real stats from calendar events
   const stats = {
-    totalEarnings: userEvents.reduce((sum, event) => sum + (event.price * event.currentParticipants), 0),
-    totalBookings: userEvents.reduce((sum, event) => sum + event.currentParticipants, 0),
-    averageRating: 4.9, // This would come from reviews in a real app
+    totalEarnings: userEvents.reduce(
+      (sum: number, event: any) => sum + (event.price * event.currentParticipants),
+      0
+    ),
+    totalBookings: userEvents.reduce(
+      (sum: number, event: any) => sum + event.currentParticipants,
+      0
+    ),
+    averageRating: 0, // No reviews yet
     activeServices: userEvents.length,
   };
-  
+
   // Debug logging
   console.log('📊 MisServicios Stats for user', currentUser?.name, ':', stats);
   console.log('📊 User events count:', userEvents.length);
   console.log('📊 Upcoming events:', upcomingEvents.length);
 
   // Convert calendar events to reservation format for display
-  const upcomingReservations = upcomingEvents.slice(0, 3).map(event => {
+  const upcomingReservations: UpcomingReservation[] = upcomingEvents.slice(0, 3).map((event: any) => {
     const eventDate = new Date(event.date + ' ' + event.startTime);
     const now = new Date();
     const isToday = eventDate.toDateString() === now.toDateString();
     const isTomorrow = eventDate.toDateString() === new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString();
-    
+
     let dateDisplay = '';
     if (isToday) {
       dateDisplay = `Hoy, ${event.startTime}`;
@@ -74,7 +89,7 @@ export default function ServicesScreen() {
       const day = eventDate.getDate();
       dateDisplay = `${month} ${day}, ${event.startTime}`;
     }
-    
+
     return {
       id: event.id,
       service: event.title,
@@ -93,9 +108,9 @@ export default function ServicesScreen() {
 
   const renderSectionButton = (section: ServiceSection, icon: React.ReactNode, title: string, subtitle: string, highlight?: boolean) => {
     if (!section.trim()) return null;
-    
+
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.sectionButton, highlight && styles.sectionButtonHighlight]}
         onPress={() => setActiveSection(section)}
         testID={`section-${section}`}
@@ -124,7 +139,7 @@ export default function ServicesScreen() {
 
       <View style={styles.recentActivity}>
         <Text style={styles.sectionTitle}>Actividad Reciente</Text>
-        {upcomingReservations.slice(0, 2).map(reservation => (
+        {upcomingReservations.slice(0, 2).map((reservation: UpcomingReservation) => (
           <View key={reservation.id} style={styles.activityCard}>
             <View style={styles.activityIcon}>
               <Clock size={20} color={Colors.primary} />
@@ -146,64 +161,64 @@ export default function ServicesScreen() {
 
   const renderCalendar = () => (
     <View style={styles.sectionContainer}>
-        <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-          <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
-          <Text style={styles.backButtonText}>Volver</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.sectionHeaderWithAction}>
-          <Text style={styles.sectionTitle}>Mi Calendario</Text>
-          <TouchableOpacity 
-            style={styles.addEventButton}
-            onPress={() => router.push('/add-event')}
-          >
-            <Plus size={20} color={Colors.white} />
-            <Text style={styles.addEventButtonText}>Agregar Evento</Text>
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.primaryButton}
-          onPress={() => router.push('/calendar')}
+      <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
+        <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
+        <Text style={styles.backButtonText}>Volver</Text>
+      </TouchableOpacity>
+
+      <View style={styles.sectionHeaderWithAction}>
+        <Text style={styles.sectionTitle}>Mi Calendario</Text>
+        <TouchableOpacity
+          style={styles.addEventButton}
+          onPress={() => router.push('/add-event')}
         >
-          <Calendar size={20} color={Colors.white} />
-          <Text style={styles.primaryButtonText}>Abrir Calendario Completo</Text>
+          <Plus size={20} color={Colors.white} />
+          <Text style={styles.addEventButtonText}>Agregar Evento</Text>
         </TouchableOpacity>
-
-        <View style={styles.calendarStats}>
-          <View style={styles.calendarStatCard}>
-            <Text style={styles.calendarStatValue}>{userEvents.length}</Text>
-            <Text style={styles.calendarStatLabel}>Eventos creados</Text>
-          </View>
-          <View style={styles.calendarStatCard}>
-            <Text style={styles.calendarStatValue}>{upcomingEvents.length}</Text>
-            <Text style={styles.calendarStatLabel}>Próximos eventos</Text>
-          </View>
-        </View>
-
-        <Text style={styles.subsectionTitle}>Próximos Eventos</Text>
-        {upcomingReservations.length > 0 ? (
-          upcomingReservations.map(reservation => (
-            <View key={reservation.id} style={styles.eventCard}>
-              <View style={styles.eventTime}>
-                <Text style={styles.eventTimeText}>{reservation.date.split(',')[1]?.trim() || ''}</Text>
-                <Text style={styles.eventDateText}>{reservation.date.split(',')[0]}</Text>
-              </View>
-              <View style={styles.eventContent}>
-                <Text style={styles.eventTitle}>{reservation.service}</Text>
-                <Text style={styles.eventClient}>{reservation.client}</Text>
-                <Text style={styles.eventPrice}>€{reservation.price}</Text>
-              </View>
-            </View>
-          ))
-        ) : (
-          <View style={styles.emptyEventsContainer}>
-            <Calendar size={48} color={Colors.border} />
-            <Text style={styles.emptyEventsText}>No tienes eventos próximos</Text>
-            <Text style={styles.emptyEventsSubtext}>Crea tu primer evento para comenzar</Text>
-          </View>
-        )}
       </View>
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={() => router.push('/calendar')}
+      >
+        <Calendar size={20} color={Colors.white} />
+        <Text style={styles.primaryButtonText}>Abrir Calendario Completo</Text>
+      </TouchableOpacity>
+
+      <View style={styles.calendarStats}>
+        <View style={styles.calendarStatCard}>
+          <Text style={styles.calendarStatValue}>{userEvents.length}</Text>
+          <Text style={styles.calendarStatLabel}>Eventos creados</Text>
+        </View>
+        <View style={styles.calendarStatCard}>
+          <Text style={styles.calendarStatValue}>{upcomingEvents.length}</Text>
+          <Text style={styles.calendarStatLabel}>Próximos eventos</Text>
+        </View>
+      </View>
+
+      <Text style={styles.subsectionTitle}>Próximos Eventos</Text>
+      {upcomingReservations.length > 0 ? (
+        upcomingReservations.map((reservation: UpcomingReservation) => (
+          <View key={reservation.id} style={styles.eventCard}>
+            <View style={styles.eventTime}>
+              <Text style={styles.eventTimeText}>{reservation.date.split(',')[1]?.trim() || ''}</Text>
+              <Text style={styles.eventDateText}>{reservation.date.split(',')[0]}</Text>
+            </View>
+            <View style={styles.eventContent}>
+              <Text style={styles.eventTitle}>{reservation.service}</Text>
+              <Text style={styles.eventClient}>{reservation.client}</Text>
+              <Text style={styles.eventPrice}>€{reservation.price}</Text>
+            </View>
+          </View>
+        ))
+      ) : (
+        <View style={styles.emptyEventsContainer}>
+          <Calendar size={48} color={Colors.border} />
+          <Text style={styles.emptyEventsText}>No tienes eventos próximos</Text>
+          <Text style={styles.emptyEventsSubtext}>Crea tu primer evento para comenzar</Text>
+        </View>
+      )}
+    </View>
   );
 
   const renderReservations = () => (
@@ -212,12 +227,12 @@ export default function ServicesScreen() {
         <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
-      
+
       <Text style={styles.sectionTitle}>Administrar Reservas</Text>
-      
+
       {upcomingReservations.length > 0 ? (
         <>
-          {upcomingReservations.map(reservation => (
+          {upcomingReservations.map((reservation: UpcomingReservation) => (
             <View key={reservation.id} style={styles.reservationCard}>
               <View style={styles.reservationHeader}>
                 <View>
@@ -240,11 +255,11 @@ export default function ServicesScreen() {
                   </Text>
                 </View>
               </View>
-              
+
               {/* Action buttons for pending reservations */}
               {reservation.status === 'pending' && (
                 <View style={styles.reservationActions}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.declineButton}
                     onPress={() => {
                       Alert.alert(
@@ -252,7 +267,7 @@ export default function ServicesScreen() {
                         '¿Estás seguro que deseas cancelar esta reserva?',
                         [
                           { text: 'No', style: 'cancel' },
-                          { 
+                          {
                             text: 'Sí, Cancelar',
                             style: 'destructive',
                             onPress: () => {
@@ -266,7 +281,7 @@ export default function ServicesScreen() {
                   >
                     <Text style={styles.declineButtonText}>Cancelar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.acceptButton}
                     onPress={() => {
                       // TODO: Implement accept reservation logic
@@ -298,9 +313,9 @@ export default function ServicesScreen() {
         <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
-      
+
       <Text style={styles.sectionTitle}>Carrito y Pagos</Text>
-      
+
       {cartItems.length > 0 ? (
         <>
           <View style={styles.cartSummary}>
@@ -324,7 +339,7 @@ export default function ServicesScreen() {
             </View>
           </View>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => router.push('/payment')}
           >
@@ -367,9 +382,9 @@ export default function ServicesScreen() {
         <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
-      
+
       <Text style={styles.sectionTitle}>Seguimiento de Clientes</Text>
-      
+
       {followUpClients.length > 0 ? (
         <>
           <View style={styles.followUpStats}>
@@ -421,9 +436,9 @@ export default function ServicesScreen() {
         <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
-      
+
       <Text style={styles.sectionTitle}>Notificaciones y Mensajes</Text>
-      
+
       <View style={styles.notificationSettings}>
         <Text style={styles.subsectionTitle}>Configuración Rápida</Text>
         <View style={styles.notificationToggle}>
@@ -490,15 +505,15 @@ export default function ServicesScreen() {
                 <Text style={styles.headerTitle}>Mis Servicios</Text>
                 <Text style={styles.headerSubtitle}>Centro de gestión integral</Text>
               </View>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.qrButton}
                 onPress={() => router.push('/qr-scanner')}
                 testID="qr-scanner-button"
               >
                 <QrCode size={24} color={Colors.white} />
               </TouchableOpacity>
-              
+
               <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
                   <DollarSign size={20} color={Colors.textOnGold} />
@@ -536,8 +551,8 @@ export default function ServicesScreen() {
                 <Text style={styles.headerTitle}>Mis Servicios</Text>
                 <Text style={styles.headerSubtitle}>Centro de gestión integral</Text>
               </View>
-              
-              <TouchableOpacity 
+
+              <TouchableOpacity
                 style={styles.qrButton}
                 onPress={() => router.push('/qr-scanner')}
                 testID="qr-scanner-button"
@@ -546,7 +561,7 @@ export default function ServicesScreen() {
               </TouchableOpacity>
             </View>
           </View>
-          
+
           {activeSection === 'calendar' && (
             <ScrollView style={styles.sectionScrollContainer} showsVerticalScrollIndicator={false}>
               {renderCalendar()}
@@ -1580,20 +1595,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  emptyState: {
+  loginEmptyState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  emptyTitle: {
+  loginEmptyTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: Colors.text,
     marginTop: 16,
     textAlign: 'center',
   },
-  emptySubtitle: {
+  loginEmptySubtitle: {
     fontSize: 14,
     color: Colors.textLight,
     marginTop: 8,

@@ -6,10 +6,10 @@ import { useGlobalSocketConnection } from '@/hooks/useGlobalSocketConnection';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  
+
   // Initialize global socket connection for real-time messaging across all tabs
   useGlobalSocketConnection();
-  
+
   return (
     <Tabs
       screenOptions={{
@@ -41,8 +41,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="near-me"
         options={{
-          title: 'Cerca de Mí',
-          tabBarIcon: ({ color, size }) => <MapPin color={color} size={size} />,
+          title: 'Comunidad',
+          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
         }}
       />
       <Tabs.Screen

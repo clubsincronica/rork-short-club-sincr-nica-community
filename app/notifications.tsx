@@ -17,7 +17,7 @@ export default function NotificationsScreen() {
   };
 
   const handleNotificationPress = (notification: OrderNotification) => {
-    markNotificationAsRead(notification.id);
+    markNotificationAsRead(); // No argument, as per function definition
     if (notification.orderId) {
       router.push(`/order-tracking/${notification.orderId}`);
     }

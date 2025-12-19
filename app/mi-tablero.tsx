@@ -4,8 +4,8 @@ import { TouchableScale } from '@/components/TouchableScale';
 import { AccessibleText, Heading } from '@/components/AccessibleText';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  Edit3, 
+import {
+  Edit3,
   Plus,
   ArrowLeft,
   Sparkles,
@@ -18,7 +18,7 @@ import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useServices } from '@/hooks/services-store';
 import { useProducts } from '@/hooks/products-store';
-import { mockServices } from '@/mocks/data';
+// import { mockServices } from '@/mocks/data';
 import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -74,48 +74,30 @@ export default function MiTableroScreen() {
   // Create comprehensive offerings from all sources - simplified approach
   const userOfferings = useMemo(() => {
     if (!currentUser) return [];
-    
+
     console.log('Mi Tablero: Current user:', currentUser.id, currentUser.name);
-    console.log('Mi Tablero: Total mockServices:', mockServices.length);
+    // 1. Add services from real services store
+    /*
+    console.log('Mi Tablero: Total mockServices: 0 (Disabled)');
     console.log('Mi Tablero: Total events:', events.length);
-    
+    */
+
     const offerings: ProfilePriorityItem[] = [];
 
-    // 1. Add services from both mockServices and real services store
-    if (__DEV__) {
-      console.log('🔍 Mi Tablero: Current user ID:', currentUser.id);
-      console.log('🔍 Mi Tablero: All mock services:', mockServices.map(s => ({ id: s.id, title: s.title, providerId: s.providerId })));
-    }
-    
-    const mockUserServices = mockServices.filter(service => service.providerId === currentUser.id);
+    // const mockUserServices = mockServices.filter(service => service.providerId === currentUser.id);
+    const mockUserServices: any[] = []; // Empty for compatibility
     const realUserServices = services.filter(service => service.providerId === currentUser.id);
+
     if (__DEV__) {
-      console.log('✅ Mi Tablero: Mock services found:', mockUserServices.length, mockUserServices.map(s => s.title));
       console.log('✅ Mi Tablero: Real services found:', realUserServices.length, realUserServices.map(s => s.title));
     }
-    
-    // Add mock services
+
+    // Mock services injection removed
+    /*
     mockUserServices.forEach(service => {
-      offerings.push({
-        id: `mock-service-${service.id}`,
-        type: 'service',
-        title: service.title,
-        description: service.description,
-        price: service.price,
-        image: service.images?.[0],
-        priority: 1,
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        tags: [],
-        metadata: {
-          duration: service.duration,
-          category: service.category,
-          isOnline: service.isOnline,
-          location: service.location
-        }
-      });
+       // ...
     });
+    */
 
     // Add real services from services store
     realUserServices.forEach(service => {
@@ -142,23 +124,23 @@ export default function MiTableroScreen() {
 
     // 2. Add ONLY user events from calendar (strict filtering)
     if (__DEV__) {
-      console.log('🔍 Mi Tablero: All events:', events.map((e: any) => ({ 
-        id: e.id, 
-        title: e.title, 
-        providerId: e.providerId, 
+      console.log('🔍 Mi Tablero: All events:', events.map((e: any) => ({
+        id: e.id,
+        title: e.title,
+        providerId: e.providerId,
         providerIdType: typeof e.providerId,
         providerIdFromObj: e.provider?.id,
         currentUserId: currentUser.id,
         currentUserIdType: typeof currentUser.id
       })));
     }
-    
+
     const userEvents = events.filter((event: any) => {
       // STRICT FILTERING: Only include events where providerId matches current user AND no provider object exists OR provider.id also matches
       const providerIdMatches = event.providerId === currentUser.id;
       const providerObjMatches = !event.provider || event.provider.id === currentUser.id;
       const isOwner = providerIdMatches && providerObjMatches;
-      
+
       if (__DEV__) {
         console.log(`🔍 Event "${event.title}": providerId=${event.providerId}, provider.id=${event.provider?.id}, currentUserId=${currentUser.id}, providerIdMatches=${providerIdMatches}, providerObjMatches=${providerObjMatches}, isOwner=${isOwner}`);
       }
@@ -167,7 +149,7 @@ export default function MiTableroScreen() {
     if (__DEV__) {
       console.log('✅ Mi Tablero: User events found:', userEvents.length, userEvents.map((e: any) => e.title));
     }
-    
+
     userEvents.forEach((event: any) => {
       console.log('✅ Mi Tablero: Adding calendar event:', event.title);
       offerings.push({
@@ -197,7 +179,7 @@ export default function MiTableroScreen() {
     // 3. Add user products from products store
     const realUserProducts = getUserProducts(currentUser.id);
     console.log('Mi Tablero: Real products found:', realUserProducts.length, realUserProducts.map(p => p.title));
-    
+
     realUserProducts.forEach(product => {
       offerings.push({
         id: product.id,
@@ -219,7 +201,7 @@ export default function MiTableroScreen() {
     });
 
     console.log('Mi Tablero: Total offerings:', offerings.length, offerings.map(o => o.title));
-    
+
     // Final safety check - ensure all items truly belong to current user
     const safeOfferings = offerings.filter(offering => {
       // Double-check by verifying item source and ownership
@@ -233,7 +215,7 @@ export default function MiTableroScreen() {
         }
         return isValid;
       }
-      
+
       if (offering.type === 'event') {
         // Check if this event ID exists in our filtered events
         const isFromUserEvents = userEvents.some((e: any) => `event-${e.id}` === offering.id);
@@ -242,61 +224,59 @@ export default function MiTableroScreen() {
         }
         return isFromUserEvents;
       }
-      
+
       if (offering.type === 'product') {
         // Products are already safely filtered via getUserProducts
         return true;
       }
-      
+
       // Default: allow other types (priority items, etc.)
       return true;
     });
-    
+
     if (__DEV__) {
       console.log('✅ Mi Tablero: Final safe offerings:', safeOfferings.length, safeOfferings.map(o => o.title));
       console.log('🔍 Mi Tablero: Final offerings breakdown:', safeOfferings.map(o => ({
         id: o.id,
         type: o.type,
         title: o.title,
-        source: o.id.startsWith('mock-service-') ? 'mock-service' : 
-              o.id.startsWith('event-') ? 'event' : 
-              o.type === 'product' ? 'product' : 'other'
+        source: o.id.startsWith('mock-service-') ? 'mock-service' :
+          o.id.startsWith('event-') ? 'event' :
+            o.type === 'product' ? 'product' : 'other'
       })));
     }
     // FINAL SECURITY LAYER: Double-check each offering against current user ID
     const ultraSafeOfferings = safeOfferings.filter(offering => {
       if (offering.type === 'service') {
-        // For mock services, verify the original mock service belongs to current user
+        // For mock services (deprecated), verify the original mock service belongs to current user
         if (offering.id.startsWith('mock-service-')) {
-          const originalId = offering.id.replace('mock-service-', '');
-          const originalMockService = mockServices.find(s => s.id === originalId);
-          return originalMockService && originalMockService.providerId === currentUser.id;
+          return false; // No more mock services
         }
         // For real services, verify providerId matches
         const realService = services.find(s => s.id === offering.id);
         return realService && realService.providerId === currentUser.id;
       }
-      
+
       if (offering.type === 'event') {
         const eventId = offering.id.replace('event-', '');
         const realEvent = events.find((e: any) => e.id === eventId);
         if (!realEvent) return false;
-        
+
         // Apply same strict filtering as above
         const providerIdMatches = realEvent.providerId === currentUser.id;
         const providerObjMatches = !realEvent.provider || realEvent.provider.id === currentUser.id;
         return providerIdMatches && providerObjMatches;
       }
-      
+
       // Products are already filtered by getUserProducts
       return true;
     });
-    
+
     console.log('🔒 Mi Tablero: Ultra-safe final offerings:', ultraSafeOfferings.length, 'vs previous:', safeOfferings.length);
     if (ultraSafeOfferings.length !== safeOfferings.length) {
       console.warn('⚠️ Mi Tablero: Removed', safeOfferings.length - ultraSafeOfferings.length, 'potentially unsafe offerings!');
     }
-    
+
     return ultraSafeOfferings;
   }, [currentUser, events]);
 
@@ -315,7 +295,7 @@ export default function MiTableroScreen() {
   const handleEditPriorityItem = (item: ProfilePriorityItem) => {
     console.log('Mi Tablero: Editing priority item:', item.id, item.title);
     console.log('Mi Tablero: Item type:', item.type);
-    
+
     // Check if this is a mock item (not editable)
     if (item.id.startsWith('mock-')) {
       Alert.alert(
@@ -325,7 +305,7 @@ export default function MiTableroScreen() {
       );
       return;
     }
-    
+
     // Navigate to create-action screen with edit parameters
     router.push({
       pathname: '/create-action',
@@ -361,7 +341,7 @@ export default function MiTableroScreen() {
         if (editingPriorityItem.id.startsWith('event-')) {
           // Extract the actual event ID
           const eventId = editingPriorityItem.id.replace('event-', '');
-          
+
           // Update the calendar event
           await updateEvent(eventId, {
             title: itemData.title,
@@ -370,16 +350,16 @@ export default function MiTableroScreen() {
             maxParticipants: parseInt(itemData.maxParticipants) || 10,
             price: itemData.price || 0
           });
-          
+
           console.log('Mi Tablero: Updated calendar event:', eventId);
         }
         // Check if this is a service that needs to be updated in services store
         else if (editingPriorityItem.type === 'service') {
           // For services, use the direct ID (no prefix needed)
           const serviceId = editingPriorityItem.id;
-          
+
           console.log('Mi Tablero: Attempting to update service:', serviceId, 'with data:', itemData);
-          
+
           // Update the service including scheduling data
           await updateService(serviceId, {
             title: itemData.title,
@@ -394,36 +374,36 @@ export default function MiTableroScreen() {
             endDate: itemData.endDate,
             schedule: itemData.schedule
           });
-          
+
           console.log('Mi Tablero: Successfully updated service:', serviceId);
         }
         // Check if this is a product that needs to be updated in products store
         else if (editingPriorityItem.type === 'product') {
           // For products, use the direct ID (no prefix needed)
           const productId = editingPriorityItem.id;
-          
+
           console.log('Mi Tablero: Attempting to update product:', productId, 'with data:', itemData);
-          
+
           // Update the product
           await updateProduct(productId, {
             title: itemData.title,
             description: itemData.description,
             price: itemData.price || 0
           });
-          
+
           console.log('Mi Tablero: Successfully updated product:', productId);
         }
-        
+
         // Update existing item in priority store
-        updatePriorityItem({ 
-          itemId: editingPriorityItem.id, 
-          updates: itemData 
+        updatePriorityItem({
+          itemId: editingPriorityItem.id,
+          updates: itemData
         });
         Alert.alert('Éxito', 'Elemento actualizado en tu tablero');
       } else {
         // Add new item to priority board
         addPriorityItem(itemData);
-        
+
         // If it's an event, also add it to the calendar
         if (itemData.type === 'event' && itemData.eventDate && currentUser) {
           // Map category to calendar categories
@@ -449,11 +429,11 @@ export default function MiTableroScreen() {
             price: itemData.price || 0,
             tags: itemData.tags || []
           };
-          
+
           console.log('Mi Tablero: Adding event to calendar:', calendarEvent);
           await addEvent(calendarEvent);
         }
-        
+
         Alert.alert('Éxito', 'Elemento añadido a tu tablero');
       }
       setIsPriorityItemModalVisible(false);
@@ -468,16 +448,16 @@ export default function MiTableroScreen() {
     const [hours, minutes] = startTime.split(':').map(Number);
     const startDate = new Date();
     startDate.setHours(hours, minutes, 0, 0);
-    
+
     const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
     return `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
   };
 
   const handleItemPress = (item: ProfilePriorityItem) => {
     // Show item details and options
-    const itemType = item.type === 'service' ? 'servicio' : 
-                     item.type === 'event' ? 'evento' : 'producto';
-    
+    const itemType = item.type === 'service' ? 'servicio' :
+      item.type === 'event' ? 'evento' : 'producto';
+
     Alert.alert(
       item.title,
       `${item.description}\n\nPrecio: ${item.price}\n\n¿Qué quieres hacer con este ${itemType}?`,
@@ -492,7 +472,7 @@ export default function MiTableroScreen() {
 
   const showItemDetails = (item: ProfilePriorityItem) => {
     let details = `📝 ${item.description}\n\n💰 Precio: ${item.price}`;
-    
+
     // Type-safe metadata access
     const metadata = (item as any).metadata;
     if (metadata) {
@@ -531,8 +511,8 @@ export default function MiTableroScreen() {
         <View style={styles.container}>
           <View style={styles.loginPrompt}>
             <Text style={styles.loginTitle}>Inicia sesión para ver tu tablero</Text>
-            <TouchableScale 
-              style={styles.primaryButton} 
+            <TouchableScale
+              style={styles.primaryButton}
               onPress={() => router.back()}
             >
               <Text style={styles.primaryButtonText}>Volver</Text>
@@ -545,7 +525,7 @@ export default function MiTableroScreen() {
 
   return (
     <ConstellationBackground intensity="light">
-      <ScrollView 
+      <ScrollView
         style={[styles.container, { paddingTop: insets.top }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -554,7 +534,7 @@ export default function MiTableroScreen() {
         }
       >
         {/* Header Card */}
-        <View style={[styles.headerCard, { marginTop: 24, backgroundColor: 'rgba(255,255,255,0.85)' }]}> 
+        <View style={[styles.headerCard, { marginTop: 24, backgroundColor: 'rgba(255,255,255,0.85)' }]}>
           {/* Title Section */}
           <View style={styles.headerTitleSection}>
             <View style={styles.headerTitleRow}>
@@ -565,7 +545,7 @@ export default function MiTableroScreen() {
             </Text>
           </View>
           {/* Navigation Row - moved below subtitle */}
-          <View style={[styles.headerTopRow, { marginTop: 8 }]}> 
+          <View style={[styles.headerTopRow, { marginTop: 8 }]}>
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.back()}
@@ -616,10 +596,10 @@ export default function MiTableroScreen() {
               {isEditMode ? 'Toca un elemento para editarlo' : 'Toca un elemento para ver más opciones'}
             </Text>
           </View>
-          
+
           <ProfilePriorityBoard
             items={userOfferings}
-            customization={{ 
+            customization={{
               theme: 'colorful',
               showBio: false,
               showSpecialties: false,
@@ -641,12 +621,12 @@ export default function MiTableroScreen() {
         {/* Profile Preview - Only show when not in edit mode */}
         {!isEditMode && (
           <View style={styles.profilePreviewSection}>
-            <TouchableScale 
+            <TouchableScale
               style={styles.profilePreviewCard}
               onPress={() => {
                 router.push({
                   pathname: '/user-profile',
-                  params: { 
+                  params: {
                     userId: currentUser.id,
                     userName: currentUser.name,
                     userEmail: currentUser.email,

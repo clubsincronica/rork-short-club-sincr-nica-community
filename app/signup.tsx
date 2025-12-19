@@ -74,7 +74,7 @@ export default function SignupScreen() {
     if (!validateForm()) return;
     
     const newUser: UserType = {
-      id: Date.now().toString(),
+      id: Date.now(),
       name,
       email,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`,
