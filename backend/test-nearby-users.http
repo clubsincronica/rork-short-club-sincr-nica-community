@@ -1,0 +1,5 @@
+### Test Nearby Users Endpoint
+GET http://localhost:3000/api/users/nearby/12.3456/-86.1234?radius=50&limit=10
+Content-Type: application/json
+
+# Replace 12.3456/-86.1234 with actual test user latitude/longitude as needed.

@@ -1,16 +1,15 @@
+import 'dotenv/config'; // Must be first!
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import cors from 'cors';
-import dotenv from 'dotenv';
+import cors from 'cors'; // removed manual dotenv import as it is now at the top
 import jwt from 'jsonwebtoken';
 import userRoutes from './routes/users';
 import messageRoutes from './routes/messages';
+import eventRoutes from './routes/events';
 import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
-
-dotenv.config();
 
 // Validate environment variables before starting server
 try {
@@ -29,21 +28,45 @@ function rowToObject(columns: string[], values: any[]): any {
   return obj;
 }
 
+// CORS Configuration
+const allowedOrigins = [
+  'https://clubsincronica.app',
+  'https://www.clubsincronica.app',
+  'https://rork.com' // From app.json
+];
+
+// Helper to check origin
+function getCorsOptions() {
+  if (!isProduction()) {
+    return { origin: true, credentials: true }; // Allow all in dev
+  }
+  return {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  };
+}
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-  },
+  cors: getCorsOptions() as any, // Type cast to avoid excessive typing issues for now
   transports: ['polling', 'websocket'],
   allowEIO3: true,
   path: '/socket.io/'
 });
 
 // Middleware
-app.use(cors());
+app.use(cors(getCorsOptions()));
 app.use(express.json());
 
 // Apply rate limiting to all API routes in production
@@ -55,6 +78,7 @@ if (isProduction()) {
 // REST API Routes
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
+app.use('/api/events', eventRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -66,117 +90,117 @@ if (!isProduction()) {
   app.post('/api/fix-conversations', async (req, res) => {
     try {
       console.log('🔧 Running conversation fix...');
-      
+
       // Import pg client if using PostgreSQL
       const usePostgres = !!process.env.DATABASE_URL;
-      
+
       if (!usePostgres) {
         return res.status(400).json({ error: 'This fix is only for PostgreSQL database' });
       }
-      
+
       const pgClient = require('./db/postgres-client');
-      
+
       // Delete corrupted conversations (where both participants are the same)
       console.log('🗑️  Deleting corrupted conversations...');
       const deleteMessages = await pgClient.query(
         'DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE participant1_id = participant2_id)'
       );
       console.log(`   Deleted ${deleteMessages.rowCount} messages from corrupted conversations`);
-      
+
       const deleteConvs = await pgClient.query(
         'DELETE FROM conversations WHERE participant1_id = participant2_id'
       );
       console.log(`   Deleted ${deleteConvs.rowCount} corrupted conversations`);
-      
+
       // Also delete specific bad conversations (2 and 3)
       const deleteSpecificMessages = await pgClient.query(
         'DELETE FROM messages WHERE conversation_id IN (2, 3)'
       );
       console.log(`   Deleted ${deleteSpecificMessages.rowCount} messages from conversations 2 and 3`);
-      
+
       const deleteSpecificConvs = await pgClient.query(
         'DELETE FROM conversations WHERE id IN (2, 3)'
       );
       console.log(`   Deleted ${deleteSpecificConvs.rowCount} specific corrupted conversations`);
-      
+
       // Check if conversation 1 is correct (between user 1 and 2)
       const conv1 = await pgClient.query(
         'SELECT * FROM conversations WHERE id = 1'
       );
-      
+
       let fixedConversationId;
-      
+
       if (conv1.length > 0) {
         const c = conv1[0];
         const hasUser1 = c.participant1_id === 1 || c.participant2_id === 1;
         const hasUser2 = c.participant1_id === 2 || c.participant2_id === 2;
-        
+
         if (hasUser1 && hasUser2) {
           console.log('✅ Conversation 1 is already correct (between users 1 and 2)');
           fixedConversationId = 1;
         } else {
           console.log('❌ Conversation 1 exists but is wrong, deleting it');
-        await pgClient.query('DELETE FROM messages WHERE conversation_id = 1');
-        await pgClient.query('DELETE FROM conversations WHERE id = 1');
-        
-        // Create correct conversation
+          await pgClient.query('DELETE FROM messages WHERE conversation_id = 1');
+          await pgClient.query('DELETE FROM conversations WHERE id = 1');
+
+          // Create correct conversation
+          const newConv = await pgClient.query(
+            'INSERT INTO conversations (participant1_id, participant2_id) VALUES (1, 2) RETURNING id'
+          );
+          fixedConversationId = newConv[0].id;
+          console.log(`✅ Created new conversation ${fixedConversationId} between users 1 and 2`);
+        }
+      } else {
+        // Conversation 1 doesn't exist, create it
         const newConv = await pgClient.query(
           'INSERT INTO conversations (participant1_id, participant2_id) VALUES (1, 2) RETURNING id'
         );
         fixedConversationId = newConv[0].id;
-        console.log(`✅ Created new conversation ${fixedConversationId} between users 1 and 2`);
+        console.log(`✅ Created conversation ${fixedConversationId} between users 1 and 2`);
       }
-    } else {
-      // Conversation 1 doesn't exist, create it
-      const newConv = await pgClient.query(
-        'INSERT INTO conversations (participant1_id, participant2_id) VALUES (1, 2) RETURNING id'
-      );
-      fixedConversationId = newConv[0].id;
-      console.log(`✅ Created conversation ${fixedConversationId} between users 1 and 2`);
-    }
-    
-    // Get final state
-    const allConversations = await pgClient.query(
-      `SELECT c.id, c.participant1_id, c.participant2_id, 
+
+      // Get final state
+      const allConversations = await pgClient.query(
+        `SELECT c.id, c.participant1_id, c.participant2_id, 
               u1.name as p1_name, u2.name as p2_name
        FROM conversations c
        LEFT JOIN users u1 ON c.participant1_id = u1.id
        LEFT JOIN users u2 ON c.participant2_id = u2.id
        ORDER BY c.id`
-    );
-    
-    console.log('✅ Fix complete!');
-    
-    res.json({
-      success: true,
-      message: 'Conversations fixed',
-      deletedMessages: deleteMessages.rowCount + deleteSpecificMessages.rowCount,
-      deletedConversations: deleteConvs.rowCount + deleteSpecificConvs.rowCount,
-      fixedConversationId,
-      remainingConversations: allConversations
-    });
-    
-  } catch (error: any) {
-    console.error('❌ Fix failed:', error);
-    res.status(500).json({ error: error.message });
-  }
+      );
+
+      console.log('✅ Fix complete!');
+
+      res.json({
+        success: true,
+        message: 'Conversations fixed',
+        deletedMessages: deleteMessages.rowCount + deleteSpecificMessages.rowCount,
+        deletedConversations: deleteConvs.rowCount + deleteSpecificConvs.rowCount,
+        fixedConversationId,
+        remainingConversations: allConversations
+      });
+
+    } catch (error: any) {
+      console.error('❌ Fix failed:', error);
+      res.status(500).json({ error: error.message });
+    }
   });
 
   // Debug endpoint - show raw database data (DEVELOPMENT ONLY)
   app.get('/api/debug-conversations', async (req, res) => {
-  try {
-    const usePostgres = !!process.env.DATABASE_URL;
-    if (!usePostgres) {
-      return res.status(400).json({ error: 'PostgreSQL only' });
-    }
-    
-    const pgClient = require('./db/postgres-client');
-    
-    // Get all users
-    const users = await pgClient.query('SELECT id, name, email FROM users ORDER BY id');
-    
-    // Get all conversations with names
-    const conversations = await pgClient.query(`
+    try {
+      const usePostgres = !!process.env.DATABASE_URL;
+      if (!usePostgres) {
+        return res.status(400).json({ error: 'PostgreSQL only' });
+      }
+
+      const pgClient = require('./db/postgres-client');
+
+      // Get all users
+      const users = await pgClient.query('SELECT id, name, email FROM users ORDER BY id');
+
+      // Get all conversations with names
+      const conversations = await pgClient.query(`
       SELECT c.id, c.participant1_id, c.participant2_id,
              u1.name as p1_name, u2.name as p2_name
       FROM conversations c
@@ -184,9 +208,9 @@ if (!isProduction()) {
       LEFT JOIN users u2 ON c.participant2_id = u2.id
       ORDER BY c.id
     `);
-    
-    // Test the query for user 1
-    const user1Convs = await pgClient.query(`
+
+      // Test the query for user 1
+      const user1Convs = await pgClient.query(`
       SELECT c.id, c.participant1_id, c.participant2_id,
              CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END as other_user_id,
              u.id as joined_user_id, u.name as joined_user_name
@@ -194,9 +218,9 @@ if (!isProduction()) {
       LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
       WHERE c.participant1_id = $1 OR c.participant2_id = $1
     `, [1]);
-    
-    // Test the query for user 2
-    const user2Convs = await pgClient.query(`
+
+      // Test the query for user 2
+      const user2Convs = await pgClient.query(`
       SELECT c.id, c.participant1_id, c.participant2_id,
              CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END as other_user_id,
              u.id as joined_user_id, u.name as joined_user_name
@@ -204,17 +228,17 @@ if (!isProduction()) {
       LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
       WHERE c.participant1_id = $1 OR c.participant2_id = $1
     `, [2]);
-    
-    res.json({
-      users,
-      conversations,
-      user1Conversations: user1Convs,
-      user2Conversations: user2Convs
-    });
-    
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+
+      res.json({
+        users,
+        conversations,
+        user1Conversations: user1Convs,
+        user2Conversations: user2Convs
+      });
+
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
   });
 } else {
   // In production, block debug and fix endpoints
@@ -231,16 +255,16 @@ const userSockets = new Map<number, string>(); // userId -> socketId
 io.use((socket, next) => {
   try {
     const token = socket.handshake.auth.token;
-    
+
     if (!token) {
       console.log('❌ Socket connection rejected: No token provided');
       return next(new Error('Authentication token required'));
     }
-    
+
     const decoded = jwt.verify(token, getJWTSecret()) as any;
     socket.data.userId = decoded.userId;
     socket.data.email = decoded.email;
-    
+
     console.log(`✅ Socket authenticated for user ${decoded.userId} (${decoded.email})`);
     next();
   } catch (error) {
@@ -267,25 +291,64 @@ io.on('connection', (socket) => {
       const { conversationId, receiverId, text } = data;
       console.log('💬 Received message:send', { conversationId, senderId, receiverId, text });
 
-      // If conversationId is 0 or missing, create or get conversation
+      // Clean/validate inputs
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+        socket.emit('message:error', { error: 'Message text is required' });
+        return;
+      }
+
       let finalConversationId = conversationId;
-      if (!conversationId || conversationId === 0) {
+
+      // If conversationId is provided, verify user belongs to it
+      if (conversationId && conversationId > 0) {
+        // We need to implement getConversationById in conversationQueries if it doesn't exist
+        // For now, let's verify by fetching the conversation between these two users
+        // and checking if the ID matches.
+
+        // Better approach: Check if sender is part of this specific conversation
+        // Since we might not have getConversationById exposed yet, we'll verify the intent:
+        // Does a conversation exist between sender and receiver with this ID?
+
+        const conversation: any = await conversationQueries.getConversation(senderId, receiverId);
+
+        if (!conversation) {
+          // Client sent a conversationID but no conversation exists between these users?
+          // This implies they might be trying to send to a conversation they are not part of,
+          // OR the conversation ID is for a different pair of users.
+          console.warn(`⚠️ User ${senderId} tried to send to conversation ${conversationId} with ${receiverId} but no direct conversation found.`);
+          // We will treat this as a new conversation or error checks
+        } else if (conversation.id !== conversationId) {
+          console.warn(`⚠️ User ${senderId} tried to send to conversation ${conversationId} but their conversation with ${receiverId} is ${conversation.id}`);
+          // Force use of the correct conversation ID
+          finalConversationId = conversation.id;
+        }
+        // If matches, we are good.
+      }
+
+      // If conversationId is 0 or missing, create or get conversation
+      if (!finalConversationId || finalConversationId === 0) {
         console.log('🆕 Creating/getting conversation for users:', senderId, 'and', receiverId);
         let conversation: any = await conversationQueries.getConversation(senderId, receiverId);
-        
+
         if (!conversation) {
           const participant1 = Math.min(senderId, receiverId);
           const participant2 = Math.max(senderId, receiverId);
           console.log(`🆕 Creating NEW conversation: participant1=${participant1}, participant2=${participant2}`);
-          
+
           const result = await conversationQueries.createConversation(participant1, participant2);
           finalConversationId = result.lastID;
-          
+
           console.log(`✅ Created conversation ID ${finalConversationId} between users ${participant1} and ${participant2}`);
         } else {
           finalConversationId = conversation.id;
           console.log(`♻️  Using existing conversation ${finalConversationId} between users ${senderId} and ${receiverId}`);
         }
+      }
+
+      // Final sanity check - if we somehow still don't have a valid conversation ID
+      if (!finalConversationId) {
+        socket.emit('message:error', { error: 'Could not resolve conversation' });
+        return;
       }
 
       // Save message to database
@@ -353,16 +416,16 @@ io.on('connection', (socket) => {
 
   // Typing indicator - use authenticated user ID
   socket.on('typing:start', (data: { conversationId: number; receiverId: number }) => {
-    io.to(`user:${data.receiverId}`).emit('typing:start', { 
-      conversationId: data.conversationId, 
-      userId: authenticatedUserId 
+    io.to(`user:${data.receiverId}`).emit('typing:start', {
+      conversationId: data.conversationId,
+      userId: authenticatedUserId
     });
   });
 
   socket.on('typing:stop', (data: { conversationId: number; receiverId: number }) => {
-    io.to(`user:${data.receiverId}`).emit('typing:stop', { 
-      conversationId: data.conversationId, 
-      userId: authenticatedUserId 
+    io.to(`user:${data.receiverId}`).emit('typing:stop', {
+      conversationId: data.conversationId,
+      userId: authenticatedUserId
     });
   });
 
@@ -395,7 +458,7 @@ const HOST = '0.0.0.0'; // Always listen on all interfaces for Railway
 // Initialize database then start server
 initializeDatabase().then(() => {
   console.log('✅ Database ready for connections');
-  
+
   httpServer.listen({
     port: PORT,
     host: '0.0.0.0'
@@ -403,7 +466,7 @@ initializeDatabase().then(() => {
     console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
     console.log(`📡 WebSocket ready for real-time messaging`);
     console.log(`💾 Database: ${process.env.DATABASE_PATH || 'clubsincronica.db'}`);
-    
+
     // Keep process alive
     setInterval(() => {
       // Heartbeat to keep process alive

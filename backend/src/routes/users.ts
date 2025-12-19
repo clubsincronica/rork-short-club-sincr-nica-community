@@ -19,17 +19,34 @@ const router = express.Router();
 // Register/Login - Create or get user (with rate limiting and validation)
 router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (req: Request, res: Response) => {
   try {
-    const { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
+    let { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
+
+    // Default coordinates if not provided (so users are always discoverable)
+    if (latitude === undefined || latitude === null) {
+      // Example: assign by email for known users, else default to SF
+      if (email === 'matias.cazeaux@gmail.com') latitude = -38.02;
+      else if (email === 'eularra@gmail.com') latitude = 40.4168;
+      else if (email === 'tom_weasley@hotmail.com') latitude = 37.7749;
+      else latitude = 37.7749;
+    }
+    if (longitude === undefined || longitude === null) {
+      if (email === 'matias.cazeaux@gmail.com') longitude = -57.53;
+      else if (email === 'eularra@gmail.com') longitude = -3.7038;
+      else if (email === 'tom_weasley@hotmail.com') longitude = -122.4194;
+      else longitude = -122.4194;
+    }
 
     if (!email) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Check if user exists
+    // Always try to get or create user by email
     let user: any = await userQueries.getUserByEmail(email);
+    let isNewUser = false;
+
 
     if (!user) {
-      // Create new user
+      // Create new user (even if password is blank)
       const passwordHash = password ? await bcrypt.hash(password, 10) : '';
       const result = await userQueries.createUser(
         email,
@@ -46,13 +63,26 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
         services ? JSON.stringify(services) : undefined,
         isHost ? 1 : 0
       );
-
       user = await userQueries.getUserById(result.lastID);
-    } else if (password) {
-      // Verify password if provided
-      if (!user.password_hash || !(await bcrypt.compare(password, user.password_hash))) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+      isNewUser = true;
+    } else {
+      // Existing user: enforce password rules
+      if (user.password_hash && user.password_hash.length > 0) {
+        // User has a password set, require correct password
+        if (!password || !(await bcrypt.compare(password, user.password_hash))) {
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+      } else {
+        // User has no password set (legacy or OAuth), only allow login if no password is provided
+        if (password) {
+          return res.status(401).json({ error: 'Password not set for this user, login without password.' });
+        }
       }
+    }
+
+    // If user still not found, fail (should never happen)
+    if (!user || !user.id) {
+      return res.status(500).json({ error: 'Failed to create or retrieve user' });
     }
 
     // Parse JSON fields
@@ -64,10 +94,29 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
     const jwtSecret = getJWTSecret();
     const token = jwt.sign({ userId: user.id, email: user.email }, jwtSecret, { expiresIn: '30d' });
 
-    res.json({ user, token });
+    res.json({ user, token, isNewUser });
   } catch (error) {
     console.error('Auth error:', error);
     res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// Get all users (for community directory)
+router.get('/users', async (req: Request, res: Response) => {
+  try {
+    const users: any[] = await userQueries.getAllUsers();
+
+    // Parse JSON fields
+    users.forEach(user => {
+      if (user.interests) user.interests = JSON.parse(user.interests);
+      if (user.services) user.services = JSON.parse(user.services);
+      user.isHost = user.is_host === 1;
+    });
+
+    res.json(users);
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ error: 'Failed to get users' });
   }
 });
 
@@ -114,7 +163,7 @@ router.put('/users/:id', strictLimiter, validateUserId, validateUpdateUser, hand
     );
 
     const user: any = await userQueries.getUserById(userId);
-    
+
     // Parse JSON fields
     if (user.interests) user.interests = JSON.parse(user.interests);
     if (user.services) user.services = JSON.parse(user.services);
@@ -151,8 +200,10 @@ router.get('/users/nearby/:latitude/:longitude', validateNearbyUsers, handleVali
 
     res.json(users);
   } catch (error) {
-    console.error('Nearby users error:', error);
-    res.status(500).json({ error: 'Failed to get nearby users' });
+    // Log the full error object for debugging
+    console.error('Nearby users error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    const errMsg = (error instanceof Error && error.message) ? error.message : 'Failed to get nearby users';
+    res.status(500).json({ error: errMsg });
   }
 });
 

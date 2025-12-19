@@ -1,9 +1,10 @@
 import rateLimit from 'express-rate-limit';
+import { isProduction } from '../config/env';
 
 // Rate limiter for authentication endpoints
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
+  max: isProduction() ? 5 : 100, // More lenient in development
   message: 'Too many login attempts from this IP, please try again after 15 minutes',
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers

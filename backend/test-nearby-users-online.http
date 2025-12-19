@@ -1,0 +1,5 @@
+### Test Nearby Users Endpoint (Railway)
+GET https://rork-short-club-sincr-nica-community-production.up.railway.app/api/users/nearby/12.3456/-86.1234?radius=50&limit=10
+Content-Type: application/json
+
+# Replace 12.3456/-86.1234 with real coordinates if available.

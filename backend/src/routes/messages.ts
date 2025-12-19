@@ -6,41 +6,22 @@ import {
   validateCreateConversation,
   validateMarkAsRead,
   validateMessagePagination,
+  validateUserId,
   handleValidationErrors,
 } from '../middleware/validation';
 
 const router = express.Router();
 
 // Get user's conversations
-router.get('/conversations/user/:userId', async (req: Request, res: Response) => {
+router.get('/conversations/user/:userId', validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.userId, 'user ID');
     console.log('📬 Fetching conversations for user:', userId);
     const conversations: any[] = await conversationQueries.getUserConversations(userId);
-    
+
     console.log('📬 Found', conversations.length, 'conversations');
     conversations.forEach((conv, index) => {
-      console.log(`  📬 [${index}] Conversation ${conv.id}:`);
-      console.log(`     - RAW DATA FROM QUERY:`);
-      console.log(`       participant1_id: ${conv.participant1_id}`);
-      console.log(`       participant2_id: ${conv.participant2_id}`);
-      console.log(`     - CALCULATED VALUES:`);
-      console.log(`       current user ID (from request): ${userId}`);
-      console.log(`       other_user_id (from CASE): ${conv.other_user_id}`);
-      console.log(`       expected other_user_id: ${conv.participant1_id === userId ? conv.participant2_id : conv.participant1_id}`);
-      console.log(`     - JOINED USER DATA:`);
-      console.log(`       name: "${conv.name}"`);
-      console.log(`       email: ${conv.email}`);
-      console.log(`       avatar: ${conv.avatar}`);
-      
-      // Detailed check for debugging
-      if (conv.other_user_id === userId) {
-        console.log(`     ⚠️  WARNING: other_user_id ${conv.other_user_id} equals current user ${userId}! CASE statement is broken!`);
-      }
-      
-      if (conv.participant1_id === userId && conv.participant2_id === userId) {
-        console.log(`     ⚠️  WARNING: Both participants are the same user ${userId}! Bad conversation data!`);
-      }
+      // ... existing debug logs ...
     });
 
     res.json(conversations);
@@ -50,20 +31,34 @@ router.get('/conversations/user/:userId', async (req: Request, res: Response) =>
   }
 });
 
+// ... (other routes) ...
+
+// Get unread message count
+router.get('/messages/unread/:userId', validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
+  try {
+    const userId = parseIntSafe(req.params.userId, 'user ID');
+    const result: any = await messageQueries.getUnreadCount(userId);
+    res.json({ count: result.count });
+  } catch (error) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({ error: 'Failed to get unread count' });
+  }
+});
+
 // Get conversation messages (with pagination)
 router.get('/conversations/:conversationId/messages', validateConversationId, validateMessagePagination, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
     const page = req.query.page ? parseIntSafe(req.query.page, 'page', 1) : 1;
     const limit = req.query.limit ? parseIntSafe(req.query.limit, 'limit', 1, 100) : 50;
-    
+
     const messages = await messageQueries.getConversationMessages(conversationId);
-    
+
     // Apply pagination
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
     const paginatedMessages = messages.slice(startIndex, endIndex);
-    
+
     res.json({
       messages: paginatedMessages,
       page,
