@@ -10,7 +10,7 @@ RUN npm ci --production=false
 
 # Copy only backend source
 COPY ./src ./src
-COPY tsconfig.json ./
+COPY tsconfig.backend.json ./
 
 # Build TypeScript
 RUN npm run build
