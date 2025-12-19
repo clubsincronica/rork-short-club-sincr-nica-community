@@ -348,13 +348,20 @@ export default function MessagesScreen() {
       if (response.ok) {
         const data = await response.json();
         console.log('💬 Conversation created/found:', data);
+        if (!data || !data.id) {
+          console.error('❌ Server returned success but no conversation ID:', data);
+          Alert.alert('Error', 'El servidor no devolvió un ID de conversación válido.');
+          return null;
+        }
         return data.id;
       } else {
         const errorText = await response.text();
         console.error('💬 Server error:', response.status, errorText);
+        Alert.alert('Error de Servidor', `No se pudo crear la conversación. Estado: ${response.status}\n${errorText.substring(0, 100)}`);
       }
     } catch (error) {
       console.error('💬 Network error creating conversation:', error);
+      Alert.alert('Error de Conexión', 'No se pudo conectar con el servidor para iniciar el chat.');
     }
     return null;
   };

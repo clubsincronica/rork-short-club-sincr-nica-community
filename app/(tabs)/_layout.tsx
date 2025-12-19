@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, Briefcase, MessageCircle, User, MapPin } from '@/components/SmartIcons';
+import { Home, Briefcase, MessageCircle, User, MapPin, Users } from '@/components/SmartIcons';
 import { useGlobalSocketConnection } from '@/hooks/useGlobalSocketConnection';
 
 export default function TabLayout() {
