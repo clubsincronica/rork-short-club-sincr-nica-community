@@ -65,6 +65,10 @@ const io = new Server(httpServer, {
   path: '/socket.io/'
 });
 
+// Trust proxy - required for Railway and other reverse proxies
+// This allows express-rate-limit to correctly identify users via X-Forwarded-For
+app.set('trust proxy', true);
+
 // Middleware
 app.use(cors(getCorsOptions()));
 app.use(express.json());
