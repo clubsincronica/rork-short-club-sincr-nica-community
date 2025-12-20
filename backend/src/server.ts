@@ -79,6 +79,7 @@ if (isProduction()) {
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/admin', require('./routes/admin').default);
 
 // Health check
 app.get('/health', (req, res) => {

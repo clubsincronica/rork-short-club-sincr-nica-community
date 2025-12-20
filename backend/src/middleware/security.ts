@@ -29,16 +29,20 @@ export function parseFloatSafe(value: any, fieldName: string, min = -Infinity, m
  */
 export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  
+
   const token = authHeader.substring(7);
-  
+
   try {
     const decoded = jwt.verify(token, getJWTSecret()) as any;
-    req.user = { userId: decoded.userId, email: decoded.email };
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role || 'user'
+    };
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -51,11 +55,11 @@ export function authenticateJWT(req: Request, res: Response, next: NextFunction)
 export function authorizeUser(req: Request, res: Response, next: NextFunction) {
   try {
     const requestedUserId = parseIntSafe(req.params.id, 'user ID');
-    
+
     if (req.user?.userId !== requestedUserId) {
       return res.status(403).json({ error: 'Forbidden - you can only access your own data' });
     }
-    
+
     next();
   } catch (error: any) {
     return res.status(400).json({ error: error.message });
@@ -69,6 +73,7 @@ declare global {
       user?: {
         userId: number;
         email: string;
+        role?: string;
       };
     }
   }

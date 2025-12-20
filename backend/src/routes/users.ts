@@ -90,9 +90,13 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
     if (user.services) user.services = JSON.parse(user.services);
     user.isHost = user.is_host === 1;
 
-    // Generate JWT token with proper secret
+    // Generate JWT token with proper secret and include role
     const jwtSecret = getJWTSecret();
-    const token = jwt.sign({ userId: user.id, email: user.email }, jwtSecret, { expiresIn: '30d' });
+    const token = jwt.sign({
+      userId: user.id,
+      email: user.email,
+      role: user.role || 'user'
+    }, jwtSecret, { expiresIn: '30d' });
 
     res.json({ user, token, isNewUser });
   } catch (error) {
