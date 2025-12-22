@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { getApiBaseUrl } from '@/utils/api-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Shield, Users, DollarSign, TrendingUp, MessageSquare } from '@/components/SmartIcons';
+import { Colors } from '@/constants/colors';
 
 export default function AdminScreen() {
     const router = useRouter();
@@ -19,7 +20,7 @@ export default function AdminScreen() {
 
             const token = await AsyncStorage.getItem('authToken');
             if (!token) {
-                setError('No authentication token found');
+                setError('No se encontró token de autenticación');
                 return;
             }
 
@@ -34,7 +35,8 @@ export default function AdminScreen() {
                 const statsData = await statsResponse.json();
                 setStats(statsData);
             } else {
-                setError('Failed to load statistics');
+                const errorData = await statsResponse.json();
+                setError(errorData.error || 'No tienes permisos de administrador');
             }
 
             // Load recent users
@@ -46,7 +48,7 @@ export default function AdminScreen() {
 
         } catch (err: any) {
             console.error('Admin data load error:', err);
-            setError(err.message || 'Failed to load admin data');
+            setError(err.message || 'Error al cargar datos de administrador');
         } finally {
             setLoading(false);
         }
@@ -60,11 +62,14 @@ export default function AdminScreen() {
         return (
             <View style={styles.container}>
                 <View style={styles.errorContainer}>
-                    <Shield size={48} color="#e74c3c" />
-                    <Text style={styles.errorTitle}>Access Error</Text>
+                    <Shield size={48} color={Colors.error} />
+                    <Text style={styles.errorTitle}>Acceso Denegado</Text>
                     <Text style={styles.errorText}>{error}</Text>
+                    <Text style={styles.errorHint}>
+                        Solo usuarios con rol "superuser" pueden acceder al panel de administración.
+                    </Text>
                     <TouchableOpacity style={styles.retryButton} onPress={loadAdminData}>
-                        <Text style={styles.retryButtonText}>Retry</Text>
+                        <Text style={styles.retryButtonText}>Reintentar</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -79,44 +84,44 @@ export default function AdminScreen() {
             }
         >
             <View style={styles.header}>
-                <Shield size={32} color="#3498db" />
-                <Text style={styles.headerTitle}>Admin Dashboard</Text>
+                <Shield size={28} color={Colors.gold} />
+                <Text style={styles.headerTitle}>Panel de Administración</Text>
             </View>
 
             {stats && (
                 <>
                     {/* Stats Cards */}
                     <View style={styles.statsGrid}>
-                        <View style={[styles.statCard, { backgroundColor: '#3498db' }]}>
+                        <View style={[styles.statCard, { backgroundColor: Colors.primary }]}>
                             <Users size={24} color="white" />
                             <Text style={styles.statValue}>{stats.users?.total || 0}</Text>
-                            <Text style={styles.statLabel}>Total Users</Text>
+                            <Text style={styles.statLabel}>Usuarios</Text>
                         </View>
 
-                        <View style={[styles.statCard, { backgroundColor: '#2ecc71' }]}>
+                        <View style={[styles.statCard, { backgroundColor: Colors.accent }]}>
                             <MessageSquare size={24} color="white" />
                             <Text style={styles.statValue}>{stats.conversations?.total || 0}</Text>
-                            <Text style={styles.statLabel}>Conversations</Text>
+                            <Text style={styles.statLabel}>Conversaciones</Text>
                         </View>
 
-                        <View style={[styles.statCard, { backgroundColor: '#e67e22' }]}>
+                        <View style={[styles.statCard, { backgroundColor: Colors.goldDark }]}>
                             <DollarSign size={24} color="white" />
                             <Text style={styles.statValue}>{stats.transactions?.total || 0}</Text>
-                            <Text style={styles.statLabel}>Transactions</Text>
+                            <Text style={styles.statLabel}>Transacciones</Text>
                         </View>
 
-                        <View style={[styles.statCard, { backgroundColor: '#9b59b6' }]}>
+                        <View style={[styles.statCard, { backgroundColor: Colors.secondaryLight }]}>
                             <TrendingUp size={24} color="white" />
                             <Text style={styles.statValue}>
                                 ${stats.revenue?.total?.toFixed(2) || '0.00'}
                             </Text>
-                            <Text style={styles.statLabel}>Revenue ({stats.revenue?.currency})</Text>
+                            <Text style={styles.statLabel}>Ingresos ({stats.revenue?.currency})</Text>
                         </View>
                     </View>
 
                     {/* Recent Users */}
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Recent Users</Text>
+                        <Text style={styles.sectionTitle}>Usuarios Recientes</Text>
                         {users.map((user) => (
                             <View key={user.id} style={styles.userCard}>
                                 <View style={styles.userInfo}>
@@ -144,21 +149,22 @@ export default function AdminScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: Colors.background,
     },
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         padding: 20,
-        backgroundColor: 'white',
+        paddingTop: 60,
+        backgroundColor: Colors.white,
         borderBottomWidth: 1,
-        borderBottomColor: '#e0e0e0',
+        borderBottomColor: Colors.border,
     },
     headerTitle: {
         fontSize: 24,
-        fontWeight: 'bold',
+        fontWeight: '700',
         marginLeft: 12,
-        color: '#333',
+        color: Colors.text,
     },
     statsGrid: {
         flexDirection: 'row',
@@ -171,7 +177,7 @@ const styles = StyleSheet.create({
         padding: 20,
         borderRadius: 12,
         alignItems: 'center',
-        shadowColor: '#000',
+        shadowColor: Colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -190,11 +196,11 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     section: {
-        backgroundColor: 'white',
+        backgroundColor: Colors.white,
         margin: 10,
         padding: 15,
         borderRadius: 12,
-        shadowColor: '#000',
+        shadowColor: Colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -202,16 +208,16 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
+        fontWeight: '700',
         marginBottom: 15,
-        color: '#333',
+        color: Colors.text,
     },
     userCard: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: 12,
-        backgroundColor: '#f9f9f9',
+        backgroundColor: Colors.surface,
         borderRadius: 8,
         marginBottom: 8,
     },
@@ -221,11 +227,11 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: 16,
         fontWeight: '600',
-        color: '#333',
+        color: Colors.text,
     },
     userEmail: {
         fontSize: 12,
-        color: '#666',
+        color: Colors.textLight,
         marginTop: 2,
     },
     userMeta: {
@@ -234,15 +240,15 @@ const styles = StyleSheet.create({
     userRole: {
         fontSize: 12,
         fontWeight: '600',
-        color: '#3498db',
+        color: Colors.primary,
         textTransform: 'uppercase',
     },
     superuserRole: {
-        color: '#e74c3c',
+        color: Colors.error,
     },
     userId: {
         fontSize: 10,
-        color: '#999',
+        color: Colors.textSecondary,
         marginTop: 2,
     },
     errorContainer: {
@@ -250,22 +256,30 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: 40,
+        paddingTop: 100,
     },
     errorTitle: {
         fontSize: 20,
-        fontWeight: 'bold',
-        color: '#e74c3c',
+        fontWeight: '700',
+        color: Colors.error,
         marginTop: 16,
     },
     errorText: {
         fontSize: 14,
-        color: '#666',
+        color: Colors.textLight,
         textAlign: 'center',
         marginTop: 8,
     },
+    errorHint: {
+        fontSize: 12,
+        color: Colors.textSecondary,
+        textAlign: 'center',
+        marginTop: 12,
+        fontStyle: 'italic',
+    },
     retryButton: {
         marginTop: 20,
-        backgroundColor: '#3498db',
+        backgroundColor: Colors.primary,
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 8,
