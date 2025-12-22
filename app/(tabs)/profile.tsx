@@ -140,30 +140,21 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!loginForm.email || !loginForm.password) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
     }
-    login({
-      id: 1,
-      name: 'Usuario Demo',
-      email: loginForm.email,
-      avatar: 'https://i.pravatar.cc/150?img=3',
-      bio: 'Practicante de bienestar holístico',
-      location: 'Madrid, España',
-      joinedDate: new Date().toISOString(),
-      rating: 4.8,
-      reviewCount: 12,
-      verified: true,
-      specialties: ['Reiki', 'Meditación'],
-      interests: ['Yoga', 'Nutrición'],
-    });
-    setIsLoginModalVisible(false);
-    setLoginForm({ email: '', password: '' });
+    try {
+      await login({ email: loginForm.email, password: loginForm.password });
+      setIsLoginModalVisible(false);
+      setLoginForm({ email: '', password: '' });
+    } catch (error) {
+      Alert.alert('Error', 'Error de inicio de sesión. Verifica tus credenciales.');
+    }
   };
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
     if (!signupForm.name || !signupForm.email || !signupForm.password) {
       Alert.alert('Error', 'Por favor completa todos los campos');
       return;
@@ -172,22 +163,13 @@ export default function ProfileScreen() {
       Alert.alert('Error', 'Las contraseñas no coinciden');
       return;
     }
-    login({
-      id: 1,
-      name: signupForm.name,
-      email: signupForm.email,
-      avatar: 'https://i.pravatar.cc/150?img=5',
-      bio: '',
-      location: '',
-      joinedDate: new Date().toISOString(),
-      rating: 0,
-      reviewCount: 0,
-      verified: false,
-      specialties: [],
-      interests: [],
-    });
-    setIsSignupModalVisible(false);
-    setSignupForm({ name: '', email: '', password: '', confirmPassword: '' });
+    try {
+      await login({ email: signupForm.email, password: signupForm.password, name: signupForm.name });
+      setIsSignupModalVisible(false);
+      setSignupForm({ name: '', email: '', password: '', confirmPassword: '' });
+    } catch (error) {
+      Alert.alert('Error', 'Error al crear la cuenta.');
+    }
   };
 
   const handleAddPaymentMethod = () => {

@@ -21,7 +21,6 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
 export const validateAuth: ValidationChain[] = [
   body('email')
     .isEmail()
-    .normalizeEmail()
     .withMessage('Valid email is required'),
   body('password')
     .optional()

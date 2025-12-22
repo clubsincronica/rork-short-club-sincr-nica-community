@@ -20,6 +20,9 @@ const router = express.Router();
 router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     let { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
+    console.log(`[AUTH DEBUG] Received login request for email: '${email}'`);
+    // Log the raw request body for debugging
+    console.log('[AUTH DEBUG] Raw request body:', req.body);
 
     // Default coordinates if not provided (so users are always discoverable)
     if (latitude === undefined || latitude === null) {
@@ -44,8 +47,18 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
     let user: any = await userQueries.getUserByEmail(email);
     let isNewUser = false;
 
-
+    // Block both creation and login for matiascazeaux@gmail.com (no-dot)
+    if (email === 'matiascazeaux@gmail.com') {
+      console.warn(`[AUTH BLOCKED] Attempt to create or login blocked user: '${email}'. Returning error.`);
+      return res.status(403).json({ error: 'This user is blocked. Please use matias.cazeaux@gmail.com.' });
+    }
     if (!user) {
+      // Extra debug: If the login request is for matias.cazeaux@gmail.com, log if the no-dot user is being created
+      if (email === 'matias.cazeaux@gmail.com') {
+        console.log(`[AUTH DEBUG] Login request for matias.cazeaux@gmail.com. No user found, creating new user.`);
+      } else {
+        console.log(`[AUTH DEBUG] No user found for email: '${email}'. Creating new user.`);
+      }
       // Create new user (even if password is blank)
       const passwordHash = password ? await bcrypt.hash(password, 10) : '';
       const result = await userQueries.createUser(
@@ -65,6 +78,8 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
       );
       user = await userQueries.getUserById(result.lastID);
       isNewUser = true;
+      console.log(`[AUTH DEBUG] Created new user: ${JSON.stringify(user)}`);
+      console.log(`[AUTH DEBUG] Email used for user creation: '${email}'`);
     } else {
       // Existing user: enforce password rules
       if (user.password_hash && user.password_hash.length > 0) {
@@ -97,7 +112,7 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
       email: user.email,
       role: user.role || 'user'
     }, jwtSecret, { expiresIn: '30d' });
-
+    console.log(`[AUTH DEBUG] Email returned in token: '${user.email}'`);
     res.json({ user, token, isNewUser });
   } catch (error) {
     console.error('Auth error:', error);

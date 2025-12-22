@@ -19,6 +19,24 @@ export const mockUsers: User[] = [
     tiktok: '@tomasllosa',
   },
   {
+    id: 4,
+    name: 'Eugenia Larra',
+    email: 'eu.larra@gmail.com',
+    avatar: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=150&h=150&fit=crop&crop=face',
+    bio: 'Co-fundadora y líder de proyectos de bienestar.',
+    location: 'Madrid, España',
+    coordinates: { latitude: 40.4168, longitude: -3.7038 },
+    specialties: ['Gestión de Proyectos', 'Bienestar', 'Liderazgo'],
+    isServiceProvider: true,
+    rating: 4.7,
+    reviewCount: 28,
+    joinedDate: '2023-11-10',
+    verified: true,
+    instagram: 'eularra',
+    facebook: 'eularra',
+    role: 'superuser',
+  },
+  {
     id: 2,  // CORRECTED: Database has Matias = ID 2
     name: 'Matias Cazeaux',
     email: 'matias.cazeaux@gmail.com',
@@ -34,6 +52,7 @@ export const mockUsers: User[] = [
     verified: true,
     instagram: 'matiascazeaux',
     facebook: 'matias.cazeaux',
+    role: 'superuser',
   },
   {
     id: 3,

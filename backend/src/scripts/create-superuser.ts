@@ -12,7 +12,9 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-const SUPERUSER_EMAIL = 'matias.cazeaux@gmail.com';
+
+// Accept email as a command-line argument
+const SUPERUSER_EMAIL = process.argv[2] || 'matias.cazeaux@gmail.com';
 
 async function createSuperUser() {
     const client = await pool.connect();
