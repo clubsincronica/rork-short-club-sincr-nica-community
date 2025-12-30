@@ -4,9 +4,12 @@ import { requireSuperUser } from '../middleware/roles';
 
 const router = express.Router();
 
+// Middleware alias for consistency
+const requireAdmin = requireSuperUser();
+
 // All admin routes require authentication and superuser role
 router.use(authenticateJWT);
-router.use(requireSuperUser());
+router.use(requireAdmin);
 
 /**
  * GET /api/admin/stats
@@ -177,6 +180,78 @@ router.get('/transactions', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Admin transactions error:', error);
         res.status(500).json({ error: 'Failed to fetch transactions' });
+    }
+});
+
+/**
+ * GET /api/admin/blocked-emails
+ * Returns list of blocked email addresses
+ */
+router.get('/blocked-emails', async (req: Request, res: Response) => {
+    try {
+        const pgClient = require('../db/postgres-client');
+        const result = await pgClient.query('SELECT email FROM blocked_emails');
+        res.json({ emails: result.map((r: any) => r.email) });
+    } catch (error) {
+        console.error('Error fetching blocked emails:', error);
+        res.status(500).json({ error: 'Error fetching blocked emails' });
+    }
+});
+
+/**
+ * POST /api/admin/remove-user
+ * Blocks and deletes a user by email
+ */
+router.post('/remove-user', async (req: Request, res: Response) => {
+    try {
+        const pgClient = require('../db/postgres-client');
+        const { email } = req.body;
+
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ error: 'Valid email required' });
+        }
+
+        // Block user by adding to blocked_emails table (create if not exists)
+        await pgClient.query(`CREATE TABLE IF NOT EXISTS blocked_emails (email TEXT PRIMARY KEY, blocked_at TIMESTAMP DEFAULT NOW())`);
+        await pgClient.query(`INSERT INTO blocked_emails (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`, [email]);
+
+        // Delete user from users table
+        const result = await pgClient.query('DELETE FROM users WHERE email = $1 RETURNING id, email, name', [email]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'No user found for email' });
+        }
+
+        res.json({ success: true, deleted: result.rows[0] });
+    } catch (error) {
+        console.error('Admin remove-user error:', error);
+        res.status(500).json({ error: 'Failed to remove user' });
+    }
+});
+
+/**
+ * POST /api/admin/unblock-user
+ * Unblocks a user by removing from blocked_emails
+ */
+router.post('/unblock-user', async (req: Request, res: Response) => {
+    try {
+        const pgClient = require('../db/postgres-client');
+        const { email } = req.body;
+
+        if (!email || typeof email !== 'string') {
+            return res.status(400).json({ error: 'Valid email required' });
+        }
+
+        const result = await pgClient.query('DELETE FROM blocked_emails WHERE email = $1 RETURNING email', [email]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Email not found in blocked list' });
+        }
+
+        res.json({ success: true, unblocked: result.rows[0].email });
+    } catch (error) {
+        console.error('Admin unblock-user error:', error);
+        res.status(500).json({ error: 'Failed to unblock user' });
     }
 });
 

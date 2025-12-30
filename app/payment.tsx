@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { StripeProvider, useStripe, Mode } from '@stripe/stripe-react-native';
+import { WebView } from 'react-native-webview';
 import {
   View,
   Text,
@@ -27,8 +29,10 @@ import {
 } from '../components/SmartIcons';
 import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Stack } from 'expo-router';
+import { getApiBaseUrl } from '@/utils/api-config';
+import { useUser } from '@/hooks/user-store';
 
 type PaymentMethod = {
   id: string;
@@ -54,10 +58,16 @@ type BookingItem = {
   image: string;
 };
 
-export default function PaymentScreen() {
+// Replace with your backend URL
+const BACKEND_URL = getApiBaseUrl();
+
+function PaymentScreenInner() {
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  
+  const { currentUser } = useUser();
+  const params = useLocalSearchParams();
+
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
     {
       id: '1',
@@ -88,30 +98,55 @@ export default function PaymentScreen() {
     },
   ]);
 
-  const [bookingItems] = useState<BookingItem[]>([
-    {
-      id: '1',
-      title: 'Sesión de Reiki Sanador',
-      provider: 'María González',
-      date: '15 de Marzo',
-      time: '10:00',
-      duration: '60 min',
-      location: 'Centro Holístico Luz',
-      price: 65,
-      image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=300&fit=crop',
-    },
-    {
-      id: '2',
-      title: 'Clase de Yoga Vinyasa',
-      provider: 'Carlos Mendoza',
-      date: '16 de Marzo',
-      time: '18:30',
-      duration: '90 min',
-      location: 'Estudio Namaste',
-      price: 25,
-      image: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=400&h=300&fit=crop',
-    },
-  ]);
+  const [bookingItems, setBookingItems] = useState<BookingItem[]>([]);
+
+  useEffect(() => {
+    // Populate booking items from params if available
+    if (params.type === 'event') {
+      const attendeeCount = parseInt(params.attendeeCount as string) || 1;
+      const price = parseFloat(params.price as string) || 0;
+
+      setBookingItems([{
+        id: params.id as string || 'default',
+        title: `${params.title}${attendeeCount > 1 ? ` (${attendeeCount} personas)` : ''}`,
+        provider: (params.providerId as string) || 'Organizador',
+        date: '', // Not strictly needed for payment summary logic but good for UI if passed
+        time: '',
+        duration: '',
+        location: '',
+        price: price * attendeeCount,
+        image: (params.image as string) || '', // No fallback image
+      }]);
+    } else if (params.type === 'product') {
+      // Future: handle product params
+      setBookingItems([{
+        id: params.id as string || 'default',
+        title: params.title as string || 'Producto',
+        provider: (params.providerId as string) || 'Vendedor',
+        date: '',
+        time: '',
+        duration: '',
+        location: '',
+        price: parseFloat(params.price as string) || 0,
+        image: (params.image as string) || '', // No fallback image
+      }]);
+    } else {
+      // Fallback/Mock
+      setBookingItems([
+        {
+          id: '1',
+          title: 'Sesión de Reiki Sanador',
+          provider: 'María González',
+          date: '15 de Marzo',
+          time: '10:00',
+          duration: '60 min',
+          location: 'Centro Holístico Luz',
+          price: 65,
+          image: '', // No fallback image for mock data
+        }
+      ]);
+    }
+  }, [params.id, params.type]);
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('1');
   const [savePaymentInfo, setSavePaymentInfo] = useState<boolean>(true);
@@ -123,26 +158,107 @@ export default function PaymentScreen() {
     name: '',
     nickname: '',
   });
+  const [loading, setLoading] = useState(false);
+  const [webViewUrl, setWebViewUrl] = useState<string | null>(null);
+  const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
 
   const subtotal = bookingItems.reduce((sum, item) => sum + item.price, 0);
   const serviceFee = Math.round(subtotal * 0.05);
   const total = subtotal + serviceFee;
 
-  const handlePayment = () => {
-    Alert.alert(
-      'Confirmar Pago',
-      `Total: €${total}\n¿Proceder con el pago?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Pagar',
-          onPress: () => {
-            Alert.alert('¡Pago Exitoso!', 'Tus reservas han sido confirmadas. Te enviaremos los detalles por email.');
-            router.back();
+  // Stripe payment flow
+  const handleStripePayment = async () => {
+    setLoading(true);
+    try {
+      // Stripe expects amount in cents
+      const res = await fetch(`${BACKEND_URL}/api/payments/stripe/create-intent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: total * 100,
+          currency: 'eur',
+          buyerId: currentUser?.id,
+          providerId: params.providerId || bookingItems[0]?.provider,
+          bookingId: params.id || bookingItems[0]?.id,
+          type: params.type || 'service'
+        }),
+      });
+      const data = await res.json();
+      if (data.clientSecret) {
+        setStripeClientSecret(data.clientSecret);
+        // Initialize PaymentSheet
+        const initResult = await initPaymentSheet({
+          paymentIntentClientSecret: data.clientSecret,
+          intentConfiguration: {
+            mode: 'payment' as any,
           },
-        },
-      ]
-    );
+          merchantDisplayName: 'Club Sincrónica',
+        });
+        if (initResult.error) {
+          Alert.alert('Stripe', `Error inicializando PaymentSheet: ${initResult.error.message}`);
+          setLoading(false);
+          return;
+        }
+        // Present PaymentSheet
+        const presentResult = await presentPaymentSheet();
+        if (presentResult.error) {
+          Alert.alert('Stripe', `Error en el pago: ${presentResult.error.message}`);
+        } else {
+          Alert.alert('Pago Exitoso', '¡El pago fue realizado con éxito!');
+          router.back();
+        }
+      } else {
+        Alert.alert('Error', 'No client secret received from backend.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Stripe payment error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // MercadoPago payment flow
+  const handleMercadoPagoPayment = async () => {
+    setLoading(true);
+    try {
+      // Example items and payer
+      const items = bookingItems.map(item => ({
+        title: item.title,
+        quantity: 1,
+        currency_id: 'ARS',
+        unit_price: item.price,
+      }));
+      const payer = { email: 'usuario@email.com' };
+      // Define back_urls for MercadoPago redirection
+      const back_urls = {
+        success: 'https://clubsincronica.app/payment-success',
+        failure: 'https://clubsincronica.app/payment-failure',
+        pending: 'https://clubsincronica.app/payment-pending',
+      };
+      const res = await fetch(`${BACKEND_URL}/api/payments/mercadopago/create-preference`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items,
+          payer,
+          back_urls,
+          buyerId: currentUser?.id,
+          providerId: params.providerId || bookingItems[0]?.provider,
+          bookingId: params.id || bookingItems[0]?.id,
+          type: params.type || 'service'
+        }),
+      });
+      const data = await res.json();
+      if (data.init_point) {
+        setWebViewUrl(data.init_point);
+      } else {
+        Alert.alert('Error', 'No init_point received from backend.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'MercadoPago payment error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddCard = () => {
@@ -187,7 +303,7 @@ export default function PaymentScreen() {
 
   const renderPaymentMethod = (method: PaymentMethod) => {
     const isSelected = selectedPaymentMethod === method.id;
-    
+
     return (
       <TouchableOpacity
         key={method.id}
@@ -244,13 +360,13 @@ export default function PaymentScreen() {
 
   return (
     <>
-      <Stack.Screen 
-        options={{ 
+      <Stack.Screen
+        options={{
           title: 'Pago',
           headerStyle: { backgroundColor: Colors.white },
           headerTintColor: Colors.text,
           headerTitleStyle: { fontWeight: '600' },
-        }} 
+        }}
       />
       <View style={styles.container}>
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -297,7 +413,7 @@ export default function PaymentScreen() {
                 <Text style={styles.addButtonText}>Añadir</Text>
               </TouchableOpacity>
             </View>
-            
+
             {paymentMethods.map(renderPaymentMethod)}
 
             {/* Add MercadoPago Option */}
@@ -324,7 +440,7 @@ export default function PaymentScreen() {
             {isAddingCard && (
               <View style={styles.addCardForm}>
                 <Text style={styles.addCardTitle}>Añadir Nueva Tarjeta</Text>
-                
+
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Número de Tarjeta</Text>
                   <TextInput
@@ -443,15 +559,56 @@ export default function PaymentScreen() {
           </View>
         </ScrollView>
 
-        {/* Payment Button */}
+        {/* Payment Buttons for Stripe and MercadoPago */}
         <View style={styles.paymentFooter}>
-          <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
+          <TouchableOpacity
+            style={[styles.paymentButton, { opacity: loading ? 0.7 : 1 }]}
+            onPress={handleStripePayment}
+            disabled={loading}
+          >
             <Lock size={20} color={Colors.white} />
-            <Text style={styles.paymentButtonText}>Pagar €{total}</Text>
+            <Text style={styles.paymentButtonText}>Pagar con Stripe (€{total})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.paymentButton, { backgroundColor: '#009EE3', marginTop: 12, opacity: loading ? 0.7 : 1 }]}
+            onPress={handleMercadoPagoPayment}
+            disabled={loading}
+          >
+            <Lock size={20} color={Colors.white} />
+            <Text style={styles.paymentButtonText}>Pagar con MercadoPago</Text>
           </TouchableOpacity>
         </View>
       </View>
+      {/* MercadoPago WebView overlay */}
+      {webViewUrl ? (
+        <WebView
+          source={{ uri: webViewUrl }}
+          onNavigationStateChange={navState => {
+            if (navState.url.includes('success')) {
+              setWebViewUrl(null);
+              Alert.alert('Pago Exitoso', '¡El pago fue realizado con éxito!');
+              router.back();
+            }
+            if (navState.url.includes('failure') || navState.url.includes('pending')) {
+              setWebViewUrl(null);
+              Alert.alert('Pago no completado', 'El pago no fue realizado.');
+            }
+          }}
+          startInLoadingState
+          style={{ flex: 1, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
+        />
+      ) : null}
     </>
+  );
+}
+
+export default function PaymentScreen() {
+  // Replace with your Stripe publishable key
+  const STRIPE_PUBLISHABLE_KEY = 'pk_test_XXXXXXXXXXXXXXXXXXXXXXXX';
+  return (
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+      <PaymentScreenInner />
+    </StripeProvider>
   );
 }
 

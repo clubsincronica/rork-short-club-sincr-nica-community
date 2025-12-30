@@ -8,6 +8,7 @@ interface UpcomingReservation {
   date: string;
   price: number;
   status: string;
+  isCheckedIn?: boolean;
 }
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
@@ -15,6 +16,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Star, Calendar, DollarSign, Users, ShoppingCart, Bell, MessageSquare, Clock, CreditCard, ChevronRight, Package, TrendingUp, AlertCircle, CheckCircle, Plus, QrCode } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
+import { useNotifications, Notification } from '@/hooks/notification-store';
+import { useProducts } from '@/hooks/products-store';
 import { Colors } from '@/constants/colors';
 
 import { router } from 'expo-router';
@@ -24,7 +27,8 @@ type ServiceSection = 'overview' | 'calendar' | 'reservations' | 'cart' | 'follo
 export default function ServicesScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
-  const { events, userEvents, upcomingEvents } = useCalendar();
+  const { events, userEvents, upcomingEvents, providerReservations, updateAttendance } = useCalendar();
+  const { notifications: realNotifications, unreadCount, markAsRead } = useNotifications();
   const [activeSection, setActiveSection] = useState<ServiceSection>('overview');
 
   // If no user logged in, show login prompt
@@ -51,9 +55,12 @@ export default function ServicesScreen() {
     );
   }
 
-  // Calculated user stats from calendar events
+  const { products: allProducts, getUserProducts, cart: productCart } = useProducts();
+  const { cart: eventCart } = useCalendar();
 
-  // Calculate real stats from calendar events
+  // Calculate real stats from calendar events and products
+  const userProducts = getUserProducts(currentUser.id.toString());
+
   const stats = {
     totalEarnings: userEvents.reduce(
       (sum: number, event: any) => sum + (event.price * event.currentParticipants),
@@ -63,47 +70,58 @@ export default function ServicesScreen() {
       (sum: number, event: any) => sum + event.currentParticipants,
       0
     ),
-    averageRating: 0, // No reviews yet
-    activeServices: userEvents.length,
+    averageRating: currentUser.rating || 0,
+    activeServices: userEvents.length + userProducts.length,
   };
 
   // Debug logging
   console.log('📊 MisServicios Stats for user', currentUser?.name, ':', stats);
   console.log('📊 User events count:', userEvents.length);
+  console.log('📊 User products count:', userProducts.length);
   console.log('📊 Upcoming events:', upcomingEvents.length);
 
-  // Convert calendar events to reservation format for display
-  const upcomingReservations: UpcomingReservation[] = upcomingEvents.slice(0, 3).map((event: any) => {
-    const eventDate = new Date(event.date + ' ' + event.startTime);
-    const now = new Date();
-    const isToday = eventDate.toDateString() === now.toDateString();
-    const isTomorrow = eventDate.toDateString() === new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString();
-
-    let dateDisplay = '';
-    if (isToday) {
-      dateDisplay = `Hoy, ${event.startTime}`;
-    } else if (isTomorrow) {
-      dateDisplay = `Mañana, ${event.startTime}`;
-    } else {
-      const month = eventDate.toLocaleDateString('es-ES', { month: 'short' });
-      const day = eventDate.getDate();
-      dateDisplay = `${month} ${day}, ${event.startTime}`;
-    }
+  // Convert provider reservations to display format
+  const upcomingReservations: any[] = providerReservations.map((res: any) => {
+    const resDate = new Date(res.created_at);
+    const month = resDate.toLocaleDateString('es-ES', { month: 'short' });
+    const day = resDate.getDate();
 
     return {
-      id: event.id,
-      service: event.title,
-      client: event.currentParticipants > 0 ? `${event.currentParticipants} participante(s)` : 'Sin reservas',
-      date: dateDisplay,
-      status: event.currentParticipants > 0 ? 'confirmed' : 'pending',
-      price: event.price
+      id: res.id.toString(),
+      service: res.event_title || 'Reserva',
+      client: res.user_name || 'Cliente',
+      date: `${month} ${day}, ${resDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`,
+      status: res.status,
+      price: res.total_price,
+      isCheckedIn: res.attended // Map backend 'attended' to UI 'isCheckedIn'
     };
   });
 
-  const cartItems: any[] = [];
+  const cartItems = [
+    ...eventCart.map((item: any) => ({
+      id: `event-${item.eventId}`,
+      service: item.event.title,
+      price: item.price,
+      quantity: item.numberOfSpots,
+      provider: item.event.provider?.name || 'Proveedor'
+    })),
+    ...productCart.map(item => ({
+      id: `product-${item.id}`,
+      service: item.product.title,
+      price: item.product.price,
+      quantity: item.quantity,
+      provider: item.product.providerName || 'Vendedor'
+    }))
+  ];
 
-  const notifications: any[] = [];
-
+  const notifications = realNotifications.map((n: Notification) => ({
+    id: n.id.toString(),
+    title: n.title,
+    message: n.message,
+    time: new Date(n.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+    type: n.type,
+    isRead: n.is_read
+  }));
   const followUpClients: any[] = [];
 
   const renderSectionButton = (section: ServiceSection, icon: React.ReactNode, title: string, subtitle: string, highlight?: boolean) => {
@@ -254,44 +272,53 @@ export default function ServicesScreen() {
                     {reservation.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
                   </Text>
                 </View>
+                {reservation.isCheckedIn && (
+                  <View style={[styles.reservationStatus, styles.statusAttended]}>
+                    <Text style={styles.reservationStatusText}>Asistió</Text>
+                  </View>
+                )}
               </View>
 
-              {/* Action buttons for pending reservations */}
-              {reservation.status === 'pending' && (
-                <View style={styles.reservationActions}>
+              {/* Action buttons */}
+              <View style={styles.reservationActions}>
+                {reservation.status === 'pending' && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.declineButton}
+                      onPress={() => {
+                        Alert.alert('Funcionalidad en desarrollo');
+                      }}
+                    >
+                      <Text style={styles.declineButtonText}>Declinar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.acceptButton}
+                      onPress={() => {
+                        Alert.alert('Funcionalidad en desarrollo');
+                      }}
+                    >
+                      <Text style={styles.acceptButtonText}>Aceptar</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                {reservation.status === 'confirmed' && !reservation.isCheckedIn && (
                   <TouchableOpacity
-                    style={styles.declineButton}
-                    onPress={() => {
-                      Alert.alert(
-                        'Cancelar Reserva',
-                        '¿Estás seguro que deseas cancelar esta reserva?',
-                        [
-                          { text: 'No', style: 'cancel' },
-                          {
-                            text: 'Sí, Cancelar',
-                            style: 'destructive',
-                            onPress: () => {
-                              // TODO: Implement cancel reservation logic
-                              Alert.alert('Reserva cancelada');
-                            }
-                          }
-                        ]
-                      );
+                    style={[styles.primaryButton, { marginTop: 10, paddingVertical: 8 }]}
+                    onPress={async () => {
+                      const success = await updateAttendance(reservation.id, true);
+                      if (success) {
+                        Alert.alert('Éxito', 'El participante ha sido marcado como asistido');
+                      } else {
+                        Alert.alert('Error', 'No se pudo actualizar la asistencia');
+                      }
                     }}
                   >
-                    <Text style={styles.declineButtonText}>Cancelar</Text>
+                    <CheckCircle size={18} color={Colors.white} />
+                    <Text style={styles.primaryButtonText}>Marcar como asistido</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.acceptButton}
-                    onPress={() => {
-                      // TODO: Implement accept reservation logic
-                      Alert.alert('Reserva confirmada', 'La reserva ha sido confirmada exitosamente.');
-                    }}
-                  >
-                    <Text style={styles.acceptButtonText}>Aceptar</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                )}
+              </View>
             </View>
           ))}
         </>
@@ -348,7 +375,7 @@ export default function ServicesScreen() {
           </TouchableOpacity>
 
           <Text style={styles.subsectionTitle}>Items en Carrito</Text>
-          {cartItems.map(item => (
+          {cartItems.map((item: any) => (
             <View key={item.id} style={styles.cartItem}>
               <View style={styles.cartItemIcon}>
                 <Package size={20} color={Colors.primary} />
@@ -458,24 +485,26 @@ export default function ServicesScreen() {
       {notifications.length > 0 ? (
         <>
           <Text style={styles.subsectionTitle}>Notificaciones Recientes</Text>
-          {notifications.map(notification => (
-            <TouchableOpacity key={notification.id} style={[styles.notificationCard, notification.unread && styles.notificationUnread]}>
+          {notifications.map((notification: any) => (
+            <TouchableOpacity
+              key={notification.id}
+              style={[styles.notificationCard, !notification.isRead && styles.notificationUnread]}
+              onPress={() => markAsRead(parseInt(notification.id))}
+            >
               <View style={[
                 styles.notificationIcon,
-                notification.type === 'booking' && styles.notificationIconBooking,
-                notification.type === 'payment' && styles.notificationIconPayment,
-                notification.type === 'reminder' && styles.notificationIconReminder,
-                notification.type === 'review' && styles.notificationIconReview,
+                notification.type === 'success' ? styles.notificationIconPayment :
+                  notification.type === 'warning' ? styles.notificationIconReminder :
+                    styles.notificationIconBooking
               ]}>
-                {notification.type === 'booking' && <Calendar size={20} color={Colors.white} />}
-                {notification.type === 'payment' && <DollarSign size={20} color={Colors.white} />}
-                {notification.type === 'reminder' && <Clock size={20} color={Colors.white} />}
-                {notification.type === 'review' && <Star size={20} color={Colors.white} />}
+                {notification.type === 'success' ? <DollarSign size={20} color={Colors.white} /> :
+                  notification.type === 'warning' ? <Clock size={20} color={Colors.white} /> :
+                    <Calendar size={20} color={Colors.white} />}
               </View>
               <View style={styles.notificationContent}>
                 <View style={styles.notificationHeader}>
                   <Text style={styles.notificationTitle}>{notification.title}</Text>
-                  {notification.unread && <View style={styles.unreadDot} />}
+                  {!notification.isRead && <View style={styles.unreadDot} />}
                 </View>
                 <Text style={styles.notificationMessage}>{notification.message}</Text>
                 <Text style={styles.notificationTime}>{notification.time}</Text>
@@ -525,11 +554,13 @@ export default function ServicesScreen() {
                   <Text style={styles.statValue}>{stats.totalBookings}</Text>
                   <Text style={styles.statLabel}>Reservas</Text>
                 </View>
-                <View style={styles.statItem}>
-                  <Star size={20} color={Colors.textOnGold} />
-                  <Text style={styles.statValue}>{stats.averageRating}</Text>
-                  <Text style={styles.statLabel}>Calificación</Text>
-                </View>
+                {stats.averageRating > 0 && (
+                  <View style={styles.statItem}>
+                    <Star size={20} color={Colors.textOnGold} />
+                    <Text style={styles.statValue}>{stats.averageRating}</Text>
+                    <Text style={styles.statLabel}>Calificación</Text>
+                  </View>
+                )}
                 <View style={styles.statItem}>
                   <Calendar size={20} color={Colors.textOnGold} />
                   <Text style={styles.statValue}>{stats.activeServices}</Text>
@@ -974,10 +1005,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusConfirmed: {
-    backgroundColor: Colors.success + '20',
+    backgroundColor: 'rgba(46, 204, 113, 0.1)',
   },
   statusPending: {
-    backgroundColor: Colors.warning + '20',
+    backgroundColor: 'rgba(241, 196, 15, 0.1)',
+  },
+  statusAttended: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    marginLeft: 8,
   },
   statusBadgeText: {
     fontSize: 12,

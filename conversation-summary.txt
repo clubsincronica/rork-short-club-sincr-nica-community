@@ -1,0 +1,35 @@
+This file contains a summary of the key points and steps from our conversations regarding your project.
+
+---
+
+1. **Backend/Frontend Integration & Debugging**
+   - Automated geocoding and user scripts.
+   - Fixed TypeScript build and deployment errors.
+   - Patched backend for GROUP BY SQL error and improved error logging.
+   - Dockerfile and tsconfig.json isolation for backend.
+   - Synced package-lock.json and resolved npm install issues.
+   - Successful Railway deployment.
+
+2. **Socket & Conversations**
+   - Diagnosed empty conversations and 'conectando' status.
+   - Found frontend sometimes connected to socket without auth token.
+   - Patched frontend to always wait for token before connecting socket.
+   - Cleaned up useGlobalSocketConnection.tsx for syntax errors.
+
+3. **Expo & Network Issues**
+   - Clarified that Expo dev server is required for development builds.
+   - Explained that production builds only need the cloud backend (Railway).
+   - Diagnosed network request failures as local backend connectivity issues.
+
+4. **Production Readiness & Super User**
+   - Plan for deep-dive diagnostic: payment integrations (Stripe, MercadoPago), bank accounts, commission logic, super user setup, and general production best practices.
+   - Will prepare a detailed report and checklist for review.
+
+5. **General Guidance**
+   - Provided step-by-step troubleshooting for build, deployment, and runtime errors.
+   - Explained how to update API URLs for production.
+   - Outlined requirements for super user and commission routing.
+
+---
+
+For a full, detailed transcript, please export the chat from your chat platform or request a specific range or topic to be included in a text file.

@@ -38,7 +38,6 @@ import { useServices } from '@/hooks/services-store';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useProducts } from '@/hooks/products-store';
 import { useUser } from '@/hooks/user-store';
-import { allMockUsers, mockServices } from '@/mocks/data';
 import { User, Service } from '@/types/user';
 import { ServiceReservationModal } from '@/components/ServiceReservationModal';
 import { TicketWallet } from '@/components/TicketWallet';
@@ -102,18 +101,13 @@ export default function UserProfileScreen() {
 
     const offerings: any[] = [];
 
-    // 1. Add user services (from both store and mock data) - STRICT ID-BASED FILTERING ONLY
-    const storeServices = services.filter(service =>
-      service.providerId === user.id
+    // 1. Add user services (from store only) - STRICT ID-BASED FILTERING ONLY
+    const userServices = services.filter(service =>
+      String(service.providerId) === String(user.id)
     );
 
-    const mockUserServices = mockServices.filter(service =>
-      service.providerId === user.id // Remove name-based matching to prevent cross-user content
-    );
+    console.log(`User Profile: Found ${userServices.length} real services for ${user.name}`);
 
-    const userServices = [...storeServices, ...mockUserServices];
-
-    console.log(`User Profile: Found ${userServices.length} services for ${user.name} (${storeServices.length} from store, ${mockUserServices.length} from mock)`);
     userServices.forEach((service: any) => console.log(`- Service: ${service.title}`));
 
     userServices.forEach(service => {
@@ -140,8 +134,8 @@ export default function UserProfileScreen() {
     // 2. Add user events - STRICT FILTERING ONLY
     const userEvents = events.filter((event: any) => {
       // Only include events where providerId matches AND no provider object exists OR provider.id also matches
-      const providerIdMatches = event.providerId === user.id;
-      const providerObjMatches = !event.provider || event.provider.id === user.id;
+      const providerIdMatches = String(event.providerId) === String(user.id);
+      const providerObjMatches = !event.provider || String(event.provider.id) === String(user.id);
       return providerIdMatches && providerObjMatches;
     });
 
@@ -174,7 +168,7 @@ export default function UserProfileScreen() {
     });
 
     // 3. Add user products
-    const realUserProducts = getUserProducts(user.id);
+    const realUserProducts = getUserProducts(String(user.id));
     console.log(`User Profile: Found ${realUserProducts.length} products for ${user.name}`);
     realUserProducts.forEach((product: any) => console.log(`- Product: ${product.title}`));
 
@@ -187,7 +181,7 @@ export default function UserProfileScreen() {
         price: product.price,
         image: product.images?.[0],
         priority: 1,
-        isActive: product.isAvailable,
+        isActive: (product as any).inStock ?? true,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
         tags: product.tags,
@@ -215,12 +209,12 @@ export default function UserProfileScreen() {
         console.log('User Profile: Loading own profile preview for:', storeCurrentUser.name, storeCurrentUser.id);
         setUser(storeCurrentUser);
 
-        // Find services for current user - STRICT ID-BASED FILTERING
-        const services = mockServices.filter(service =>
-          service.providerId === storeCurrentUser.id
+        // Find real services for current user
+        const userServicesFromStore = services.filter(service =>
+          String(service.providerId) === String(storeCurrentUser.id)
         );
 
-        setUserServices(services);
+        setUserServices(userServicesFromStore as any);
         setLoading(false);
         return;
       }
@@ -246,11 +240,11 @@ export default function UserProfileScreen() {
             console.log('User Profile: Loaded real user from API:', userData.name);
             setUser(userData);
 
-            // Still use mock services for now unless we have a services endpoint
-            const services = mockServices.filter(service =>
-              service.providerId === userData.id
+            // Use real services
+            const userServicesFromStore = services.filter(service =>
+              String(service.providerId) === String(userData.id)
             );
-            setUserServices(services);
+            setUserServices(userServicesFromStore as any);
             setLoading(false);
             return;
           }
@@ -259,26 +253,9 @@ export default function UserProfileScreen() {
         }
       }
 
-      // 2. Fallback to Mock Data logic
-      // STRICT ID-BASED MATCHING ONLY to prevent content leakage
-      let foundUser = allMockUsers.find(u => u.id === userId);
-
-      // Only fall back to name matching if no userId provided and we have exact userName
-      if (!foundUser && !userId && userName) {
-        foundUser = allMockUsers.find(u => u.name === userName);
-      }
-
-      if (foundUser) {
-        console.log('User Profile: Loading profile for:', foundUser.name, foundUser.id);
-        setUser(foundUser);
-
-        // Find services by this user - STRICT ID-BASED FILTERING ONLY
-        const services = mockServices.filter(service =>
-          service.providerId === foundUser!.id // Remove name-based matching
-        );
-
-        setUserServices(services);
-      }
+      // 2. If not found in API, user is not found
+      console.log('User Profile: User not found in API');
+      setUser(null);
     } catch (error) {
       console.error('Error loading user profile:', error);
       Alert.alert('Error', 'No se pudo cargar el perfil del usuario');
@@ -469,13 +446,13 @@ export default function UserProfileScreen() {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{Math.floor(Math.random() * 50) + 10}</Text>
+                <Text style={styles.statNumber}>0</Text>
                 <Text style={styles.statLabel}>Seguidores</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
                 <Star size={16} color={Colors.gold} />
-                <Text style={styles.statNumber}>4.{Math.floor(Math.random() * 9) + 1}</Text>
+                <Text style={styles.statNumber}>{user.rating || '0.0'}</Text>
                 <Text style={styles.statLabel}>Rating</Text>
               </View>
             </View>

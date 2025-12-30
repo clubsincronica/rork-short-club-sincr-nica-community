@@ -10,11 +10,11 @@ import {
   Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-  X, 
-  Plus, 
-  Trash2, 
-  Edit3, 
+import {
+  X,
+  Plus,
+  Trash2,
+  Edit3,
   DollarSign,
 } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
@@ -22,46 +22,28 @@ import { BankAccount } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { useRouter } from 'expo-router';
 
-// Estado global simple
-interface GlobalState {
-  modalVisible: boolean;
-  editingAccount: BankAccount | null;
-  formData: {
-    bankName: string;
-    accountNumber: string;
-    accountHolderName: string;
-    percentage: number;
-    nickname: string;
-  };
-  updateCounter: number;
-}
-
-let globalState: GlobalState = {
-  modalVisible: false,
-  editingAccount: null,
-  formData: {
-    bankName: '',
-    accountNumber: '',
-    accountHolderName: '',
-    percentage: 0,
-    nickname: '',
-  },
-  updateCounter: 0,
-};
+// Removed globalState to use proper React state
 
 export default function BankAccountsManagement() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { currentUser, addBankAccount, updateBankAccount, removeBankAccount } = useUser();
-  
-  // Use global state with a simpler approach that forces re-renders
-  const modalVisible = globalState.modalVisible;
-  const editingAccount = globalState.editingAccount;
-  const formData = globalState.formData;
+
+  const [modalVisible, setModalVisible] = React.useState(false);
+  const [editingAccount, setEditingAccount] = React.useState<BankAccount | null>(null);
+  const [formData, setFormData] = React.useState({
+    bankName: '',
+    accountNumber: '',
+    accountHolderName: '',
+    percentage: 0,
+    nickname: '',
+  });
+
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const bankColors = {
     primary: '#2563eb',
-    primaryLight: '#3b82f6', 
+    primaryLight: '#3b82f6',
     primaryDark: '#1d4ed8',
     secondary: '#eff6ff',
     accent: '#1e40af',
@@ -71,61 +53,46 @@ export default function BankAccountsManagement() {
   };
 
   const resetForm = () => {
-    globalState.formData = {
+    setFormData({
       bankName: '',
       accountNumber: '',
       accountHolderName: '',
       percentage: 0,
       nickname: '',
-    };
-    globalState.editingAccount = null;
+    });
+    setEditingAccount(null);
   };
 
   const openAddModal = () => {
     resetForm();
-    globalState.modalVisible = true;
-    globalState.editingAccount = null;
-    // Force component refresh by navigating away and back
-    setTimeout(() => {
-      router.replace('/bank-accounts');
-    }, 1);
+    setModalVisible(true);
   };
 
   const closeModal = () => {
-    globalState.modalVisible = false;
-    globalState.editingAccount = null;
+    setModalVisible(false);
     resetForm();
-    // Force component refresh
-    setTimeout(() => {
-      router.replace('/bank-accounts');
-    }, 1);
   };
 
   const openEditModal = (account: BankAccount) => {
-    globalState.formData = {
+    setFormData({
       bankName: account.bankName,
       accountNumber: account.accountNumber,
       accountHolderName: account.accountHolderName,
       percentage: account.percentage,
       nickname: account.nickname || '',
-    };
-    globalState.editingAccount = account;
-    globalState.modalVisible = true;
-    // Force component refresh
-    setTimeout(() => {
-      router.replace('/bank-accounts');
-    }, 1);
+    });
+    setEditingAccount(account);
+    setModalVisible(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.bankName || !formData.accountNumber || !formData.accountHolderName) {
       Alert.alert('Error', 'Por favor completa todos los campos obligatorios');
       return;
     }
 
-    // Ensure percentage is a number
     const percentage = typeof formData.percentage === 'number' ? formData.percentage : parseFloat(formData.percentage) || 0;
-    
+
     if (percentage <= 0) {
       Alert.alert('Error', 'El porcentaje debe ser mayor que 0');
       return;
@@ -143,32 +110,30 @@ export default function BankAccountsManagement() {
     const accountData = {
       ...formData,
       percentage: percentage,
-      // Add required BankAccount fields with defaults
       accountType: 'checking' as const,
-      currency: 'EUR',
-      country: 'ES',
-      isVerified: false,
-      isActive: true
+      countryCode: 'ES', // Match backend field name
+      isPrimary: (currentUser?.bankAccounts?.length || 0) === 0, // First account is primary
     };
 
+    setIsSaving(true);
     try {
       if (editingAccount) {
-        updateBankAccount({ accountId: editingAccount.id, updates: accountData });
+        await updateBankAccount({ id: editingAccount.id, updates: accountData });
         Alert.alert('Éxito', 'Cuenta actualizada correctamente');
       } else {
-        addBankAccount(accountData);
+        await addBankAccount(accountData);
         Alert.alert('Éxito', 'Cuenta añadida correctamente');
       }
-
       closeModal();
-      resetForm();
     } catch (error) {
       console.error('Error saving bank account:', error);
       Alert.alert('Error', 'Hubo un problema al guardar la cuenta bancaria');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     Alert.alert(
       'Eliminar Cuenta',
       '¿Estás seguro de que deseas eliminar esta cuenta bancaria?',
@@ -180,9 +145,7 @@ export default function BankAccountsManagement() {
   };
 
   const updateFormField = (field: string, value: any) => {
-    (globalState.formData as any)[field] = value;
-    globalState.updateCounter = (globalState.updateCounter || 0) + 1;
-    // Just update the state without navigation to avoid losing focus
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   // Temporarily always enable save button for testing
@@ -192,14 +155,14 @@ export default function BankAccountsManagement() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.back()}
           style={styles.backButton}
         >
           <X size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Cuentas Bancarias</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={openAddModal}
           style={styles.addButton}
         >
@@ -212,7 +175,7 @@ export default function BankAccountsManagement() {
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionsTitle}>Gestiona tus Cuentas Bancarias</Text>
           <Text style={styles.instructionsText}>
-            Configura múltiples cuentas bancarias y asigna porcentajes de distribución de ingresos. 
+            Configura múltiples cuentas bancarias y asigna porcentajes de distribución de ingresos.
             El total debe sumar 100%.
           </Text>
         </View>
@@ -307,7 +270,7 @@ export default function BankAccountsManagement() {
               <Text style={styles.modalTitle}>
                 {editingAccount ? 'Editar Cuenta' : 'Nueva Cuenta Bancaria'}
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={closeModal}
                 style={styles.modalCloseButton}
               >
@@ -395,11 +358,11 @@ export default function BankAccountsManagement() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleSave}
-                style={[styles.saveButton, { opacity: isFormValid ? 1 : 0.5 }]}
-                disabled={!isFormValid}
+                style={[styles.saveButton, { opacity: isFormValid && !isSaving ? 1 : 0.5 }]}
+                disabled={!isFormValid || isSaving}
               >
                 <Text style={styles.saveButtonText}>
-                  {editingAccount ? 'Actualizar' : 'Guardar'}
+                  {isSaving ? 'Guardando...' : (editingAccount ? 'Actualizar' : 'Guardar')}
                 </Text>
               </TouchableOpacity>
             </View>

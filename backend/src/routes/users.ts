@@ -1,8 +1,14 @@
 import express, { Request, Response } from 'express';
 import { userQueries } from '../models/database-sqljs';
 import { getJWTSecret } from '../config/env';
+import {
+  addBankAccount,
+  getBankAccountsByUserId,
+  updateBankAccount,
+  deleteBankAccount
+} from '../models/bank-account';
 import { authLimiter, strictLimiter } from '../middleware/rateLimiter';
-import { parseIntSafe, parseFloatSafe } from '../middleware/security';
+import { parseIntSafe, parseFloatSafe, authenticateJWT } from '../middleware/security';
 import {
   validateAuth,
   validateUserId,
@@ -242,6 +248,59 @@ router.get('/users/search/:query', validateSearch, handleValidationErrors, async
   } catch (error) {
     console.error('Search users error:', error);
     res.status(500).json({ error: 'Failed to search users' });
+  }
+});
+
+// Bank Account Endpoints
+
+// Get all bank accounts for the current user
+router.get('/users/me/bank-accounts', authenticateJWT, async (req: Request | any, res: Response) => {
+  try {
+    const userId = req.user.userId;
+    const accounts = await getBankAccountsByUserId(userId);
+    res.json(accounts);
+  } catch (error) {
+    console.error('Error fetching bank accounts:', error);
+    res.status(500).json({ error: 'Failed to fetch bank accounts' });
+  }
+});
+
+// Add a new bank account
+router.post('/users/me/bank-accounts', authenticateJWT, async (req: Request | any, res: Response) => {
+  try {
+    const userId = req.user.userId;
+    const accountData = { ...req.body, userId };
+    const result = await addBankAccount(accountData);
+    res.status(201).json({ id: result.lastID, ...accountData });
+  } catch (error) {
+    console.error('Error adding bank account:', error);
+    res.status(500).json({ error: 'Failed to add bank account' });
+  }
+});
+
+// Update a bank account
+router.put('/users/me/bank-accounts/:id', authenticateJWT, async (req: Request | any, res: Response) => {
+  try {
+    const userId = req.user.userId;
+    const accountId = parseInt(req.params.id);
+    await updateBankAccount(accountId, userId, req.body);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error updating bank account:', error);
+    res.status(500).json({ error: 'Failed to update bank account' });
+  }
+});
+
+// Delete a bank account
+router.delete('/users/me/bank-accounts/:id', authenticateJWT, async (req: Request | any, res: Response) => {
+  try {
+    const userId = req.user.userId;
+    const accountId = parseInt(req.params.id);
+    await deleteBankAccount(accountId, userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting bank account:', error);
+    res.status(500).json({ error: 'Failed to delete bank account' });
   }
 });
 

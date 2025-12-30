@@ -86,7 +86,7 @@ export default function MiTableroScreen() {
 
     // const mockUserServices = mockServices.filter(service => service.providerId === currentUser.id);
     const mockUserServices: any[] = []; // Empty for compatibility
-    const realUserServices = services.filter(service => service.providerId === currentUser.id);
+    const realUserServices = services.filter(service => String(service.providerId) === String(currentUser.id));
 
     if (__DEV__) {
       console.log('✅ Mi Tablero: Real services found:', realUserServices.length, realUserServices.map(s => s.title));
@@ -137,8 +137,8 @@ export default function MiTableroScreen() {
 
     const userEvents = events.filter((event: any) => {
       // STRICT FILTERING: Only include events where providerId matches current user AND no provider object exists OR provider.id also matches
-      const providerIdMatches = event.providerId === currentUser.id;
-      const providerObjMatches = !event.provider || event.provider.id === currentUser.id;
+      const providerIdMatches = String(event.providerId) === String(currentUser.id);
+      const providerObjMatches = !event.provider || String(event.provider.id) === String(currentUser.id);
       const isOwner = providerIdMatches && providerObjMatches;
 
       if (__DEV__) {
@@ -177,7 +177,7 @@ export default function MiTableroScreen() {
     });
 
     // 3. Add user products from products store
-    const realUserProducts = getUserProducts(currentUser.id);
+    const realUserProducts = getUserProducts(String(currentUser.id));
     console.log('Mi Tablero: Real products found:', realUserProducts.length, realUserProducts.map(p => p.title));
 
     realUserProducts.forEach(product => {
@@ -189,7 +189,7 @@ export default function MiTableroScreen() {
         price: product.price,
         image: product.images?.[0],
         priority: 1,
-        isActive: product.isAvailable,
+        isActive: product.inStock,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
         tags: product.tags,
@@ -207,13 +207,11 @@ export default function MiTableroScreen() {
       // Double-check by verifying item source and ownership
       if (offering.type === 'service') {
         // Check if this service ID exists in our filtered services
-        const isFromMockServices = mockUserServices.some(s => `mock-service-${s.id}` === offering.id);
         const isFromRealServices = realUserServices.some(s => s.id === offering.id);
-        const isValid = isFromMockServices || isFromRealServices;
-        if (!isValid) {
+        if (!isFromRealServices) {
           console.warn('⚠️ Mi Tablero: Filtering out unauthorized service:', offering.title, offering.id);
         }
-        return isValid;
+        return isFromRealServices;
       }
 
       if (offering.type === 'event') {
@@ -240,9 +238,8 @@ export default function MiTableroScreen() {
         id: o.id,
         type: o.type,
         title: o.title,
-        source: o.id.startsWith('mock-service-') ? 'mock-service' :
-          o.id.startsWith('event-') ? 'event' :
-            o.type === 'product' ? 'product' : 'other'
+        source: o.id.startsWith('event-') ? 'event' :
+          o.type === 'product' ? 'product' : 'other'
       })));
     }
     // FINAL SECURITY LAYER: Double-check each offering against current user ID
@@ -253,8 +250,8 @@ export default function MiTableroScreen() {
           return false; // No more mock services
         }
         // For real services, verify providerId matches
-        const realService = services.find(s => s.id === offering.id);
-        return realService && realService.providerId === currentUser.id;
+        const realService = services.find(s => String(s.id) === String(offering.id));
+        return realService && String(realService.providerId) === String(currentUser.id);
       }
 
       if (offering.type === 'event') {
@@ -296,15 +293,7 @@ export default function MiTableroScreen() {
     console.log('Mi Tablero: Editing priority item:', item.id, item.title);
     console.log('Mi Tablero: Item type:', item.type);
 
-    // Check if this is a mock item (not editable)
-    if (item.id.startsWith('mock-')) {
-      Alert.alert(
-        'Elemento de demostración',
-        'Este es un elemento de demostración y no puede ser editado. Crea tus propios servicios, eventos o productos para editarlos.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+    // Navigate to create-action screen with edit parameters
 
     // Navigate to create-action screen with edit parameters
     router.push({
@@ -396,7 +385,7 @@ export default function MiTableroScreen() {
 
         // Update existing item in priority store
         updatePriorityItem({
-          itemId: editingPriorityItem.id,
+          id: editingPriorityItem.id,
           updates: itemData
         });
         Alert.alert('Éxito', 'Elemento actualizado en tu tablero');
@@ -669,7 +658,7 @@ export default function MiTableroScreen() {
       <EventOrganizerDashboard
         isVisible={showOrganizerDashboard}
         onClose={() => setShowOrganizerDashboard(false)}
-        userId={currentUser?.id || 'unknown'}
+        userId={currentUser?.id?.toString() || 'unknown'}
         onEventCreate={(event) => {
           // Handle event creation
           addEvent({

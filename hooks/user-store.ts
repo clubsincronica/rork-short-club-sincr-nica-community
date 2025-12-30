@@ -2,7 +2,7 @@ import React, { createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
-import { User, PaymentMethod, UserPreferences } from '@/types/user';
+import { User, PaymentMethod, UserPreferences, ProfilePriorityItem } from '@/types/user';
 // import { mockUsers } from '@/mocks/data';
 import { getApiBaseUrl } from '@/utils/api-config';
 
@@ -313,6 +313,136 @@ const useUserStore = () => {
     }
   });
 
+  const addBankAccountMutation = useMutation({
+    mutationFn: async (account: any) => {
+      if (!currentUser) throw new Error('No user logged in');
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/users/me/bank-accounts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(account)
+      });
+      if (!response.ok) throw new Error('Failed to add bank account');
+      const data = await response.json();
+
+      const updatedUser = {
+        ...currentUser,
+        bankAccounts: [...(currentUser.bankAccounts || []), data]
+      };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      queryClient.setQueryData(['currentUser'], user);
+    }
+  });
+
+  const updateBankAccountMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: number; updates: any }) => {
+      if (!currentUser) throw new Error('No user logged in');
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/users/me/bank-accounts/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updates)
+      });
+      if (!response.ok) throw new Error('Failed to update bank account');
+
+      const updatedAccounts = (currentUser.bankAccounts || []).map(acc =>
+        acc.id === id ? { ...acc, ...updates } : acc
+      );
+      const updatedUser = { ...currentUser, bankAccounts: updatedAccounts };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      queryClient.setQueryData(['currentUser'], user);
+    }
+  });
+
+  const removeBankAccountMutation = useMutation({
+    mutationFn: async (id: number) => {
+      if (!currentUser) throw new Error('No user logged in');
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/users/me/bank-accounts/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to delete bank account');
+
+      const updatedAccounts = (currentUser.bankAccounts || []).filter(acc => acc.id !== id);
+      const updatedUser = { ...currentUser, bankAccounts: updatedAccounts };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      queryClient.setQueryData(['currentUser'], user);
+    }
+  });
+
+  const addPriorityItemMutation = useMutation({
+    mutationFn: async (item: Omit<ProfilePriorityItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+      if (!currentUser) throw new Error('No user logged in');
+      const newItem: ProfilePriorityItem = {
+        ...item,
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      const updatedUser = {
+        ...currentUser,
+        priorityBoard: [...(currentUser.priorityBoard || []), newItem]
+      };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      queryClient.setQueryData(['currentUser'], user);
+    }
+  });
+
+  const updatePriorityItemMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ProfilePriorityItem> }) => {
+      if (!currentUser) throw new Error('No user logged in');
+      const updatedBoard = (currentUser.priorityBoard || []).map(item =>
+        item.id === id ? { ...item, ...updates, updatedAt: new Date().toISOString() } : item
+      );
+      const updatedUser = { ...currentUser, priorityBoard: updatedBoard };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      queryClient.setQueryData(['currentUser'], user);
+    }
+  });
+
+  const removePriorityItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!currentUser) throw new Error('No user logged in');
+      const updatedBoard = (currentUser.priorityBoard || []).filter(item => item.id !== id);
+      const updatedUser = { ...currentUser, priorityBoard: updatedBoard };
+      await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      return updatedUser;
+    },
+    onSuccess: (user) => {
+      setCurrentUser(user);
+      queryClient.setQueryData(['currentUser'], user);
+    }
+  });
+
   useEffect(() => {
     if (userQuery.data) {
       setCurrentUser(userQuery.data);
@@ -344,6 +474,12 @@ const useUserStore = () => {
     addPaymentMethod: addPaymentMethodMutation.mutate,
     removePaymentMethod: removePaymentMethodMutation.mutate,
     setDefaultPaymentMethod: setDefaultPaymentMethodMutation.mutate,
+    addBankAccount: addBankAccountMutation.mutateAsync,
+    updateBankAccount: updateBankAccountMutation.mutateAsync,
+    removeBankAccount: removeBankAccountMutation.mutateAsync,
+    addPriorityItem: addPriorityItemMutation.mutate,
+    updatePriorityItem: updatePriorityItemMutation.mutate,
+    removePriorityItem: removePriorityItemMutation.mutate,
     isLoginLoading: loginMutation.isPending,
   }), [
     currentUser,
@@ -357,6 +493,12 @@ const useUserStore = () => {
     addPaymentMethodMutation.mutate,
     removePaymentMethodMutation.mutate,
     setDefaultPaymentMethodMutation.mutate,
+    addBankAccountMutation.mutateAsync,
+    updateBankAccountMutation.mutateAsync,
+    removeBankAccountMutation.mutateAsync,
+    addPriorityItemMutation.mutate,
+    updatePriorityItemMutation.mutate,
+    removePriorityItemMutation.mutate,
     loginMutation.isPending
   ]);
 };

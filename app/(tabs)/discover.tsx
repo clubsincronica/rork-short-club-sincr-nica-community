@@ -10,11 +10,12 @@ import { TouchableScale } from '@/components/TouchableScale';
 import { AccessibleText, Heading } from '@/components/AccessibleText';
 import { SkeletonCard } from '@/components/SkeletonLoader';
 import { useDebounce } from '@/hooks/useDebounce';
-import { mockServices, mockLodging } from '@/mocks/data';
-import { ServiceCategory } from '@/types/user';
-import { Colors } from '@/constants/colors';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
+import { useServices } from '@/hooks/services-store';
+import { useLodging } from '@/hooks/lodging-store';
+import { ServiceCategory, Service, Lodging } from '@/types/user';
+import { Colors } from '@/constants/colors';
 
 type ViewMode = 'services' | 'lodging';
 
@@ -22,11 +23,13 @@ export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const { upcomingEvents } = useCalendar();
   const { currentUser } = useUser();
+  const { services: allServices } = useServices();
+  const { lodgings: allLodgings } = useLodging();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('services');
   const [isLoading] = useState<boolean>(false);
-  
+
   if (__DEV__) {
     console.log('DiscoverScreen rendered - this should appear in Rork preview');
     console.log('Current user:', currentUser);
@@ -36,67 +39,42 @@ export default function DiscoverScreen() {
     console.log('Selected category:', selectedCategory);
     console.log('View mode:', viewMode);
   }
-  
+
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  // Update mock services with real user data (profile pictures, etc.)
-  const servicesWithRealUsers = useMemo(() => {
-    if (!currentUser) return mockServices;
-    
-    return mockServices.map(service => {
-      // If the service provider matches the current user or another real user, update their avatar
-      if (service.provider.id === currentUser.id || service.provider.email === currentUser.email) {
-        return {
-          ...service,
-          provider: {
-            ...service.provider,
-            avatar: currentUser.avatar || service.provider.avatar,
-            bio: currentUser.bio || service.provider.bio,
-            instagram: currentUser.instagram || service.provider.instagram,
-            facebook: currentUser.facebook || service.provider.facebook,
-            tiktok: currentUser.tiktok || service.provider.tiktok,
-          }
-        };
-      }
-      return service;
-    });
-  }, [currentUser]);
-
   const filteredServices = useMemo(() => {
-    let filtered = servicesWithRealUsers;
-    
+    let filtered = allServices as any[];
+
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(service => service.category === selectedCategory);
+      filtered = filtered.filter((service: any) => service.category === selectedCategory);
     }
-    
+
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(service => 
+      filtered = filtered.filter((service: any) =>
         service.title.toLowerCase().includes(query) ||
         service.description.toLowerCase().includes(query) ||
-        service.provider.name.toLowerCase().includes(query) ||
-        service.tags.some(tag => tag.toLowerCase().includes(query))
+        (service.tags && service.tags.some((tag: string) => tag.toLowerCase().includes(query)))
       );
     }
-    
+
     return filtered;
-  }, [debouncedSearchQuery, selectedCategory, servicesWithRealUsers]);
+  }, [debouncedSearchQuery, selectedCategory, allServices]);
 
   const filteredLodging = useMemo(() => {
-    let filtered = mockLodging;
-    
+    let filtered = allLodgings as any[];
+
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
-      filtered = filtered.filter(lodging => 
+      filtered = filtered.filter((lodging: any) =>
         lodging.title.toLowerCase().includes(query) ||
         lodging.description.toLowerCase().includes(query) ||
-        lodging.host.name.toLowerCase().includes(query) ||
         lodging.location.toLowerCase().includes(query)
       );
     }
-    
+
     return filtered;
-  }, [debouncedSearchQuery]);
+  }, [debouncedSearchQuery, allLodgings]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -108,7 +86,7 @@ export default function DiscoverScreen() {
               <Heading level={1} style={styles.titleText}>Club Sincrónica</Heading>
               <AccessibleText style={styles.subtitleText}>Encuentra tu bienestar</AccessibleText>
             </View>
-            
+
             <View style={styles.searchContainer}>
               <View style={styles.searchInputContainer}>
                 <Search size={20} color={Colors.textLight} />
@@ -121,8 +99,8 @@ export default function DiscoverScreen() {
                   testID="search-input"
                 />
               </View>
-              <TouchableScale 
-                style={styles.filterButton} 
+              <TouchableScale
+                style={styles.filterButton}
                 testID="filter-button"
                 accessibilityLabel="Filtros de búsqueda"
                 accessibilityHint="Abre las opciones de filtrado"
@@ -130,7 +108,7 @@ export default function DiscoverScreen() {
                 <Filter size={20} color={Colors.gold} />
               </TouchableScale>
             </View>
-            
+
             <View style={styles.viewModeContainer}>
               <TouchableScale
                 style={[styles.viewModeButton, viewMode === 'services' && styles.activeViewMode]}
@@ -159,9 +137,9 @@ export default function DiscoverScreen() {
         </View>
 
         <View style={styles.content}>
-          <OnTodayBoard 
-            events={upcomingEvents} 
-            onEventPress={() => {}}
+          <OnTodayBoard
+            events={upcomingEvents}
+            onEventPress={() => { }}
           />
 
           {viewMode === 'services' && (
@@ -172,11 +150,11 @@ export default function DiscoverScreen() {
           )}
 
           <View style={styles.resultsContainer}>
-            <AccessibleText 
+            <AccessibleText
               style={styles.resultsText}
               accessibilityLiveRegion="polite"
             >
-              {viewMode === 'services' 
+              {viewMode === 'services'
                 ? `${filteredServices.length} servicios encontrados`
                 : `${filteredLodging.length} lugares encontrados`
               }
@@ -195,7 +173,7 @@ export default function DiscoverScreen() {
                 <ServiceCard
                   key={service.id}
                   service={service}
-                  onPress={() => {}}
+                  onPress={() => { }}
                 />
               ))}
             </View>
@@ -205,7 +183,7 @@ export default function DiscoverScreen() {
                 <LodgingCard
                   key={lodging.id}
                   lodging={lodging}
-                  onPress={() => {}}
+                  onPress={() => { }}
                 />
               ))}
             </View>

@@ -58,23 +58,23 @@ interface ActionData {
   eventDate: string;
   eventTime: string;
   eventEndTime: string;
-  
+
   // Service-specific
   duration: string;
-  
+
   // Service calendar integration
   hasSchedule: boolean;
   startDate: string;      // Service availability start date
   endDate: string;        // Service availability end date
   selectedDays: string[]; // Days of week: ['monday', 'wednesday', 'friday']
   timeSlots: string[];    // Time slots: ['10:00-12:00', '14:00-16:00']
-  
+
   // Lodging-specific
   lodgingType: string;    // 'retreat-center', 'healing-space', 'eco-lodge', 'spiritual-sanctuary', 'wellness-resort'
   maxGuests: string;
   amenities: string[];
   images: string[];
-  
+
   // Common
   category: string;
   location: string;
@@ -122,19 +122,19 @@ export default function CreateActionScreen() {
   const { addService, updateService, services } = useServices();
   const { addProduct, updateProduct, products } = useProducts();
   const { addLodging, updateLodging, lodgings } = useLodging();
-  
+
   // Edit mode detection
   const isEditMode = params.itemId ? true : false;
   const editItemId = params.itemId as string;
   const editItemType = params.itemType as string;
-  
+
   console.log('CreateAction: Edit mode:', isEditMode, 'ItemID:', editItemId, 'Type:', editItemType);
-  
+
   const [currentStep, setCurrentStep] = useState(isEditMode ? 2 : 1); // Start at step 2 if editing
   const totalSteps = 4;
   const [isTimeSlotModalVisible, setIsTimeSlotModalVisible] = useState(false);
   const [newTimeSlot, setNewTimeSlot] = useState('');
-  
+
   const [actionData, setActionData] = useState<ActionData>({
     type: (isEditMode && editItemType) ? editItemType as ActionType : 'event',
     title: '',
@@ -199,18 +199,18 @@ export default function CreateActionScreen() {
   // Helper function to convert date to DD/MM/AAAA format for display
   const formatDateForDisplay = (dateStr: string): string => {
     if (!dateStr) return '';
-    
+
     // If already in DD/MM/YYYY or DD/MM/AAAA format, return as is
     if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
       return dateStr;
     }
-    
+
     // If in YYYY-MM-DD format, convert to DD/MM/YYYY
     if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
       const [year, month, day] = dateStr.split('-');
       return `${day}/${month}/${year}`;
     }
-    
+
     // Return as is if format unknown
     return dateStr;
   };
@@ -219,10 +219,10 @@ export default function CreateActionScreen() {
   useEffect(() => {
     if (isEditMode && editItemId && editItemType) {
       console.log('CreateAction: Loading data for edit mode');
-      
+
       // Strip the type prefix from the ID if present (e.g., "event-123" -> "123")
       let cleanId = editItemId.replace(/^(event-|service-|product-)/, '');
-      
+
       // Strip the timestamp suffix from expanded recurring event IDs (e.g., "123-1735689600000" -> "123")
       if (cleanId.includes('-')) {
         const parts = cleanId.split('-');
@@ -233,9 +233,9 @@ export default function CreateActionScreen() {
           console.log('CreateAction: Detected expanded recurring event instance, using base ID:', cleanId);
         }
       }
-      
+
       console.log('CreateAction: Clean ID:', cleanId, 'Original ID:', editItemId);
-      
+
       let existingItem: any = null;
 
       // Find the item based on type
@@ -250,7 +250,7 @@ export default function CreateActionScreen() {
       if (existingItem) {
         console.log('CreateAction: Found existing item:', existingItem);
         console.log('CreateAction: Existing permissions:', existingItem.permissions);
-        
+
         // Map existing data to ActionData structure
         setActionData({
           type: editItemType as ActionType,
@@ -287,7 +287,7 @@ export default function CreateActionScreen() {
           isOnline: existingItem.isOnline || false,
           maxParticipants: existingItem.maxParticipants?.toString() || '10',
         });
-        
+
         console.log('CreateAction: Data loaded successfully, permissions:', existingItem.permissions);
       } else {
         console.warn('CreateAction: Item not found in store');
@@ -351,7 +351,7 @@ export default function CreateActionScreen() {
             }
           }
         }
-        
+
         if (actionData.type === 'service' && actionData.hasSchedule) {
           if (!actionData.startDate) {
             Alert.alert('Error', 'La fecha de inicio del servicio es requerida');
@@ -370,7 +370,7 @@ export default function CreateActionScreen() {
             return false;
           }
         }
-        
+
         if (actionData.type === 'lodging') {
           if (!actionData.lodgingType) {
             Alert.alert('Error', 'El tipo de alojamiento es requerido');
@@ -381,7 +381,7 @@ export default function CreateActionScreen() {
             return false;
           }
         }
-        
+
         if (!actionData.category) {
           Alert.alert('Error', 'La categoría es requerida');
           return false;
@@ -436,15 +436,15 @@ export default function CreateActionScreen() {
         }
 
         // Convert date format DD/MM/YYYY -> YYYY-MM-DD
-        const normalizedDate = actionData.isRecurring 
+        const normalizedDate = actionData.isRecurring
           ? (() => {
-              const [day, month, year] = actionData.recurringStartDate.split('/');
-              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            })()
+            const [day, month, year] = actionData.recurringStartDate.split('/');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          })()
           : (() => {
-              const [day, month, year] = actionData.eventDate.split('/');
-              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            })();
+            const [day, month, year] = actionData.eventDate.split('/');
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          })();
 
         // Map category
         const categoryMap: { [key: string]: string } = {
@@ -477,7 +477,7 @@ export default function CreateActionScreen() {
         };
 
         console.log('📅 Create Action: Event data:', calendarEvent);
-        
+
         if (isEditMode && editItemId) {
           // Strip prefix and timestamp suffix from ID if present
           let cleanId = editItemId.replace(/^(event-|service-|product-)/, '');
@@ -548,7 +548,7 @@ export default function CreateActionScreen() {
         }
 
         const serviceData = {
-          providerId: currentUser.id,
+          providerId: String(currentUser.id),
           title: actionData.title.trim(),
           description: actionData.description.trim(),
           category: categoryMap[actionData.category] || 'otros',
@@ -567,7 +567,7 @@ export default function CreateActionScreen() {
 
         console.log('📋 Create Action: Service data with permissions:', serviceData);
         console.log('📋 Create Action: Permissions array:', actionData.permissions);
-        
+
         if (isEditMode && editItemId) {
           // Strip prefix and timestamp suffix from ID if present
           let cleanId = editItemId.replace(/^(event-|service-|product-)/, '');
@@ -587,10 +587,10 @@ export default function CreateActionScreen() {
           console.log('✅ Create Action: Service created successfully');
         }
 
-        const scheduleMessage = actionData.hasSchedule 
+        const scheduleMessage = actionData.hasSchedule
           ? `\n\n🗓️ Horarios configurados:\n• Días: ${actionData.selectedDays.join(', ')}\n• Horarios: ${actionData.timeSlots.join(', ')}\n• Período: ${actionData.startDate} - ${actionData.endDate}`
           : '';
-        
+
         Alert.alert(
           isEditMode ? 'Servicio Actualizado' : 'Servicio Creado',
           `Tu servicio "${actionData.title}" ha sido ${isEditMode ? 'actualizado' : 'creado'} exitosamente y aparecerá en tu tablero.${scheduleMessage}`,
@@ -618,7 +618,7 @@ export default function CreateActionScreen() {
         };
 
         const productData = {
-          providerId: currentUser.id,
+          providerId: String(currentUser.id),
           title: actionData.title.trim(),
           description: actionData.description.trim(),
           category: categoryMap[actionData.category] || 'otros',
@@ -630,7 +630,7 @@ export default function CreateActionScreen() {
         };
 
         console.log('🛍️ Create Action: Product data:', productData);
-        
+
         if (isEditMode && editItemId) {
           // Strip prefix and timestamp suffix from ID if present
           let cleanId = editItemId.replace(/^(event-|service-|product-)/, '');
@@ -649,7 +649,7 @@ export default function CreateActionScreen() {
           await addProduct(productData);
           console.log('✅ Create Action: Product created successfully');
         }
-        
+
         Alert.alert(
           isEditMode ? 'Producto Actualizado' : 'Producto Creado',
           `Tu producto "${actionData.title}" ha sido ${isEditMode ? 'actualizado' : 'creado'} exitosamente y aparecerá en tu tablero.`,
@@ -666,15 +666,13 @@ export default function CreateActionScreen() {
         }
 
         const lodgingData = {
-          hostId: currentUser.id,
+          hostId: String(currentUser.id),
           host: currentUser,
           title: actionData.title.trim(),
           description: actionData.description.trim(),
           type: actionData.lodgingType as any, // retreat-center, healing-space, etc.
           pricePerNight: actionData.isFree ? 0 : (parseFloat(actionData.price) || 0),
-          images: actionData.images.length > 0 ? actionData.images : [
-            'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop'
-          ],
+          images: actionData.images.length > 0 ? actionData.images : [], // No fallback image
           location: actionData.location || 'Por definir',
           amenities: actionData.amenities,
           maxGuests: parseInt(actionData.maxGuests) || 4,
@@ -684,7 +682,7 @@ export default function CreateActionScreen() {
         };
 
         console.log('🏡 Create Action: Lodging data:', lodgingData);
-        
+
         if (isEditMode && editItemId) {
           let cleanId = editItemId.replace(/^(event-|service-|product-|lodging-)/, '');
           console.log('🏡 Create Action: Updating existing lodging:', cleanId);
@@ -695,7 +693,7 @@ export default function CreateActionScreen() {
           await addLodging(lodgingData);
           console.log('✅ Create Action: Lodging created successfully');
         }
-        
+
         Alert.alert(
           isEditMode ? 'Alojamiento Actualizado' : 'Alojamiento Creado',
           `Tu alojamiento "${actionData.title}" ha sido ${isEditMode ? 'actualizado' : 'creado'} exitosamente y aparecerá en descubrir.`,
@@ -742,7 +740,7 @@ export default function CreateActionScreen() {
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>¿Qué quieres crear?</Text>
       <Text style={styles.stepSubtitle}>Elige el tipo de acción que deseas compartir</Text>
-      
+
       {/* Replace ACTION_TYPES mapping with static options or remove if not needed */}
       <View style={styles.typeGrid}>
         {/* Example static buttons for 'event', 'service', 'product', 'lodging' */}
@@ -800,7 +798,7 @@ export default function CreateActionScreen() {
       <Text style={styles.stepSubtitle}>
         Cuéntanos sobre tu {getTypeLabel(actionData.type)}
       </Text>
-      
+
       <View style={styles.formGroup}>
         <Text style={styles.label}>
           Título <Text style={styles.required}>*</Text>
@@ -892,8 +890,8 @@ export default function CreateActionScreen() {
               />
             </View>
             <Text style={styles.inputHelper}>
-              {actionData.isRecurring 
-                ? 'Este evento ocurrirá múltiples veces en el rango de fechas seleccionado' 
+              {actionData.isRecurring
+                ? 'Este evento ocurrirá múltiples veces en el rango de fechas seleccionado'
                 : 'Este evento ocurrirá solo una vez'}
             </Text>
           </View>
@@ -1107,7 +1105,7 @@ export default function CreateActionScreen() {
                   Días disponibles <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={styles.daysGrid}>
-                  {[ 
+                  {[
                     { id: 'monday', label: 'Lun', fullName: 'Lunes' },
                     { id: 'tuesday', label: 'Mar', fullName: 'Martes' },
                     { id: 'wednesday', label: 'Mié', fullName: 'Miércoles' },
@@ -1339,7 +1337,7 @@ export default function CreateActionScreen() {
             } else if (actionData.type === 'product') {
               permissionOptions = ['Ver detalles', 'Comprar', 'Comentar', 'Compartir', 'Contactar'];
             }
-            
+
             return permissionOptions.map((permission) => {
               const isSelected = actionData.permissions.includes(permission);
               return (
@@ -1347,7 +1345,7 @@ export default function CreateActionScreen() {
                   key={permission}
                   style={[styles.permissionButton, isSelected && styles.permissionButtonSelected]}
                   onPress={() => {
-                    const newPermissions = isSelected 
+                    const newPermissions = isSelected
                       ? actionData.permissions.filter(p => p !== permission)
                       : [...actionData.permissions, permission];
                     updateData('permissions', newPermissions);
@@ -1439,7 +1437,7 @@ export default function CreateActionScreen() {
                         <CalendarIcon size={16} color={Colors.textLight} />
                         <Text style={styles.reviewDetailText}>
                           {actionData.selectedDays.map(day => {
-                            const dayMap: {[key: string]: string} = {
+                            const dayMap: { [key: string]: string } = {
                               'monday': 'Lun',
                               'tuesday': 'Mar',
                               'wednesday': 'Mié',
@@ -1554,7 +1552,7 @@ export default function CreateActionScreen() {
               <Text style={styles.navButtonText}>Anterior</Text>
             </TouchableOpacity>
           )}
-          
+
           <TouchableOpacity
             style={[
               styles.navButton,
@@ -1564,8 +1562,8 @@ export default function CreateActionScreen() {
             onPress={currentStep === totalSteps ? handleSubmit : nextStep}
           >
             <Text style={styles.navButtonPrimaryText}>
-              {currentStep === totalSteps 
-                ? (isEditMode ? 'Guardar' : 'Crear') 
+              {currentStep === totalSteps
+                ? (isEditMode ? 'Guardar' : 'Crear')
                 : 'Siguiente'}
             </Text>
             {/* Removed chevron icon for Siguiente button as requested */}
@@ -1589,7 +1587,7 @@ export default function CreateActionScreen() {
             <Text style={styles.modalExample}>
               Ejemplo: 10:00-12:00 o 14:30-16:30
             </Text>
-            
+
             <TextInput
               style={styles.modalInput}
               placeholder="10:00-12:00"
@@ -1599,7 +1597,7 @@ export default function CreateActionScreen() {
               autoCapitalize="none"
               autoCorrect={false}
             />
-            
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancelButton]}
@@ -1610,7 +1608,7 @@ export default function CreateActionScreen() {
               >
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalConfirmButton]}
                 onPress={() => {
@@ -1627,7 +1625,7 @@ export default function CreateActionScreen() {
                     Alert.alert('Error', 'Este horario ya existe');
                     return;
                   }
-                  
+
                   const timeSlots = [...actionData.timeSlots, newTimeSlot];
                   updateData('timeSlots', timeSlots);
                   setIsTimeSlotModalVisible(false);
@@ -1951,15 +1949,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navButtonPrimaryText: {
-  fontSize: 18,
-  fontWeight: '700',
-  color: Colors.white,
-  textAlignVertical: 'center',
-  textAlign: 'center',
-  paddingVertical: 0,
-  includeFontPadding: false,
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.white,
+    textAlignVertical: 'center',
+    textAlign: 'center',
+    paddingVertical: 0,
+    includeFontPadding: false,
   },
-  
+
   // Schedule styles
   scheduleSection: {
     backgroundColor: Colors.white,
@@ -2058,7 +2056,7 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '500',
   },
-  
+
   // Modal styles
   modalOverlay: {
     flex: 1,

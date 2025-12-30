@@ -1,134 +1,201 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getApiBaseUrl } from '@/utils/api-config';
+import { useUser } from '@/hooks/user-store';
 
 export interface Product {
   id: string;
   providerId: string;
+  providerName?: string;
+  providerAvatar?: string;
   title: string;
   description: string;
   category: string;
   price: number;
-  images?: string[];
+  images: string[];
   tags: string[];
+  specifications?: string;
+  features?: string;
+  inStock: boolean;
+  stockCount: number;
+  shippingInfo?: string;
   createdAt: string;
   updatedAt: string;
-  
-  // Product-specific fields
-  inventory?: number;
-  isDigital: boolean;
-  isAvailable: boolean;
+}
+
+export interface ProductCartItem {
+  id: string;
+  product: Product;
+  quantity: number;
+  price: number;
 }
 
 interface ProductsContextType {
   products: Product[];
-  addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
-  updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
+  isLoading: boolean;
+  addProduct: (product: any) => Promise<any>;
+  updateProduct: (id: string, updates: any) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   getUserProducts: (userId: string) => Product[];
-  getProductsByCategory: (category: string) => Product[];
+
+  // Cart
+  cart: ProductCartItem[];
+  addToCart: (product: Product, quantity?: number) => void;
+  removeFromCart: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
+  clearCart: () => void;
+  cartTotal: number;
 }
 
 const ProductsContext = createContext<ProductsContextType | undefined>(undefined);
 
-const PRODUCTS_STORAGE_KEY = '@rork_products';
+const PRODUCT_CART_KEY = '@rork_product_cart';
 
 export const ProductsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const queryClient = useQueryClient();
+  const { currentUser } = useUser();
+  const [cart, setCart] = useState<ProductCartItem[]>([]);
 
-  // Load products from storage
+  // Fetch products from API
+  const { data: products = [], isLoading } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const response = await fetch(`${getApiBaseUrl()}/api/products`);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return await response.json();
+    }
+  });
+
+  // Load cart from storage
   useEffect(() => {
-    loadProducts();
+    const loadCart = async () => {
+      try {
+        const storedCart = await AsyncStorage.getItem(PRODUCT_CART_KEY);
+        if (storedCart) {
+          setCart(JSON.parse(storedCart));
+        }
+      } catch (error) {
+        console.error('Error loading product cart:', error);
+      }
+    };
+    loadCart();
   }, []);
 
-  const loadProducts = async () => {
-    try {
-      const storedProducts = await AsyncStorage.getItem(PRODUCTS_STORAGE_KEY);
-      if (storedProducts) {
-        const parsedProducts = JSON.parse(storedProducts);
-        console.log('📦 Products Store: Loaded', parsedProducts.length, 'products');
-        setProducts(parsedProducts);
-      }
-    } catch (error) {
-      console.error('📦 Products Store: Error loading products:', error);
+  // Save cart to storage
+  useEffect(() => {
+    AsyncStorage.setItem(PRODUCT_CART_KEY, JSON.stringify(cart));
+  }, [cart]);
+
+  const addProductMutation = useMutation({
+    mutationFn: async (productData: any) => {
+      const response = await fetch(`${getApiBaseUrl()}/api/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...productData,
+          providerId: currentUser?.id
+        }),
+      });
+      if (!response.ok) throw new Error('Failed to create product');
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     }
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
+      const response = await fetch(`${getApiBaseUrl()}/api/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) throw new Error('Failed to update product');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    }
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`${getApiBaseUrl()}/api/products/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete product');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    }
+  });
+
+  const addProduct = async (productData: any) => {
+    return await addProductMutation.mutateAsync(productData);
   };
 
-  const saveProducts = async (updatedProducts: Product[]) => {
-    try {
-      await AsyncStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(updatedProducts));
-      console.log('📦 Products Store: Saved', updatedProducts.length, 'products');
-    } catch (error) {
-      console.error('📦 Products Store: Error saving products:', error);
-    }
-  };
-
-  const addProduct = async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      const newProduct: Product = {
-        ...productData,
-        id: `product-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const updatedProducts = [...products, newProduct];
-      setProducts(updatedProducts);
-      await saveProducts(updatedProducts);
-      
-      console.log('✅ Products Store: Product created:', newProduct.title);
-    } catch (error) {
-      console.error('📦 Products Store: Error creating product:', error);
-      throw error;
-    }
-  };
-
-  const updateProduct = async (id: string, updates: Partial<Product>) => {
-    try {
-      const updatedProducts = products.map(product =>
-        product.id === id
-          ? { ...product, ...updates, updatedAt: new Date().toISOString() }
-          : product
-      );
-      
-      setProducts(updatedProducts);
-      await saveProducts(updatedProducts);
-      
-      console.log('✅ Products Store: Product updated:', id);
-    } catch (error) {
-      console.error('📦 Products Store: Error updating product:', error);
-      throw error;
-    }
+  const updateProduct = async (id: string, updates: any) => {
+    await updateProductMutation.mutateAsync({ id, updates });
   };
 
   const deleteProduct = async (id: string) => {
-    try {
-      const updatedProducts = products.filter(product => product.id !== id);
-      setProducts(updatedProducts);
-      await saveProducts(updatedProducts);
-      
-      console.log('✅ Products Store: Product deleted:', id);
-    } catch (error) {
-      console.error('📦 Products Store: Error deleting product:', error);
-      throw error;
-    }
+    await deleteProductMutation.mutateAsync(id);
   };
 
   const getUserProducts = (userId: string): Product[] => {
-    return products.filter(product => product.providerId === userId);
+    return products.filter((p: Product) => p.providerId.toString() === userId);
   };
 
-  const getProductsByCategory = (category: string): Product[] => {
-    return products.filter(product => product.category === category);
-  };
+  // Cart Logic
+  const addToCart = useCallback((product: Product, quantity: number = 1) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + quantity, price: product.price * (item.quantity + quantity) }
+            : item
+        );
+      }
+      return [...prev, { id: product.id, product, quantity, price: product.price * quantity }];
+    });
+  }, []);
+
+  const removeFromCart = useCallback((productId: string) => {
+    setCart(prev => prev.filter(item => item.id !== productId));
+  }, []);
+
+  const updateQuantity = useCallback((productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setCart(prev => prev.map(item =>
+      item.id === productId ? { ...item, quantity, price: item.product.price * quantity } : item
+    ));
+  }, [removeFromCart]);
+
+  const clearCart = useCallback(() => {
+    setCart([]);
+  }, []);
+
+  const cartTotal = cart.reduce((total, item) => total + item.price, 0);
 
   return (
     <ProductsContext.Provider value={{
       products,
+      isLoading,
       addProduct,
       updateProduct,
       deleteProduct,
       getUserProducts,
-      getProductsByCategory,
+      cart,
+      addToCart,
+      removeFromCart,
+      updateQuantity,
+      clearCart,
+      cartTotal,
     }}>
       {children}
     </ProductsContext.Provider>

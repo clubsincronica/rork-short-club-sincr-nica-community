@@ -12,6 +12,7 @@ import { ServicesProvider } from '@/hooks/services-store';
 import CustomSplashScreen from '@/components/SplashScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/app-settings-store';
+import { NotificationProvider } from '@/hooks/notification-store';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -161,15 +162,17 @@ export default function RootLayout() {
         <AppSettingsProvider>
           <UserProvider>
             <CalendarProvider>
-              <ServicesProvider>
-                <ProductsProvider>
-                  <VendorProvider>
-                    <GestureHandlerRootView style={styles.rootContainer}>
-                      <RootLayoutNav />
-                    </GestureHandlerRootView>
-                  </VendorProvider>
-                </ProductsProvider>
-              </ServicesProvider>
+              <NotificationProvider>
+                <ServicesProvider>
+                  <ProductsProvider>
+                    <VendorProvider>
+                      <GestureHandlerRootView style={styles.rootContainer}>
+                        <RootLayoutNav />
+                      </GestureHandlerRootView>
+                    </VendorProvider>
+                  </ProductsProvider>
+                </ServicesProvider>
+              </NotificationProvider>
             </CalendarProvider>
           </UserProvider>
         </AppSettingsProvider>

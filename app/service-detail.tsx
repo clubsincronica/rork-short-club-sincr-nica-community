@@ -197,11 +197,9 @@ export default function ServiceDetailScreen() {
     );
   }
 
-  const serviceImages = [
-    'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=400&h=300&fit=crop'
-  ];
+  const serviceImages = (service?.images && service.images.length > 0)
+    ? service.images
+    : []; // No fallback image - show empty state or hide image section
 
   return (
     <View style={styles.container}>
@@ -287,8 +285,8 @@ export default function ServiceDetailScreen() {
               <Text style={styles.providerName}>{provider?.name || service.provider.name}</Text>
               <View style={styles.providerRating}>
                 <Star size={16} color={Colors.gold} />
-                <Text style={styles.ratingText}>0.0</Text>
-                <Text style={styles.reviewCount}>(0 reseñas)</Text>
+                <Text style={styles.ratingText}>{provider?.rating || '0.0'}</Text>
+                <Text style={styles.reviewCount}>({provider?.reviewCount || 0} reseñas)</Text>
               </View>
             </View>
             <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
@@ -298,7 +296,7 @@ export default function ServiceDetailScreen() {
           <View style={styles.detailsSection}>
             <View style={styles.detailItem}>
               <Clock size={18} color={Colors.primary} />
-              <Text style={styles.detailText}>Duración: 1-2 horas</Text>
+              <Text style={styles.detailText}>Duración: {service.duration ? `${service.duration} min` : '1-2 horas'}</Text>
             </View>
 
             <View style={styles.detailItem}>
@@ -318,27 +316,24 @@ export default function ServiceDetailScreen() {
           </View>
 
           {/* Features */}
-          <View style={styles.featuresSection}>
-            <Text style={styles.sectionTitle}>Incluido en el servicio</Text>
-            <View style={styles.featuresList}>
-              <View style={styles.featureItem}>
-                <CheckCircle size={16} color={Colors.success} />
-                <Text style={styles.featureText}>Consulta personalizada</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <CheckCircle size={16} color={Colors.success} />
-                <Text style={styles.featureText}>Material incluido</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <CheckCircle size={16} color={Colors.success} />
-                <Text style={styles.featureText}>Seguimiento post-servicio</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <CheckCircle size={16} color={Colors.success} />
-                <Text style={styles.featureText}>Garantía de satisfacción</Text>
+          {((service.tags && service.tags.length > 0) || (service as any).features?.length > 0) && (
+            <View style={styles.featuresSection}>
+              <Text style={styles.sectionTitle}>Incluido en el servicio</Text>
+              <View style={styles.featuresList}>
+                {(service as any).features ? (service as any).features.map((feature: string, index: number) => (
+                  <View key={`feature-${index}`} style={styles.featureItem}>
+                    <CheckCircle size={16} color={Colors.success} />
+                    <Text style={styles.featureText}>{feature}</Text>
+                  </View>
+                )) : service.tags.map((tag, index) => (
+                  <View key={`tag-${index}`} style={styles.featureItem}>
+                    <CheckCircle size={16} color={Colors.success} />
+                    <Text style={styles.featureText}>{tag}</Text>
+                  </View>
+                ))}
               </View>
             </View>
-          </View>
+          )}
 
           {/* Description */}
           <View style={styles.descriptionSection}>

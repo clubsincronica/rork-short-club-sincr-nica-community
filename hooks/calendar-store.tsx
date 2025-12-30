@@ -31,6 +31,7 @@ export const useCalendar = () => {
       events: [],
       upcomingEvents: [],
       reservations: [],
+      providerReservations: [],
       cart: [],
       settings: {
         isPublic: true,
@@ -46,6 +47,7 @@ export const useCalendar = () => {
       createReservation: () => Promise.resolve(null),
       updateReservation: () => Promise.resolve(false),
       deleteReservation: () => Promise.resolve(false),
+      updateAttendance: () => Promise.resolve(false),
       addToCart: () => { },
       removeFromCart: () => { },
       clearCart: () => { },
@@ -91,6 +93,23 @@ const useCalendarHook = () => {
         return [];
       }
     }
+  });
+
+  // Fetch provider reservations
+  const { data: providerReservations = [], isLoading: isProviderReservationsLoading } = useQuery({
+    queryKey: ['provider-reservations', currentUser?.id],
+    queryFn: async () => {
+      if (!currentUser) return [];
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/reservations/provider/${currentUser.id}`);
+        if (!response.ok) throw new Error('Failed to fetch provider reservations');
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching provider reservations:', error);
+        return [];
+      }
+    },
+    enabled: !!currentUser
   });
 
   // Load other local data
@@ -267,66 +286,90 @@ const useCalendarHook = () => {
 
     if (!currentUser) {
       console.warn('No current user found for reservation');
-      return;
+      return null;
     }
 
     let event: CalendarEvent | undefined;
     if (typeof eventIdOrEvent === 'string') {
-      // Find event by ID in the events array
       event = events.find((e: CalendarEvent) => e.id === eventIdOrEvent);
       if (!event) {
         console.warn('Event not found for reservation:', eventIdOrEvent);
-        return;
+        return null;
       }
     } else {
-      // Use the provided event object directly
       event = eventIdOrEvent;
       console.log('📝 Using provided event object directly:', event.id);
     }
 
-    const reservation: Reservation = {
-      id: `res_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      eventId: event.id,
-      event,
-      userId: currentUser.id.toString(),
-      user: currentUser,
-      status: settings.autoConfirmReservations ? 'confirmed' : 'pending',
+    const reservationData = {
+      eventId: parseInt(event.id),
+      userId: currentUser.id,
+      providerId: parseInt(event.providerId),
+      status: 'confirmed',
       numberOfSpots,
       totalPrice: event.price * numberOfSpots,
-      paymentStatus: 'pending',
+      paymentStatus: paymentMethod === 'free' ? 'completed' : 'pending',
       paymentMethod,
-      createdAt: new Date().toISOString(),
-      isCheckedIn: false,
+      notes: ''
     };
 
-    // Generate QR ticket for confirmed reservations
-    if (reservation.status === 'confirmed') {
-      try {
-        const tickets = TicketGenerator.generateTicketsForReservation(reservation);
-        if (tickets.length > 0) {
-          reservation.ticketQRCode = tickets[0].qrData; // Store first ticket's QR code
-          console.log('🎫 Generated QR ticket for reservation:', reservation.id);
-        }
-      } catch (error) {
-        console.error('Error generating QR ticket:', error);
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/reservations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reservationData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create reservation on server');
       }
+
+      const result = await response.json();
+
+      const reservation: Reservation = {
+        id: result.id.toString(),
+        eventId: event.id,
+        event,
+        userId: currentUser.id.toString(),
+        user: currentUser,
+        status: 'confirmed',
+        numberOfSpots,
+        totalPrice: reservationData.totalPrice,
+        paymentStatus: reservationData.paymentStatus as any,
+        paymentMethod,
+        createdAt: new Date().toISOString(),
+        isCheckedIn: false,
+      };
+
+      // Generate QR ticket for confirmed reservations
+      if (reservation.status === 'confirmed') {
+        try {
+          const tickets = TicketGenerator.generateTicketsForReservation(reservation);
+          if (tickets.length > 0) {
+            reservation.ticketQRCode = tickets[0].qrData;
+            console.log('🎫 Generated QR ticket for reservation:', reservation.id);
+          }
+        } catch (error) {
+          console.error('Error generating QR ticket:', error);
+        }
+      }
+
+      const updatedReservations = [...reservations, reservation];
+      await AsyncStorage.setItem(STORAGE_KEYS.RESERVATIONS, JSON.stringify(updatedReservations));
+      setReservations(updatedReservations);
+
+      // Update event participants count
+      await updateEvent(event.id, {
+        currentParticipants: event.currentParticipants + numberOfSpots,
+      });
+
+      return reservation;
+    } catch (error) {
+      console.error('❌ Error creating reservation:', error);
+      return null;
     }
-
-    console.log('📝 Created reservation object:', reservation);
-
-    const updatedReservations = [...reservations, reservation];
-    console.log('📝 Updated reservations array:', updatedReservations);
-
-    await AsyncStorage.setItem(STORAGE_KEYS.RESERVATIONS, JSON.stringify(updatedReservations));
-    setReservations(updatedReservations);
-
-    // Update event participants count
-    await updateEvent(event.id, {
-      currentParticipants: event.currentParticipants + numberOfSpots,
-    });
-
-    return reservation;
-  }, [currentUser, events, reservations, settings.autoConfirmReservations, updateEvent]);
+  }, [currentUser, events, reservations, updateEvent]);
 
   // Cancel reservation
   const cancelReservation = useCallback(async (reservationId: string) => {
@@ -347,6 +390,30 @@ const useCalendarHook = () => {
       });
     }
   }, [reservations, events, updateEvent]);
+
+  // Update attendance
+  const updateAttendance = useCallback(async (reservationId: string, attended: boolean) => {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/api/reservations/${reservationId}/attendance`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attended })
+      });
+
+      if (!response.ok) throw new Error('Failed to update attendance');
+
+      const updatedReservations = reservations.map((r: Reservation) =>
+        r.id === reservationId ? { ...r, isCheckedIn: attended, checkInTime: attended ? new Date().toISOString() : undefined } : r
+      );
+
+      await AsyncStorage.setItem(STORAGE_KEYS.RESERVATIONS, JSON.stringify(updatedReservations));
+      setReservations(updatedReservations);
+      return true;
+    } catch (error) {
+      console.error('Error updating attendance:', error);
+      return false;
+    }
+  }, [reservations]);
 
   // Update settings
   const updateSettings = useCallback(async (newSettings: Partial<UserCalendarSettings>) => {
@@ -519,6 +586,7 @@ const useCalendarHook = () => {
     isLoading,
     userEvents,
     userReservations,
+    providerReservations,
     upcomingEvents,
     cartTotal,
     addEvent,
@@ -531,9 +599,11 @@ const useCalendarHook = () => {
     cancelReservation,
     updateSettings,
     checkoutCart,
+    updateAttendance,
   }), [
     events,
     reservations,
+    providerReservations,
     cart,
     settings,
     isLoading,
@@ -551,12 +621,14 @@ const useCalendarHook = () => {
     cancelReservation,
     updateSettings,
     checkoutCart,
+    updateAttendance,
   ]);
 
   return {
     events,
     userEvents,
     userReservations,
+    providerReservations,
     cart,
     cartTotal,
     settings,
@@ -571,6 +643,7 @@ const useCalendarHook = () => {
     cancelReservation,
     updateSettings,
     checkoutCart,
+    updateAttendance,
   };
 };
 

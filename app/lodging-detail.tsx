@@ -18,12 +18,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useLodging } from '@/hooks/lodging-store';
 import { useCalendar } from '@/hooks/calendar-store';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Star, 
-  MessageCircle, 
-  Phone, 
+import {
+  ArrowLeft,
+  MapPin,
+  Star,
+  MessageCircle,
+  Phone,
   Mail,
   Calendar,
   Clock,
@@ -58,7 +58,7 @@ const MONTHS = [
 export default function LodgingDetailScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { getLodgingById } = useLodging();
+  const { lodgings: allLodgings } = useLodging();
   const { addToCart } = useCalendar();
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -70,56 +70,34 @@ export default function LodgingDetailScreen() {
   const [showGuestsModal, setShowGuestsModal] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectingCheckIn, setSelectingCheckIn] = useState(true);
-  
-  // Get lodging from store by ID
-  const lodgingId = params.lodgingId as string || '1';
-  const lodging = getLodgingById(lodgingId);
-  
-  // Fallback mock data if lodging not found in store
-  const mockLodging = {
-    id: '1',
-    title: 'Acogedor Apartamento en el Centro de Madrid',
-    description: 'Hermoso apartamento completamente renovado en el corazón de Madrid. Perfecto para parejas o viajeros de negocios. A solo 5 minutos andando del Puerta del Sol y cerca de todos los principales puntos de interés turístico.',
-    host: {
-      id: '1',
-      name: 'Carlos Mendoza',
-      email: 'carlos@clubsincronica.com',
-      avatar: 'https://via.placeholder.com/60',
-      location: 'Madrid, España',
-      bio: 'Host verificado',
-      coordinates: { latitude: 40.4168, longitude: -3.7038 },
-      specialties: [],
-      isServiceProvider: false,
-      rating: 4.7,
-      reviewCount: 156,
-      joinedDate: '2020-01-01',
-      verified: true,
-    },
-    hostId: '1',
-    pricePerNight: 75,
-    images: [
-      'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1560448204-e9b388ada75e?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1515263487990-61b07816b924?w=400&h=300&fit=crop',
-      'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=400&h=300&fit=crop'
-    ],
-    type: 'retreat-center' as any,
-    location: 'Centro, Madrid, España',
-    amenities: ['WiFi gratuito', 'Cocina completa', 'TV por cable', 'Aire acondicionado'],
-    maxGuests: 4,
-    rating: 4.7,
-    reviewCount: 23,
-    availableDates: [],
-  };
-  
-  const displayLodging = lodging || mockLodging;
-  
+
+  // Get lodging from store by ID or Title (for deep linking)
+  const lodgingId = params.lodgingId as string;
+  const lodgingName = params.lodgingName as string;
+
+  const displayLodging = useMemo(() => {
+    if (!lodgingId && !lodgingName) return null;
+    return allLodgings.find(l =>
+      (lodgingId && l.id === lodgingId) ||
+      (lodgingName && l.title === lodgingName)
+    ) || null;
+  }, [lodgingId, lodgingName, allLodgings]);
+
   if (!displayLodging) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={[styles.sectionTitle, { marginBottom: 16 }]}>Alojamiento no encontrado</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: Colors.primary, fontSize: 16 }}>Volver</Text>
+      <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <Home size={64} color={Colors.textLight} style={{ marginBottom: 20 }} />
+        <Text style={[styles.lodgingTitle, { textAlign: 'center', marginBottom: 12 }]}>
+          Alojamiento no encontrado
+        </Text>
+        <Text style={{ color: Colors.textLight, textAlign: 'center', marginBottom: 24, fontSize: 16 }}>
+          No pudimos encontrar los detalles del lugar solicitado.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: Colors.gold, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
+          onPress={() => router.back()}
+        >
+          <Text style={{ color: Colors.textOnGold, fontWeight: '700', fontSize: 16 }}>Volver</Text>
         </TouchableOpacity>
       </View>
     );
@@ -132,14 +110,14 @@ export default function LodgingDetailScreen() {
     }
 
     const totalPrice = displayLodging.pricePerNight * nights;
-    
+
     Alert.alert(
       'Confirmar Reserva',
       `¿Reservar ${nights} ${nights === 1 ? 'noche' : 'noches'} para ${guests} ${guests === 1 ? 'huésped' : 'huéspedes'} por €${totalPrice.toFixed(2)}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Reservar', 
+        {
+          text: 'Reservar',
           onPress: () => {
             // Create a calendar event-like object for the cart
             const lodgingEvent = {
@@ -171,9 +149,9 @@ export default function LodgingDetailScreen() {
 
             // Add to cart
             addToCart(lodgingEvent.id, nights, lodgingEvent as any);
-            
+
             Alert.alert(
-              '¡Agregado al Carrito!', 
+              '¡Agregado al Carrito!',
               'Tu reserva ha sido agregada al carrito. Procede al pago para confirmar.',
               [
                 {
@@ -195,8 +173,8 @@ export default function LodgingDetailScreen() {
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Mensaje', onPress: () => router.push('/(tabs)/messages') },
-        { 
-          text: 'Ver Perfil', 
+        {
+          text: 'Ver Perfil',
           onPress: () => router.push({
             pathname: '/user-profile',
             params: { userName: displayLodging.host.name }
@@ -221,8 +199,8 @@ export default function LodgingDetailScreen() {
     setIsFavorite(!isFavorite);
     Alert.alert(
       'Favoritos',
-      isFavorite ? 
-        'Alojamiento eliminado de favoritos' : 
+      isFavorite ?
+        'Alojamiento eliminado de favoritos' :
         'Alojamiento agregado a favoritos'
     );
   };
@@ -339,385 +317,385 @@ export default function LodgingDetailScreen() {
 
   return (
     <>
-    <ScrollView 
-      style={[styles.container, { paddingTop: insets.top }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableScale 
-          style={styles.headerButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft size={24} color={Colors.white} />
-        </TouchableScale>
-        
-        <View style={styles.headerActions}>
-          <TouchableScale 
+      <ScrollView
+        style={[styles.container, { paddingTop: insets.top }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableScale
             style={styles.headerButton}
-            onPress={handleFavorite}
+            onPress={() => router.back()}
           >
-            <Heart size={24} color={Colors.white} fill={isFavorite} />
+            <ArrowLeft size={24} color={Colors.white} />
           </TouchableScale>
-          
-          <TouchableScale 
-            style={styles.headerButton}
-            onPress={handleShare}
-          >
-            <Share size={24} color={Colors.white} />
-          </TouchableScale>
-        </View>
-      </View>
 
-      {/* Main Image */}
-      <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: displayLodging.images[selectedImageIndex] }}
-          style={styles.mainImage}
-        />
-        
-        {/* Image Gallery */}
-        <FlatList
-          data={displayLodging.images}
-          renderItem={renderImageItem}
-          keyExtractor={(_, index) => index.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.imageGallery}
-          contentContainerStyle={styles.imageGalleryContent}
-        />
-      </View>
+          <View style={styles.headerActions}>
+            <TouchableScale
+              style={styles.headerButton}
+              onPress={handleFavorite}
+            >
+              <Heart size={24} color={Colors.white} fill={isFavorite} />
+            </TouchableScale>
 
-      {/* Lodging Info */}
-      <View style={styles.lodgingInfo}>
-        {/* Title and Type */}
-        <View style={styles.titleSection}>
-          <Text style={styles.lodgingTitle}>{displayLodging.title}</Text>
-          <View style={styles.typeTag}>
-            <Text style={styles.typeText}>{displayLodging.type}</Text>
+            <TouchableScale
+              style={styles.headerButton}
+              onPress={handleShare}
+            >
+              <Share size={24} color={Colors.white} />
+            </TouchableScale>
           </View>
         </View>
 
-        {/* Capacity and Rating */}
-        <View style={styles.capacityRatingSection}>
-          <View style={styles.capacityInfo}>
-            <Users size={18} color={Colors.primary} />
-            <Text style={styles.capacityText}>
-              {displayLodging.maxGuests} huéspedes
-            </Text>
-          </View>
-          
-          <View style={styles.ratingInfo}>
-            <Star size={16} color={Colors.gold} />
-            <Text style={styles.ratingText}>{displayLodging.rating}</Text>
-            <Text style={styles.reviewCount}>({displayLodging.reviewCount} reseñas)</Text>
-          </View>
-        </View>
-
-        {/* Location */}
-        <TouchableScale 
-          style={styles.locationSection}
-          onPress={handleViewLocation}
-        >
-          <MapPin size={20} color={Colors.primary} />
-          <Text style={styles.locationText}>{displayLodging.location}</Text>
-          <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
-        </TouchableScale>
-
-        {/* Host Info */}
-        <TouchableScale 
-          style={styles.hostSection}
-          onPress={handleContactHost}
-        >
-          <Image 
-            source={{ uri: displayLodging.host.avatar }}
-            style={styles.hostAvatar}
+        {/* Main Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: displayLodging.images[selectedImageIndex] }}
+            style={styles.mainImage}
           />
-          <View style={styles.hostInfo}>
-            <View style={styles.hostNameRow}>
-              <Text style={styles.hostName}>{displayLodging.host.name}</Text>
-              {displayLodging.host.verified && (
-                <Award size={16} color={Colors.success} />
-              )}
-            </View>
-            <View style={styles.hostStats}>
-              <Text style={styles.hostStat}>Anfitrión verificado</Text>
-            </View>
-          </View>
-          <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
-        </TouchableScale>
 
-        {/* Price Section */}
-        <View style={styles.priceSection}>
-          <View style={styles.priceInfo}>
-            <View style={styles.priceRow}>
-              <Text style={styles.currentPrice}>€{displayLodging.pricePerNight.toFixed(2)}</Text>
+          {/* Image Gallery */}
+          <FlatList
+            data={displayLodging.images}
+            renderItem={renderImageItem}
+            keyExtractor={(_, index) => index.toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.imageGallery}
+            contentContainerStyle={styles.imageGalleryContent}
+          />
+        </View>
+
+        {/* Lodging Info */}
+        <View style={styles.lodgingInfo}>
+          {/* Title and Type */}
+          <View style={styles.titleSection}>
+            <Text style={styles.lodgingTitle}>{displayLodging.title}</Text>
+            <View style={styles.typeTag}>
+              <Text style={styles.typeText}>{displayLodging.type}</Text>
             </View>
-            <Text style={styles.priceUnit}>por noche</Text>
           </View>
-          
-          <View style={styles.selectors}>
-            <TouchableScale 
-              style={styles.dateSelector}
-              onPress={handleDateSelection}
-            >
-              <Calendar size={16} color={Colors.primary} />
-              <Text style={styles.dateSelectorText}>
-                {checkInDate && checkOutDate 
-                  ? `${checkInDate.getDate()} ${MONTHS[checkInDate.getMonth()].substring(0, 3).toLowerCase()} - ${checkOutDate.getDate()} ${MONTHS[checkOutDate.getMonth()].substring(0, 3).toLowerCase()}` 
-                  : 'Seleccionar fechas'}
+
+          {/* Capacity and Rating */}
+          <View style={styles.capacityRatingSection}>
+            <View style={styles.capacityInfo}>
+              <Users size={18} color={Colors.primary} />
+              <Text style={styles.capacityText}>
+                {displayLodging.maxGuests} huéspedes
               </Text>
-            </TouchableScale>
+            </View>
 
-            <TouchableScale 
-              style={styles.guestsSelector}
-              onPress={handleGuestsSelection}
-            >
-              <Users size={16} color={Colors.primary} />
-              <Text style={styles.dateSelectorText}>
-                {guests} {guests === 1 ? 'huésped' : 'huéspedes'}
-              </Text>
-            </TouchableScale>
+            <View style={styles.ratingInfo}>
+              <Star size={16} color={Colors.gold} />
+              <Text style={styles.ratingText}>{displayLodging.rating}</Text>
+              <Text style={styles.reviewCount}>({displayLodging.reviewCount} reseñas)</Text>
+            </View>
           </View>
-        </View>
 
-        {/* Booking Summary */}
-        <View style={styles.bookingSummary}>
-          <Text style={styles.summaryTitle}>Resumen de la estancia</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>€{displayLodging.pricePerNight.toFixed(2)} x {nights} noches</Text>
-            <Text style={styles.summaryValue}>€{(displayLodging.pricePerNight * nights).toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tarifa de limpieza</Text>
-            <Text style={styles.summaryValue}>€15.00</Text>
-          </View>
-          <View style={styles.summaryDivider} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryTotal}>Total</Text>
-            <Text style={styles.summaryTotalValue}>€{(displayLodging.pricePerNight * nights + 15).toFixed(2)}</Text>
-          </View>
-        </View>
+          {/* Location */}
+          <TouchableScale
+            style={styles.locationSection}
+            onPress={handleViewLocation}
+          >
+            <MapPin size={20} color={Colors.primary} />
+            <Text style={styles.locationText}>{displayLodging.location}</Text>
+            <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableScale>
 
-        {/* Description */}
-        <View style={styles.descriptionSection}>
-          <Text style={styles.sectionTitle}>Descripción</Text>
-          <Text style={styles.descriptionText}>{displayLodging.description}</Text>
-        </View>
-
-        {/* Amenities */}
-        <View style={styles.amenitiesSection}>
-          <Text style={styles.sectionTitle}>Servicios y comodidades</Text>
-          <View style={styles.amenitiesGrid}>
-            {displayLodging.amenities.map((amenity, index) => (
-              <View key={index} style={styles.amenityItem}>
-                <CheckCircle size={16} color={Colors.success} />
-                <Text style={styles.amenityText}>{amenity}</Text>
+          {/* Host Info */}
+          <TouchableScale
+            style={styles.hostSection}
+            onPress={handleContactHost}
+          >
+            <Image
+              source={{ uri: displayLodging.host.avatar }}
+              style={styles.hostAvatar}
+            />
+            <View style={styles.hostInfo}>
+              <View style={styles.hostNameRow}>
+                <Text style={styles.hostName}>{displayLodging.host.name}</Text>
+                {displayLodging.host.verified && (
+                  <Award size={16} color={Colors.success} />
+                )}
               </View>
-            ))}
+              <View style={styles.hostStats}>
+                <Text style={styles.hostStat}>Anfitrión verificado</Text>
+              </View>
+            </View>
+            <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
+          </TouchableScale>
+
+          {/* Price Section */}
+          <View style={styles.priceSection}>
+            <View style={styles.priceInfo}>
+              <View style={styles.priceRow}>
+                <Text style={styles.currentPrice}>€{displayLodging.pricePerNight.toFixed(2)}</Text>
+              </View>
+              <Text style={styles.priceUnit}>por noche</Text>
+            </View>
+
+            <View style={styles.selectors}>
+              <TouchableScale
+                style={styles.dateSelector}
+                onPress={handleDateSelection}
+              >
+                <Calendar size={16} color={Colors.primary} />
+                <Text style={styles.dateSelectorText}>
+                  {checkInDate && checkOutDate
+                    ? `${checkInDate.getDate()} ${MONTHS[checkInDate.getMonth()].substring(0, 3).toLowerCase()} - ${checkOutDate.getDate()} ${MONTHS[checkOutDate.getMonth()].substring(0, 3).toLowerCase()}`
+                    : 'Seleccionar fechas'}
+                </Text>
+              </TouchableScale>
+
+              <TouchableScale
+                style={styles.guestsSelector}
+                onPress={handleGuestsSelection}
+              >
+                <Users size={16} color={Colors.primary} />
+                <Text style={styles.dateSelectorText}>
+                  {guests} {guests === 1 ? 'huésped' : 'huéspedes'}
+                </Text>
+              </TouchableScale>
+            </View>
           </View>
+
+          {/* Booking Summary */}
+          <View style={styles.bookingSummary}>
+            <Text style={styles.summaryTitle}>Resumen de la estancia</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>€{displayLodging.pricePerNight.toFixed(2)} x {nights} noches</Text>
+              <Text style={styles.summaryValue}>€{(displayLodging.pricePerNight * nights).toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Tarifa de limpieza</Text>
+              <Text style={styles.summaryValue}>€15.00</Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryTotal}>Total</Text>
+              <Text style={styles.summaryTotalValue}>€{(displayLodging.pricePerNight * nights + 15).toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {/* Description */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>Descripción</Text>
+            <Text style={styles.descriptionText}>{displayLodging.description}</Text>
+          </View>
+
+          {/* Amenities */}
+          <View style={styles.amenitiesSection}>
+            <Text style={styles.sectionTitle}>Servicios y comodidades</Text>
+            <View style={styles.amenitiesGrid}>
+              {displayLodging.amenities.map((amenity, index) => (
+                <View key={index} style={styles.amenityItem}>
+                  <CheckCircle size={16} color={Colors.success} />
+                  <Text style={styles.amenityText}>{amenity}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* TODO: Add highlights, nearby places, rules, detailed ratings when extended lodging data is available */}
         </View>
 
-        {/* TODO: Add highlights, nearby places, rules, detailed ratings when extended lodging data is available */}
-      </View>
+        {/* Action Buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableScale
+            style={styles.contactButton}
+            onPress={handleContactHost}
+          >
+            <MessageCircle size={20} color={Colors.primary} />
+            <Text style={styles.contactButtonText}>Contactar</Text>
+          </TouchableScale>
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
-        <TouchableScale
-          style={styles.contactButton}
-          onPress={handleContactHost}
-        >
-          <MessageCircle size={20} color={Colors.primary} />
-          <Text style={styles.contactButtonText}>Contactar</Text>
-        </TouchableScale>
+          <TouchableScale
+            style={styles.bookButton}
+            onPress={handleBooking}
+          >
+            <Calendar size={20} color={Colors.white} />
+            <Text style={styles.bookButtonText}>Reservar</Text>
+          </TouchableScale>
+        </View>
 
-        <TouchableScale
-          style={styles.bookButton}
-          onPress={handleBooking}
-        >
-          <Calendar size={20} color={Colors.white} />
-          <Text style={styles.bookButtonText}>Reservar</Text>
-        </TouchableScale>
-      </View>
+        <View style={styles.bottomPadding} />
+      </ScrollView>
 
-      <View style={styles.bottomPadding} />
-    </ScrollView>
-
-    {/* Date Selection Modal */}
-    <Modal
-      visible={showDateModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowDateModal(false)}
-    >
-      <Pressable 
-        style={styles.modalOverlay}
-        onPress={() => setShowDateModal(false)}
+      {/* Date Selection Modal */}
+      <Modal
+        visible={showDateModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDateModal(false)}
       >
-        <Pressable 
-          style={[styles.modalContent, styles.calendarModalContent]}
-          onPress={(e) => e.stopPropagation()}
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowDateModal(false)}
         >
-          <Text style={styles.modalTitle}>Seleccionar Fechas de Estancia</Text>
-          
-          {/* Date selection indicators */}
-          <View style={styles.dateSelectionIndicators}>
-            <View style={styles.dateIndicator}>
-              <Text style={styles.dateIndicatorLabel}>Check-in</Text>
-              <Text style={styles.dateIndicatorValue}>
-                {checkInDate ? checkInDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : 'Seleccionar'}
-              </Text>
+          <Pressable
+            style={[styles.modalContent, styles.calendarModalContent]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.modalTitle}>Seleccionar Fechas de Estancia</Text>
+
+            {/* Date selection indicators */}
+            <View style={styles.dateSelectionIndicators}>
+              <View style={styles.dateIndicator}>
+                <Text style={styles.dateIndicatorLabel}>Check-in</Text>
+                <Text style={styles.dateIndicatorValue}>
+                  {checkInDate ? checkInDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : 'Seleccionar'}
+                </Text>
+              </View>
+              <View style={styles.nightsIndicator}>
+                <Text style={styles.nightsValue}>{nights}</Text>
+                <Text style={styles.nightsLabel}>{nights === 1 ? 'noche' : 'noches'}</Text>
+              </View>
+              <View style={styles.dateIndicator}>
+                <Text style={styles.dateIndicatorLabel}>Check-out</Text>
+                <Text style={styles.dateIndicatorValue}>
+                  {checkOutDate ? checkOutDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : 'Seleccionar'}
+                </Text>
+              </View>
             </View>
-            <View style={styles.nightsIndicator}>
-              <Text style={styles.nightsValue}>{nights}</Text>
-              <Text style={styles.nightsLabel}>{nights === 1 ? 'noche' : 'noches'}</Text>
-            </View>
-            <View style={styles.dateIndicator}>
-              <Text style={styles.dateIndicatorLabel}>Check-out</Text>
-              <Text style={styles.dateIndicatorValue}>
-                {checkOutDate ? checkOutDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : 'Seleccionar'}
+
+            {/* Calendar navigation */}
+            <View style={styles.calendarHeader}>
+              <TouchableOpacity onPress={handlePreviousMonth}>
+                <ChevronLeft size={24} color={Colors.primary} />
+              </TouchableOpacity>
+              <Text style={styles.calendarMonth}>
+                {MONTHS[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </Text>
+              <TouchableOpacity onPress={handleNextMonth}>
+                <ChevronRight size={24} color={Colors.primary} />
+              </TouchableOpacity>
             </View>
-          </View>
 
-          {/* Calendar navigation */}
-          <View style={styles.calendarHeader}>
-            <TouchableOpacity onPress={handlePreviousMonth}>
-              <ChevronLeft size={24} color={Colors.primary} />
-            </TouchableOpacity>
-            <Text style={styles.calendarMonth}>
-              {MONTHS[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-            </Text>
-            <TouchableOpacity onPress={handleNextMonth}>
-              <ChevronRight size={24} color={Colors.primary} />
-            </TouchableOpacity>
-          </View>
+            {/* Weekday headers */}
+            <View style={styles.calendarWeekdays}>
+              {WEEKDAYS.map(day => (
+                <Text key={day} style={styles.calendarWeekday}>
+                  {day}
+                </Text>
+              ))}
+            </View>
 
-          {/* Weekday headers */}
-          <View style={styles.calendarWeekdays}>
-            {WEEKDAYS.map(day => (
-              <Text key={day} style={styles.calendarWeekday}>
-                {day}
-              </Text>
-            ))}
-          </View>
+            {/* Calendar grid */}
+            <ScrollView style={styles.calendarScrollView}>
+              <View style={styles.calendarGrid}>
+                {calendarDays.map(day => {
+                  const isToday = day.toDateString() === new Date().toDateString();
+                  const isCheckIn = checkInDate && day.toDateString() === checkInDate.toDateString();
+                  const isCheckOut = checkOutDate && day.toDateString() === checkOutDate.toDateString();
+                  const isInRange = checkInDate && checkOutDate && day > checkInDate && day < checkOutDate;
+                  const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
+                  const isPast = day < new Date() && !isToday;
 
-          {/* Calendar grid */}
-          <ScrollView style={styles.calendarScrollView}>
-            <View style={styles.calendarGrid}>
-              {calendarDays.map(day => {
-                const isToday = day.toDateString() === new Date().toDateString();
-                const isCheckIn = checkInDate && day.toDateString() === checkInDate.toDateString();
-                const isCheckOut = checkOutDate && day.toDateString() === checkOutDate.toDateString();
-                const isInRange = checkInDate && checkOutDate && day > checkInDate && day < checkOutDate;
-                const isCurrentMonth = day.getMonth() === currentMonth.getMonth();
-                const isPast = day < new Date() && !isToday;
-
-                return (
-                  <TouchableOpacity
-                    key={day.toISOString()}
-                    style={[
-                      styles.calendarDay,
-                      isToday && styles.calendarDayToday,
-                      (isCheckIn || isCheckOut) && styles.calendarDaySelected,
-                      isInRange && styles.calendarDayInRange,
-                      !isCurrentMonth && styles.calendarDayOtherMonth,
-                      isPast && styles.calendarDayPast,
-                    ]}
-                    onPress={() => !isPast && handleDateSelect(day)}
-                    disabled={isPast}
-                  >
-                    <Text
+                  return (
+                    <TouchableOpacity
+                      key={day.toISOString()}
                       style={[
-                        styles.calendarDayText,
-                        isToday && styles.calendarDayTextToday,
-                        (isCheckIn || isCheckOut) && styles.calendarDayTextSelected,
-                        !isCurrentMonth && styles.calendarDayTextOtherMonth,
+                        styles.calendarDay,
+                        isToday && styles.calendarDayToday,
+                        (isCheckIn || isCheckOut) && styles.calendarDaySelected,
+                        isInRange && styles.calendarDayInRange,
+                        !isCurrentMonth && styles.calendarDayOtherMonth,
+                        isPast && styles.calendarDayPast,
                       ]}
+                      onPress={() => !isPast && handleDateSelect(day)}
+                      disabled={isPast}
                     >
-                      {day.getDate()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                      <Text
+                        style={[
+                          styles.calendarDayText,
+                          isToday && styles.calendarDayTextToday,
+                          (isCheckIn || isCheckOut) && styles.calendarDayTextSelected,
+                          !isCurrentMonth && styles.calendarDayTextOtherMonth,
+                        ]}
+                      >
+                        {day.getDate()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={handleResetDates}
+              >
+                <Text style={styles.modalCancelText}>Reiniciar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={handleSaveDates}
+                disabled={!checkInDate || !checkOutDate}
+              >
+                <Text style={styles.modalSaveText}>Confirmar</Text>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={handleResetDates}
-            >
-              <Text style={styles.modalCancelText}>Reiniciar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalSaveButton}
-              onPress={handleSaveDates}
-              disabled={!checkInDate || !checkOutDate}
-            >
-              <Text style={styles.modalSaveText}>Confirmar</Text>
-            </TouchableOpacity>
-          </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
 
-    {/* Guests Selection Modal */}
-    <Modal
-      visible={showGuestsModal}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setShowGuestsModal(false)}
-    >
-      <Pressable 
-        style={styles.modalOverlay}
-        onPress={() => setShowGuestsModal(false)}
+      {/* Guests Selection Modal */}
+      <Modal
+        visible={showGuestsModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowGuestsModal(false)}
       >
-        <Pressable 
-          style={styles.modalContent}
-          onPress={(e) => e.stopPropagation()}
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowGuestsModal(false)}
         >
-          <Text style={styles.modalTitle}>Número de Huéspedes</Text>
-          
-          <View style={styles.guestsContainer}>
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={() => setGuests(Math.max(1, guests - 1))}
-            >
-              <Text style={styles.guestButtonText}>-</Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.guestsCount}>{guests}</Text>
-            
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={() => setGuests(Math.min(displayLodging.maxGuests, guests + 1))}
-            >
-              <Text style={styles.guestButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
+          <Pressable
+            style={styles.modalContent}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <Text style={styles.modalTitle}>Número de Huéspedes</Text>
 
-          <Text style={styles.maxGuestsText}>
-            Máximo: {displayLodging.maxGuests} huéspedes
-          </Text>
+            <View style={styles.guestsContainer}>
+              <TouchableOpacity
+                style={styles.guestButton}
+                onPress={() => setGuests(Math.max(1, guests - 1))}
+              >
+                <Text style={styles.guestButtonText}>-</Text>
+              </TouchableOpacity>
 
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowGuestsModal(false)}
-            >
-              <Text style={styles.modalCancelText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalSaveButton}
-              onPress={handleSaveGuests}
-            >
-              <Text style={styles.modalSaveText}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
+              <Text style={styles.guestsCount}>{guests}</Text>
+
+              <TouchableOpacity
+                style={styles.guestButton}
+                onPress={() => setGuests(Math.min(displayLodging.maxGuests, guests + 1))}
+              >
+                <Text style={styles.guestButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.maxGuestsText}>
+              Máximo: {displayLodging.maxGuests} huéspedes
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowGuestsModal(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={handleSaveGuests}
+              >
+                <Text style={styles.modalSaveText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
     </>
   );
 }

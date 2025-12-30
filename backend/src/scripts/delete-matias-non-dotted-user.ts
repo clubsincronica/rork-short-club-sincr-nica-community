@@ -16,7 +16,7 @@ const pool = new Pool({
 
 async function main() {
   const client = await pool.connect();
-  const emails = ['matiascazeaux@gmail.com', 'eularra@gmail.com'];
+  const emails = ['matiascazeaux@gmail.com', 'matias.cazeaux@gmail.com@gmail.com'];
   try {
     for (const email of emails) {
       const result = await client.query('DELETE FROM users WHERE email = $1 RETURNING id, email, name, role', [email]);

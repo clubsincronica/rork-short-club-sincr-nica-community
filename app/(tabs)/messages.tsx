@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -45,11 +45,12 @@ export default function MessagesScreen() {
   } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
-  const scrollViewRef = useRef<ScrollView>(null);
-  const socketRef = useRef<ReturnType<typeof initSocket> | null>(null);
-  const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
   const [newMessageNotification, setNewMessageNotification] = useState<{
     senderName: string;
     senderAvatar?: string;
@@ -79,7 +80,14 @@ export default function MessagesScreen() {
             logger.debug(`     - ⚠️  ISSUE CHECK: Is name "${conv.name}" same as current user "${currentUser.name}"? ${conv.name === currentUser.name ? 'YES - BUG!' : 'No - OK'}`);
           });
         }
-        setConversations(data);
+        if (Array.isArray(data)) {
+          // Filter out any invalid items (null, undefined, or missing ID)
+          const validConversations = data.filter((item: any) => item && typeof item === 'object' && item.id);
+          setConversations(validConversations);
+        } else {
+          console.error('❌ Expected array of conversations but got:', typeof data, data);
+          setConversations([]);
+        }
       }
     } catch (error) {
       logger.error('Failed to load conversations:', error);
@@ -282,14 +290,14 @@ export default function MessagesScreen() {
           return prev;
         }
 
-        console.log('💬 Message added to local state');
-        return [...prev, {
+        console.log('💬 Message added to local state (prepended for inverted list)');
+        return [{
           id: message.id?.toString() || Date.now().toString(),
           text: message.text,
           senderId: message.sender_id?.toString(),
           sender: message.sender_id === currentUser.id ? 'me' : 'other',
           timestamp: new Date(message.created_at),
-        }];
+        }, ...prev];
       });
 
       // Return early based on whether we handled the message
@@ -306,27 +314,45 @@ export default function MessagesScreen() {
   }, [currentUser, isFocused, activeConversation]);
 
   // Load message history for active conversation
-  const loadConversationMessages = async (conversationId: number) => {
-    setIsLoadingMessages(true);
+  const loadConversationMessages = async (conversationId: number, pageNum = 1) => {
+    if (pageNum === 1) {
+      setIsLoadingMessages(true);
+      setPage(1);
+      setHasMore(true);
+    } else {
+      setIsFetchingMore(true);
+    }
+
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversationId}/messages`);
+      const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversationId}/messages?page=${pageNum}&limit=20`);
       if (response.ok) {
         const data = await response.json();
         // Backend returns { messages: [], page, limit, total }
         const messagesList = data.messages || [];
-        console.log('💬 Loaded messages:', messagesList.length);
-        setMessages(messagesList.map((msg: any) => ({
+        console.log('💬 Loaded messages:', messagesList.length, 'page:', pageNum);
+
+        const newMessages = messagesList.map((msg: any) => ({
           id: msg.id.toString(),
           text: msg.text,
           senderId: msg.sender_id.toString(),
           sender: msg.sender_id === currentUser?.id ? 'me' : 'other',
           timestamp: new Date(msg.created_at),
-        })));
+        }));
+
+        setMessages(prev => {
+          if (pageNum === 1) return newMessages;
+          // Append older messages to the end of the newest-to-oldest list
+          return [...prev, ...newMessages];
+        });
+
+        setHasMore(messagesList.length === 20);
+        setPage(pageNum);
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
     } finally {
       setIsLoadingMessages(false);
+      setIsFetchingMore(false);
     }
   };
 
@@ -426,14 +452,16 @@ export default function MessagesScreen() {
     }
   }, [activeConversation?.conversationId]);
 
-  // Scroll to bottom when messages change
+  // Scroll to bottom when messages change (not needed with inverted FlatList as index 0 is at bottom)
+  /*
   useEffect(() => {
-    if (messages.length > 0 && scrollViewRef.current) {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+    if (messages.length > 0 && flatListRef.current) {
+      // setTimeout(() => {
+      //   flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      // }, 100);
     }
   }, [messages]);
+  */
 
   const handleSendMessage = async () => {
     if (!messageText.trim() || !activeConversation || !currentUser) return;
@@ -530,43 +558,52 @@ export default function MessagesScreen() {
       </View>
 
       {/* Messages List */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-      >
-        {messages.length === 0 ? (
-          <View style={styles.emptyConversation}>
-            <MessageCircle size={48} color={Colors.textLight} />
-            <Text style={styles.emptyConversationText}>
-              Comienza la conversación con {activeConversation?.userName}
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        inverted
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View
+            style={[
+              styles.messageBubble,
+              item.sender === 'me' ? styles.myMessage : styles.otherMessage
+            ]}
+          >
+            <Text style={[
+              styles.messageText,
+              item.sender === 'me' ? styles.myMessageText : styles.otherMessageText
+            ]}>
+              {item.text}
+            </Text>
+            <Text style={[
+              styles.messageTime,
+              item.sender === 'me' ? styles.myMessageTime : styles.otherMessageTime
+            ]}>
+              {item.timestamp.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
-        ) : (
-          messages.map((message) => (
-            <View
-              key={message.id}
-              style={[
-                styles.messageBubble,
-                message.sender === 'me' ? styles.myMessage : styles.otherMessage
-              ]}
-            >
-              <Text style={[
-                styles.messageText,
-                message.sender === 'me' ? styles.myMessageText : styles.otherMessageText
-              ]}>
-                {message.text}
-              </Text>
-              <Text style={[
-                styles.messageTime,
-                message.sender === 'me' ? styles.myMessageTime : styles.otherMessageTime
-              ]}>
-                {message.timestamp.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+        )}
+        style={styles.messagesList}
+        contentContainerStyle={styles.messagesContent}
+        onEndReached={() => {
+          if (hasMore && !isFetchingMore && activeConversation?.conversationId) {
+            loadConversationMessages(activeConversation.conversationId, page + 1);
+          }
+        }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={isFetchingMore ? <ActivityIndicator color={Colors.gold} style={{ marginVertical: 10 }} /> : null}
+        ListEmptyComponent={
+          !isLoadingMessages ? (
+            <View style={styles.emptyConversation}>
+              <MessageCircle size={48} color={Colors.textLight} />
+              <Text style={styles.emptyConversationText}>
+                Comienza la conversación con {activeConversation?.userName}
               </Text>
             </View>
-          ))
-        )}
-      </ScrollView>
+          ) : null
+        }
+      />
 
       {/* Message Input */}
       <View style={[styles.messageInputContainer, { paddingBottom: insets.bottom }]}>
@@ -806,14 +843,23 @@ export default function MessagesScreen() {
 
         {isLoadingConversations ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>Cargando conversaciones...</Text>
+            <ActivityIndicator color={Colors.gold} size="large" />
+            <Text style={[styles.emptyStateText, { marginTop: 16 }]}>Cargando conversaciones...</Text>
           </View>
-        ) : conversations.length === 0 ? (
-          renderEmptyState()
         ) : (
-          <ScrollView style={styles.conversationsList}>
-            {conversations.map(renderConversationItem)}
-          </ScrollView>
+          <FlatList
+            data={conversations.filter(c =>
+              c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (c.last_message && c.last_message.toLowerCase().includes(searchQuery.toLowerCase()))
+            )}
+            renderItem={({ item }) => renderConversationItem(item)}
+            keyExtractor={item => item.id.toString()}
+            style={styles.conversationsList}
+            ListEmptyComponent={renderEmptyState()}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+          />
         )}
       </View>
 

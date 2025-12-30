@@ -124,18 +124,18 @@ export async function initializeDatabase() {
       await pgClient.query(`
         CREATE TABLE IF NOT EXISTS events (
           id SERIAL PRIMARY KEY,
-          provider_id INTEGER NOT NULL,
+          provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           title TEXT NOT NULL,
           description TEXT,
-          category TEXT NOT NULL,
-          start_time TEXT NOT NULL,
-          end_time TEXT NOT NULL,
-          date TEXT NOT NULL,
+          category TEXT,
+          start_time TEXT,
+          end_time TEXT,
+          date TEXT,
           location TEXT,
-          is_online BOOLEAN DEFAULT FALSE,
+          is_online BOOLEAN DEFAULT false,
           max_participants INTEGER DEFAULT 0,
           current_participants INTEGER DEFAULT 0,
-          price DOUBLE PRECISION DEFAULT 0,
+          price DECIMAL(10,2) DEFAULT 0,
           image TEXT,
           tags TEXT,
           status TEXT DEFAULT 'upcoming',
@@ -145,16 +145,103 @@ export async function initializeDatabase() {
       `);
 
       await pgClient.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_provider 
-        ON events(provider_id)
+        CREATE TABLE IF NOT EXISTS products (
+          id SERIAL PRIMARY KEY,
+          provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          category TEXT,
+          price DECIMAL(10,2) NOT NULL,
+          images TEXT,
+          tags TEXT,
+          specifications TEXT,
+          features TEXT,
+          in_stock BOOLEAN DEFAULT true,
+          stock_count INTEGER DEFAULT 0,
+          shipping_info TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
       `);
 
       await pgClient.query(`
-        CREATE INDEX IF NOT EXISTS idx_events_date 
-        ON events(date)
+        CREATE TABLE IF NOT EXISTS bank_accounts (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          account_type TEXT NOT NULL,
+          account_number TEXT NOT NULL,
+          account_holder_name TEXT NOT NULL,
+          bank_name TEXT,
+          country_code TEXT NOT NULL,
+          is_primary BOOLEAN DEFAULT false,
+          percentage INTEGER DEFAULT 0,
+          nickname TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
       `);
 
-      console.log('Postgres events table initialized');
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS transactions (
+          id SERIAL PRIMARY KEY,
+          booking_id INTEGER,
+          total_amount DECIMAL(10,2) NOT NULL,
+          app_fee_amount DECIMAL(10,2) NOT NULL,
+          provider_amount DECIMAL(10,2) NOT NULL,
+          provider_id INTEGER REFERENCES users(id),
+          buyer_id INTEGER REFERENCES users(id),
+          payment_provider TEXT NOT NULL,
+          payment_id TEXT,
+          status TEXT DEFAULT 'pending',
+          currency TEXT DEFAULT 'ARS',
+          metadata TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS reservations (
+          id SERIAL PRIMARY KEY,
+          event_id INTEGER REFERENCES events(id) ON DELETE SET NULL,
+          service_id TEXT,
+          product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          status TEXT DEFAULT 'pending',
+          number_of_spots INTEGER DEFAULT 1,
+          total_price DECIMAL(10,2) NOT NULL,
+          payment_status TEXT DEFAULT 'pending',
+          payment_method TEXT,
+          notes TEXT,
+          attended BOOLEAN DEFAULT false,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          type TEXT NOT NULL,
+          title TEXT NOT NULL,
+          message TEXT NOT NULL,
+          read BOOLEAN DEFAULT false,
+          data TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_bank_accounts_user ON bank_accounts(user_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_transactions_payment ON transactions(payment_provider, payment_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_reservations_user ON reservations(user_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_reservations_provider ON reservations(provider_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_events_provider ON events(provider_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_products_provider ON products(provider_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read)`);
+
+      console.log('Postgres events, bank_accounts, transactions, and reservations tables initialized');
     } else {
       // Use sql.js
       console.log('Using SQL.js database');
@@ -200,14 +287,57 @@ export async function initializeDatabase() {
         `);
 
         db.run(`
-          CREATE TABLE IF NOT EXISTS messages (
+          CREATE TABLE IF NOT EXISTS bank_accounts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            conversation_id INTEGER NOT NULL,
-            sender_id INTEGER NOT NULL,
-            receiver_id INTEGER NOT NULL,
-            text TEXT NOT NULL,
-            read INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            user_id INTEGER NOT NULL,
+            account_type TEXT NOT NULL,
+            account_number TEXT NOT NULL,
+            account_holder_name TEXT NOT NULL,
+            bank_name TEXT,
+            country_code TEXT NOT NULL,
+            is_primary INTEGER DEFAULT 0,
+            percentage INTEGER DEFAULT 0,
+            nickname TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            booking_id INTEGER,
+            total_amount REAL NOT NULL,
+            app_fee_amount REAL NOT NULL,
+            provider_amount REAL NOT NULL,
+            provider_id INTEGER,
+            buyer_id INTEGER,
+            payment_provider TEXT NOT NULL,
+            payment_id TEXT,
+            status TEXT DEFAULT 'pending',
+            currency TEXT DEFAULT 'ARS',
+            metadata TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS reservations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_id INTEGER,
+            service_id TEXT,
+            user_id INTEGER NOT NULL,
+            provider_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'pending',
+            number_of_spots INTEGER DEFAULT 1,
+            total_price REAL NOT NULL,
+            payment_status TEXT DEFAULT 'pending',
+            payment_method TEXT,
+            notes TEXT,
+            attended INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
         `);
 
@@ -218,6 +348,9 @@ export async function initializeDatabase() {
         db.run(`CREATE INDEX IF NOT EXISTS idx_conversations_participant1 ON conversations(participant1_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_conversations_participant2 ON conversations(participant2_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_location ON users(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_bank_accounts_user ON bank_accounts(user_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_transactions_payment ON transactions(payment_provider, payment_id)`);
+        db.run(`CREATE INDEX IF NOT EXISTS idx_reservations_user ON reservations(user_id)`);
 
         console.log('SQLite database created with indexes');
         saveDatabase();
@@ -654,4 +787,160 @@ export const eventQueries = usePostgres ? {
   getEventById: (id: number) => null,
   deleteEvent: (id: number) => { },
   updateEvent: (id: number, event: any) => { }
+};
+
+// Product queries
+export const productQueries = usePostgres ? {
+  createProduct: async (product: any) => {
+    const res = await pgClient.query(
+      `INSERT INTO products (
+        provider_id, title, description, category, price, images, tags, 
+        specifications, features, in_stock, stock_count, shipping_info
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+      RETURNING id`,
+      [
+        product.providerId, product.title, product.description, product.category, product.price,
+        JSON.stringify(product.images || []), JSON.stringify(product.tags || []),
+        product.specifications, product.features, product.inStock ?? true,
+        product.stockCount ?? 0, product.shippingInfo
+      ]
+    );
+    return { lastID: res[0]?.id ?? null };
+  },
+
+  getProducts: async () => {
+    const rows = await pgClient.query(`
+      SELECT p.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM products p
+      LEFT JOIN users u ON u.id = p.provider_id
+      ORDER BY p.created_at DESC
+    `);
+    return rows.map((row: any) => ({
+      ...row,
+      providerId: row.provider_id,
+      inStock: row.in_stock,
+      stockCount: row.stock_count,
+      shippingInfo: row.shipping_info,
+      images: row.images ? JSON.parse(row.images) : [],
+      tags: row.tags ? JSON.parse(row.tags) : []
+    }));
+  },
+
+  getProductById: async (id: number) => {
+    const rows = await pgClient.query(`
+      SELECT p.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM products p
+      LEFT JOIN users u ON u.id = p.provider_id
+      WHERE p.id = $1
+    `, [id]);
+
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+      ...row,
+      providerId: row.provider_id,
+      inStock: row.in_stock,
+      stockCount: row.stock_count,
+      shippingInfo: row.shipping_info,
+      images: row.images ? JSON.parse(row.images) : [],
+      tags: row.tags ? JSON.parse(row.tags) : []
+    };
+  },
+
+  getProductsByProvider: async (providerId: number) => {
+    const rows = await pgClient.query(`
+      SELECT * FROM products WHERE provider_id = $1 ORDER BY created_at DESC
+    `, [providerId]);
+    return rows.map((row: any) => ({
+      ...row,
+      providerId: row.provider_id,
+      inStock: row.in_stock,
+      stockCount: row.stock_count,
+      shippingInfo: row.shipping_info,
+      images: row.images ? JSON.parse(row.images) : [],
+      tags: row.tags ? JSON.parse(row.tags) : []
+    }));
+  },
+
+  updateProduct: async (id: number, product: any) => {
+    await pgClient.query(`
+      UPDATE products SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        category = COALESCE($3, category),
+        price = COALESCE($4, price),
+        images = COALESCE($5, images),
+        tags = COALESCE($6, tags),
+        specifications = COALESCE($7, specifications),
+        features = COALESCE($8, features),
+        in_stock = COALESCE($9, in_stock),
+        stock_count = COALESCE($10, stock_count),
+        shipping_info = COALESCE($11, shipping_info),
+        updated_at = NOW()
+      WHERE id = $12
+    `, [
+      product.title, product.description, product.category, product.price,
+      product.images ? JSON.stringify(product.images) : null,
+      product.tags ? JSON.stringify(product.tags) : null,
+      product.specifications, product.features, product.inStock,
+      product.stockCount, product.shippingInfo, id
+    ]);
+  },
+
+  deleteProduct: async (id: number) => {
+    await pgClient.query(`DELETE FROM products WHERE id = $1`, [id]);
+  }
+} : {
+  createProduct: (product: any) => ({ lastID: 0 }),
+  getProducts: () => [],
+  getProductById: (id: number) => null,
+  getProductsByProvider: (id: number) => [],
+  updateProduct: (id: number, product: any) => { },
+  deleteProduct: (id: number) => { }
+};
+
+// Notification queries
+export const notificationQueries = usePostgres ? {
+  createNotification: async (notif: any) => {
+    const res = await pgClient.query(
+      `INSERT INTO notifications (user_id, type, title, message, data)
+       VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [notif.userId, notif.type, notif.title, notif.message, notif.data ? JSON.stringify(notif.data) : null]
+    );
+    return { lastID: res[0]?.id ?? null };
+  },
+
+  getUserNotifications: async (userId: number) => {
+    const rows = await pgClient.query(
+      `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+      [userId]
+    );
+    return rows.map((row: any) => ({
+      ...row,
+      userId: row.user_id,
+      data: row.data ? JSON.parse(row.data) : null
+    }));
+  },
+
+  markAsRead: async (id: number) => {
+    await pgClient.query(`UPDATE notifications SET read = true WHERE id = $1`, [id]);
+  },
+
+  markAllAsRead: async (userId: number) => {
+    await pgClient.query(`UPDATE notifications SET read = true WHERE user_id = $1`, [userId]);
+  },
+
+  getUnreadCount: async (userId: number) => {
+    const res = await pgClient.query(
+      `SELECT COUNT(*)::int as count FROM notifications WHERE user_id = $1 AND read = false`,
+      [userId]
+    );
+    return res[0]?.count ?? 0;
+  }
+} : {
+  createNotification: (notif: any) => ({ lastID: 0 }),
+  getUserNotifications: (userId: number) => [],
+  markAsRead: (id: number) => { },
+  markAllAsRead: (userId: number) => { },
+  getUnreadCount: (userId: number) => 0
 };

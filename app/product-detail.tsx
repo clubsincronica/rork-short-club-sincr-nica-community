@@ -9,16 +9,17 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Star, 
-  MessageCircle, 
-  Phone, 
+import {
+  ArrowLeft,
+  MapPin,
+  Star,
+  MessageCircle,
+  Phone,
   Mail,
   ShoppingCart,
   Heart,
@@ -34,69 +35,58 @@ import {
 } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { TouchableScale } from '@/components/TouchableScale';
+import { useProducts } from '@/hooks/products-store';
+import { useUser } from '@/hooks/user-store';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 // Mock product data
-const mockProduct = {
-  id: '1',
-  title: 'Artesanía Local Hecha a Mano',
-  description: 'Hermosa pieza de artesanía elaborada por artesanos locales de Madrid. Cada pieza es única y refleja la tradición cultural de nuestra región.',
-  price: 45.99,
-  originalPrice: 65.99,
-  images: [
-    'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=400&fit=crop'
-  ],
-  seller: {
-    name: 'María Artesana',
-    avatar: 'https://via.placeholder.com/60',
-    rating: 4.8,
-    reviewCount: 127,
-    location: 'Madrid, España'
-  },
-  category: 'Artesanías',
-  tags: ['Hecho a mano', 'Sostenible', 'Local'],
-  specifications: [
-    { label: 'Material', value: 'Cerámica y madera' },
-    { label: 'Dimensiones', value: '15cm x 10cm x 8cm' },
-    { label: 'Peso', value: '300g' },
-    { label: 'Origen', value: 'Madrid, España' }
-  ],
-  features: [
-    'Diseño único y original',
-    'Materiales sostenibles',
-    'Hecho por artesanos locales',
-    'Perfecto para decoración',
-    'Empaque eco-friendly'
-  ],
-  inStock: true,
-  stockCount: 8,
-  shipping: {
-    free: true,
-    estimatedDays: '2-3 días'
-  }
-};
+// Product cleanup - no more mockProduct here
 
 export default function ProductDetailScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const [product, setProduct] = useState(mockProduct);
+  const { products, isLoading: productsLoading, addToCart } = useProducts();
+  const { currentUser } = useUser();
+
+  const [product, setProduct] = useState<any>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (params.productId && products.length > 0) {
+      const found = products.find((p: any) => p.id.toString() === params.productId);
+      if (found) {
+        setProduct(found);
+        setLoading(false);
+      }
+    } else if (params.id && products.length > 0) {
+      const found = products.find((p: any) => p.id.toString() === params.id);
+      if (found) {
+        setProduct(found);
+        setLoading(false);
+      }
+    }
+  }, [params.productId, params.id, products]);
 
   const handleAddToCart = () => {
+    if (!currentUser) {
+      Alert.alert('Inicia sesión', 'Debes iniciar sesión para agregar productos al carrito.');
+      router.push('/login');
+      return;
+    }
+
     Alert.alert(
       'Agregar al Carrito',
       `¿Agregar ${quantity} unidad${quantity > 1 ? 'es' : ''} de "${product.title}" al carrito?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Agregar', 
+        {
+          text: 'Agregar',
           onPress: () => {
+            addToCart(product as any, quantity);
             Alert.alert('¡Agregado!', `${quantity} producto${quantity > 1 ? 's' : ''} agregado${quantity > 1 ? 's' : ''} al carrito`);
           }
         }
@@ -105,15 +95,32 @@ export default function ProductDetailScreen() {
   };
 
   const handleBuyNow = () => {
+    if (!currentUser) {
+      Alert.alert('Inicia sesión', 'Debes iniciar sesión para realizar una compra.');
+      router.push('/login');
+      return;
+    }
+
     Alert.alert(
       'Comprar Ahora',
       `¿Proceder a comprar ${quantity} unidad${quantity > 1 ? 'es' : ''} por €${(product.price * quantity).toFixed(2)}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Comprar', 
+        {
+          text: 'Comprar',
           onPress: () => {
-            router.push('/payment');
+            router.push({
+              pathname: '/payment',
+              params: {
+                type: 'product',
+                id: product.id,
+                title: product.title,
+                price: product.price.toString(),
+                quantity: quantity.toString(),
+                providerId: product.providerId || product.seller?.id || '',
+                image: product.images?.[0] || ''
+              }
+            });
           }
         }
       ]
@@ -127,8 +134,8 @@ export default function ProductDetailScreen() {
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Mensaje', onPress: () => router.push('/(tabs)/messages') },
-        { 
-          text: 'Ver Perfil', 
+        {
+          text: 'Ver Perfil',
           onPress: () => router.push({
             pathname: '/user-profile',
             params: { userName: product.seller.name }
@@ -153,8 +160,8 @@ export default function ProductDetailScreen() {
     setIsFavorite(!isFavorite);
     Alert.alert(
       'Favoritos',
-      isFavorite ? 
-        'Producto eliminado de favoritos' : 
+      isFavorite ?
+        'Producto eliminado de favoritos' :
         'Producto agregado a favoritos'
     );
   };
@@ -180,29 +187,38 @@ export default function ProductDetailScreen() {
     </TouchableScale>
   );
 
+  if (loading || !product) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={{ marginTop: 10, color: Colors.textLight }}>Cargando producto...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableScale 
+        <TouchableScale
           style={styles.headerButton}
           onPress={() => router.back()}
         >
           <ArrowLeft size={24} color={Colors.text} />
         </TouchableScale>
-        
+
         <View style={styles.headerActions}>
-          <TouchableScale 
+          <TouchableScale
             style={styles.headerButton}
             onPress={handleFavorite}
           >
             <Heart size={24} color={isFavorite ? Colors.error : Colors.text} fill={isFavorite} />
           </TouchableScale>
-          
-          <TouchableScale 
+
+          <TouchableScale
             style={styles.headerButton}
             onPress={handleShare}
           >
@@ -213,11 +229,11 @@ export default function ProductDetailScreen() {
 
       {/* Main Image */}
       <View style={styles.imageContainer}>
-        <Image 
+        <Image
           source={{ uri: product.images[selectedImageIndex] }}
           style={styles.mainImage}
         />
-        
+
         {/* Image Gallery */}
         <FlatList
           data={product.images}
@@ -245,32 +261,32 @@ export default function ProductDetailScreen() {
 
         {/* Tags */}
         <View style={styles.tagsContainer}>
-          {product.tags.map((tag, index) => (
-            <View key={index} style={styles.tag}>
+          {product.tags.map((tag: string, index: number) => (
+            <View key={`tag-${index}`} style={styles.tag}>
               <Text style={styles.tagText}>{tag}</Text>
             </View>
           ))}
         </View>
 
         {/* Seller Info */}
-        <TouchableScale 
+        <TouchableScale
           style={styles.sellerSection}
           onPress={handleContactSeller}
         >
-          <Image 
-            source={{ uri: product.seller.avatar }}
+          <Image
+            source={{ uri: product.providerAvatar || 'https://via.placeholder.com/60' }}
             style={styles.sellerAvatar}
           />
           <View style={styles.sellerInfo}>
-            <Text style={styles.sellerName}>{product.seller.name}</Text>
+            <Text style={styles.sellerName}>{product.providerName || 'Vendedor'}</Text>
             <View style={styles.sellerRating}>
               <Star size={16} color={Colors.gold} />
-              <Text style={styles.ratingText}>{product.seller.rating}</Text>
-              <Text style={styles.reviewCount}>({product.seller.reviewCount} reseñas)</Text>
+              <Text style={styles.ratingText}>{(product as any).seller?.rating || '0.0'}</Text>
+              <Text style={styles.reviewCount}>({(product as any).seller?.reviewCount || 0} reseñas)</Text>
             </View>
             <View style={styles.sellerLocation}>
               <MapPin size={14} color={Colors.textSecondary} />
-              <Text style={styles.locationText}>{product.seller.location}</Text>
+              <Text style={styles.locationText}>{(product as any).seller?.location || 'Ubicación no disponible'}</Text>
             </View>
           </View>
           <ArrowLeft size={16} color={Colors.textSecondary} style={{ transform: [{ rotate: '180deg' }] }} />
@@ -284,22 +300,22 @@ export default function ProductDetailScreen() {
               {product.inStock ? `En stock (${product.stockCount} disponibles)` : 'Agotado'}
             </Text>
           </View>
-          
+
           {/* Quantity Selector */}
           <View style={styles.quantitySelector}>
             <Text style={styles.quantityLabel}>Cantidad:</Text>
             <View style={styles.quantityControls}>
-              <TouchableScale 
+              <TouchableScale
                 style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
                 onPress={decrementQuantity}
                 disabled={quantity <= 1}
               >
                 <Minus size={16} color={quantity <= 1 ? Colors.textSecondary : Colors.text} />
               </TouchableScale>
-              
+
               <Text style={styles.quantityText}>{quantity}</Text>
-              
-              <TouchableScale 
+
+              <TouchableScale
                 style={[styles.quantityButton, quantity >= product.stockCount && styles.quantityButtonDisabled]}
                 onPress={incrementQuantity}
                 disabled={quantity >= product.stockCount}
@@ -315,15 +331,15 @@ export default function ProductDetailScreen() {
           <View style={styles.shippingItem}>
             <Truck size={18} color={Colors.primary} />
             <Text style={styles.shippingText}>
-              {product.shipping.free ? 'Envío gratuito' : 'Envío con costo'} • {product.shipping.estimatedDays}
+              {product.shippingInfo || 'Envío disponible • Consultar plazos'}
             </Text>
           </View>
-          
+
           <View style={styles.shippingItem}>
             <Shield size={18} color={Colors.primary} />
             <Text style={styles.shippingText}>Compra protegida</Text>
           </View>
-          
+
           <View style={styles.shippingItem}>
             <CreditCard size={18} color={Colors.primary} />
             <Text style={styles.shippingText}>Pago seguro</Text>
@@ -336,27 +352,35 @@ export default function ProductDetailScreen() {
           <Text style={styles.descriptionText}>{product.description}</Text>
         </View>
 
-        {/* Features */}
-        <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Características</Text>
-          {product.features.map((feature, index) => (
-            <View key={index} style={styles.featureItem}>
-              <CheckCircle size={16} color={Colors.success} />
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Features - only if present */}
+        {product.features && (
+          <View style={styles.featuresSection}>
+            <Text style={styles.sectionTitle}>Características</Text>
+            {(typeof product.features === 'string' ? product.features.split(',') : product.features).map((feature: string, index: number) => (
+              <View key={`feat-${index}`} style={styles.featureItem}>
+                <CheckCircle size={16} color={Colors.success} />
+                <Text style={styles.featureText}>{feature.trim()}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
-        {/* Specifications */}
-        <View style={styles.specificationsSection}>
-          <Text style={styles.sectionTitle}>Especificaciones</Text>
-          {product.specifications.map((spec, index) => (
-            <View key={index} style={styles.specificationItem}>
-              <Text style={styles.specLabel}>{spec.label}:</Text>
-              <Text style={styles.specValue}>{spec.value}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Specifications - only if present */}
+        {product.specifications && (
+          <View style={styles.specificationsSection}>
+            <Text style={styles.sectionTitle}>Especificaciones</Text>
+            {Array.isArray(product.specifications) ? product.specifications.map((spec: any, index: number) => (
+              <View key={`spec-${index}`} style={styles.specificationItem}>
+                <Text style={styles.specLabel}>{spec.label}:</Text>
+                <Text style={styles.specValue}>{spec.value}</Text>
+              </View>
+            )) : (
+              <View style={styles.specificationItem}>
+                <Text style={styles.specValue}>{product.specifications}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Action Buttons */}

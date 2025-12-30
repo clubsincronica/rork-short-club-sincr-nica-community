@@ -21,6 +21,22 @@ export interface User {
   twitter?: string;
   linkedin?: string;
   bankAccounts?: BankAccount[];
+  priorityBoard?: ProfilePriorityItem[];
+}
+
+export interface ProfilePriorityItem {
+  id: string;
+  type: 'service' | 'event' | 'product' | 'other';
+  title: string;
+  description: string;
+  price: number | string;
+  image?: string;
+  priority: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  tags?: string[];
+  metadata?: any;
 }
 
 export interface Service {
@@ -399,7 +415,7 @@ export interface EventTicket {
 }
 
 export interface BankAccount {
-  id: string;
+  id: number;
   accountNumber: string;
   bankName: string;
   accountType: 'checking' | 'savings';

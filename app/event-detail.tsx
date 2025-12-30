@@ -12,12 +12,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import { 
-  ArrowLeft, 
-  MapPin, 
-  Star, 
-  MessageCircle, 
-  Phone, 
+import {
+  ArrowLeft,
+  MapPin,
+  Star,
+  MessageCircle,
+  Phone,
   Mail,
   Calendar,
   Clock,
@@ -34,69 +34,20 @@ import {
 import { Colors } from '@/constants/colors';
 import { TouchableScale } from '@/components/TouchableScale';
 import { useCalendar } from '@/hooks/calendar-store';
-import { allMockUsers } from '@/mocks/data';
+import { useUser } from '@/hooks/user-store';
+// Removed: import { allMockUsers } from '@/mocks/data';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Mock event data
-const mockEvent = {
-  id: '1',
-  title: 'Taller de Cerámica Tradicional',
-  description: 'Aprende las técnicas tradicionales de cerámica en un ambiente acogedor y creativo. Este taller está diseñado tanto para principiantes como para personas con experiencia previa. Incluye todos los materiales y una pieza terminada para llevar a casa.',
-  organizer: {
-    name: 'Elena Martínez',
-    avatar: 'https://via.placeholder.com/60',
-    rating: 4.9,
-    reviewCount: 83,
-    location: 'Madrid, España'
-  },
-  date: '2024-11-15',
-  time: '10:00',
-  endTime: '13:00',
-  duration: 180, // minutes
-  location: 'Estudio de Arte Luna, Calle Mayor 25, Madrid',
-  coordinates: { latitude: 40.4168, longitude: -3.7038 },
-  price: 35.00,
-  originalPrice: 45.00,
-  currency: 'EUR',
-  images: [
-    'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1571115764595-644a1f56a55c?w=400&h=300&fit=crop',
-    'https://images.unsplash.com/photo-1594736797933-d0cab1ff0fce?w=400&h=300&fit=crop'
-  ],
-  category: 'Taller',
-  tags: ['Artesanía', 'Cerámica', 'Arte', 'Manos'],
-  maxAttendees: 12,
-  currentAttendees: 8,
-  requirements: [
-    'No se requiere experiencia previa',
-    'Ropa cómoda que se pueda ensuciar',
-    'Ganas de aprender y crear'
-  ],
-  includes: [
-    'Todos los materiales necesarios',
-    'Herramientas de cerámica',
-    'Una pieza terminada para llevar',
-    'Refrigerios durante el descanso',
-    'Certificado de participación'
-  ],
-  agenda: [
-    { time: '10:00', activity: 'Bienvenida y presentación' },
-    { time: '10:15', activity: 'Introducción a la cerámica' },
-    { time: '10:30', activity: 'Preparación del barro' },
-    { time: '11:00', activity: 'Técnicas básicas de modelado' },
-    { time: '12:00', activity: 'Descanso con refrigerios' },
-    { time: '12:15', activity: 'Finalización de piezas' },
-    { time: '13:00', activity: 'Cierre y despedida' }
-  ]
-};
+// Event cleanup - no more mockEvent here
 
 export default function EventDetailScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { events } = useCalendar();
-  
-  const [event, setEvent] = useState(mockEvent);
+  const { events, createReservation } = useCalendar();
+  const { currentUser } = useUser();
+
+  const [event, setEvent] = useState<any>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [attendeeCount, setAttendeeCount] = useState(1);
@@ -113,30 +64,30 @@ export default function EventDetailScreen() {
     try {
       const eventId = params.eventId as string;
       const eventName = params.eventName as string;
-      
+
       console.log('Event Detail: Loading event with ID:', eventId, 'Name:', eventName);
-      
+
       // Find the real event from calendar store
       const realEvent = events.find((e: any) => e.id === eventId || e.title === eventName);
-      
+
       if (realEvent) {
         console.log('Event Detail: ✅ Found real event:', realEvent.title, realEvent.id);
-        
-        // Find the provider/organizer
-        const provider = allMockUsers.find(u => u.id === realEvent.providerId);
-        
+
+        // Find the provider/organizer from user store or use event data
+        const organizer = {
+          name: realEvent.provider?.name || 'Organizador',
+          avatar: realEvent.provider?.avatar || '', // No fallback avatar
+          rating: realEvent.provider?.rating || 0,
+          reviewCount: realEvent.provider?.reviewCount || 0,
+          location: realEvent.location || 'Ubicación'
+        };
+
         // Transform real event to expected format
         const transformedEvent = {
           id: realEvent.id,
           title: realEvent.title,
           description: realEvent.description || 'Descripción del evento',
-          organizer: {
-            name: provider?.name || realEvent.provider?.name || 'Organizador',
-            avatar: provider?.avatar || 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-            rating: provider?.rating || 4.8,
-            reviewCount: provider?.reviewCount || 50,
-            location: provider?.location || realEvent.location || 'Ubicación'
-          },
+          organizer,
           date: realEvent.date,
           time: realEvent.startTime,
           endTime: realEvent.endTime,
@@ -150,24 +101,21 @@ export default function EventDetailScreen() {
           tags: realEvent.tags || [],
           maxAttendees: realEvent.maxParticipants || 10,
           currentAttendees: realEvent.currentParticipants || 0,
-          requirements: [
+          requirements: realEvent.requirements || [
             'No se requiere experiencia previa',
             'Ganas de participar',
           ],
-          includes: [
+          includes: realEvent.includes || [
             'Experiencia completa',
             'Material incluido si es necesario',
           ],
-          agenda: [
+          agenda: realEvent.agenda || [
             { time: realEvent.startTime || '10:00', activity: 'Inicio del evento' },
             { time: realEvent.endTime || '12:00', activity: 'Cierre del evento' }
           ],
-          images: [
-            'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop',
-            'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=300&fit=crop'
-          ]
+          images: (realEvent.images && realEvent.images.length > 0) ? realEvent.images : []
         };
-        
+
         setEvent(transformedEvent as any);
       } else {
         console.log('Event Detail: ⚠️ Event not found, using mock data');
@@ -180,17 +128,24 @@ export default function EventDetailScreen() {
     }
   };
 
-  const handleRSVP = () => {
+  const handleRSVP = async () => {
+    if (!currentUser) {
+      Alert.alert('Inicia sesión', 'Debes iniciar sesión para inscribirte a un evento.');
+      router.push('/login');
+      return;
+    }
+
     if (isRegistered) {
       Alert.alert(
         'Cancelar Inscripción',
         '¿Estás seguro de que quieres cancelar tu inscripción?',
         [
           { text: 'No', style: 'cancel' },
-          { 
-            text: 'Sí, cancelar', 
+          {
+            text: 'Sí, cancelar',
             style: 'destructive',
-            onPress: () => {
+            onPress: async () => {
+              // TODO: Implement cancelReservation in calendar-store
               setIsRegistered(false);
               Alert.alert('Cancelado', 'Tu inscripción ha sido cancelada.');
             }
@@ -198,21 +153,55 @@ export default function EventDetailScreen() {
         ]
       );
     } else {
-      Alert.alert(
-        'Confirmar Inscripción',
-        `¿Inscribir ${attendeeCount} ${attendeeCount === 1 ? 'persona' : 'personas'} por €${(event.price * attendeeCount).toFixed(2)}?`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Inscribir', 
-            onPress: () => {
-              setIsRegistered(true);
-              Alert.alert('¡Inscrito!', 'Te has inscrito exitosamente al evento.');
-              router.push('/calendar');
+      const totalPrice = event.price * attendeeCount;
+
+      if (totalPrice === 0) {
+        // Free event
+        Alert.alert(
+          'Confirmar Inscripción',
+          `¿Inscribir ${attendeeCount} ${attendeeCount === 1 ? 'persona' : 'personas'} gratis?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Inscribir',
+              onPress: async () => {
+                const reservation = await createReservation(event.id, attendeeCount, 'free');
+                if (reservation) {
+                  setIsRegistered(true);
+                  Alert.alert('¡Inscrito!', 'Te has inscrito exitosamente al evento.');
+                  router.push('/calendar');
+                }
+              }
             }
-          }
-        ]
-      );
+          ]
+        );
+      } else {
+        // Paid event
+        Alert.alert(
+          'Confirmar Inscripción',
+          `¿Inscribir ${attendeeCount} ${attendeeCount === 1 ? 'persona' : 'personas'} por €${totalPrice.toFixed(2)}?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Continuar al Pago',
+              onPress: () => {
+                router.push({
+                  pathname: '/payment',
+                  params: {
+                    type: 'event',
+                    id: event.id,
+                    title: event.title,
+                    price: event.price.toString(),
+                    attendeeCount: attendeeCount.toString(),
+                    providerId: params.providerId || event.organizer?.id || '',
+                    image: event.images?.[0] || ''
+                  }
+                });
+              }
+            }
+          ]
+        );
+      }
     }
   };
 
@@ -223,8 +212,8 @@ export default function EventDetailScreen() {
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Mensaje', onPress: () => router.push('/(tabs)/messages') },
-        { 
-          text: 'Ver Perfil', 
+        {
+          text: 'Ver Perfil',
           onPress: () => router.push({
             pathname: '/user-profile',
             params: { userName: event.organizer.name }
@@ -249,8 +238,8 @@ export default function EventDetailScreen() {
     setIsFavorite(!isFavorite);
     Alert.alert(
       'Favoritos',
-      isFavorite ? 
-        'Evento eliminado de favoritos' : 
+      isFavorite ?
+        'Evento eliminado de favoritos' :
         'Evento agregado a favoritos'
     );
   };
@@ -290,29 +279,39 @@ export default function EventDetailScreen() {
 
   const availableSpots = event.maxAttendees - event.currentAttendees;
 
+  if (loading || !event) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: Colors.textLight }}>Cargando evento...</Text>
+      </View>
+    );
+  }
+
+  const images = event.images.length > 0 ? event.images : []; // No fallback images
+
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableScale 
+        <TouchableScale
           style={styles.headerButton}
           onPress={() => router.back()}
         >
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableScale>
-        
+
         <View style={styles.headerActions}>
-          <TouchableScale 
+          <TouchableScale
             style={styles.headerButton}
             onPress={handleFavorite}
           >
             <Heart size={24} color={Colors.white} fill={isFavorite} />
           </TouchableScale>
-          
-          <TouchableScale 
+
+          <TouchableScale
             style={styles.headerButton}
             onPress={handleShare}
           >
@@ -323,13 +322,13 @@ export default function EventDetailScreen() {
 
       {/* Event Image */}
       <View style={styles.imageContainer}>
-        <Image 
+        <Image
           source={{ uri: event.images[selectedImageIndex] }}
           style={styles.mainImage}
         />
-        
+
         <View style={styles.imageIndicators}>
-          {event.images.map((_, index) => (
+          {event.images.map((_: string, index: number) => (
             <TouchableScale
               key={index}
               style={[
@@ -363,7 +362,7 @@ export default function EventDetailScreen() {
               <Text style={styles.timeText}>{event.time} - {event.endTime}</Text>
             </View>
           </View>
-          
+
           <View style={styles.dateTimeItem}>
             <Clock size={20} color={Colors.primary} />
             <Text style={styles.durationText}>{event.duration} minutos</Text>
@@ -371,7 +370,7 @@ export default function EventDetailScreen() {
         </View>
 
         {/* Location */}
-        <TouchableScale 
+        <TouchableScale
           style={styles.locationSection}
           onPress={handleViewLocation}
         >
@@ -381,11 +380,11 @@ export default function EventDetailScreen() {
         </TouchableScale>
 
         {/* Organizer */}
-        <TouchableScale 
+        <TouchableScale
           style={styles.organizerSection}
           onPress={handleContactOrganizer}
         >
-          <Image 
+          <Image
             source={{ uri: event.organizer.avatar }}
             style={styles.organizerAvatar}
           />
@@ -409,7 +408,7 @@ export default function EventDetailScreen() {
             )}
             <Text style={styles.priceLabel}>por persona</Text>
           </View>
-          
+
           <View style={styles.attendanceSection}>
             <Users size={18} color={Colors.primary} />
             <Text style={styles.attendanceText}>
@@ -427,17 +426,17 @@ export default function EventDetailScreen() {
             <View style={styles.attendeeSelectorRow}>
               <Text style={styles.attendeeLabel}>Número de personas:</Text>
               <View style={styles.attendeeControls}>
-                <TouchableScale 
+                <TouchableScale
                   style={[styles.attendeeButton, attendeeCount <= 1 && styles.attendeeButtonDisabled]}
                   onPress={decrementAttendees}
                   disabled={attendeeCount <= 1}
                 >
                   <Minus size={16} color={attendeeCount <= 1 ? Colors.textSecondary : Colors.text} />
                 </TouchableScale>
-                
+
                 <Text style={styles.attendeeCount}>{attendeeCount}</Text>
-                
-                <TouchableScale 
+
+                <TouchableScale
                   style={[styles.attendeeButton, attendeeCount >= availableSpots && styles.attendeeButtonDisabled]}
                   onPress={incrementAttendees}
                   disabled={attendeeCount >= availableSpots}
@@ -452,7 +451,7 @@ export default function EventDetailScreen() {
 
         {/* Tags */}
         <View style={styles.tagsContainer}>
-          {event.tags.map((tag, index) => (
+          {event.tags.map((tag: string, index: number) => (
             <View key={index} style={styles.tag}>
               <Text style={styles.tagText}>{tag}</Text>
             </View>
@@ -468,7 +467,7 @@ export default function EventDetailScreen() {
         {/* What's Included */}
         <View style={styles.includesSection}>
           <Text style={styles.sectionTitle}>¿Qué incluye?</Text>
-          {event.includes.map((item, index) => (
+          {event.includes.map((item: string, index: number) => (
             <View key={index} style={styles.includeItem}>
               <CheckCircle size={16} color={Colors.success} />
               <Text style={styles.includeText}>{item}</Text>
@@ -479,7 +478,7 @@ export default function EventDetailScreen() {
         {/* Requirements */}
         <View style={styles.requirementsSection}>
           <Text style={styles.sectionTitle}>Requisitos</Text>
-          {event.requirements.map((requirement, index) => (
+          {event.requirements.map((requirement: string, index: number) => (
             <View key={index} style={styles.requirementItem}>
               <CheckCircle size={16} color={Colors.primary} />
               <Text style={styles.requirementText}>{requirement}</Text>
@@ -490,7 +489,7 @@ export default function EventDetailScreen() {
         {/* Agenda */}
         <View style={styles.agendaSection}>
           <Text style={styles.sectionTitle}>Programa del día</Text>
-          {event.agenda.map((item, index) => (
+          {event.agenda.map((item: { time: string; activity: string }, index: number) => (
             <View key={index} style={styles.agendaItem}>
               <Text style={styles.agendaTime}>{item.time}</Text>
               <Text style={styles.agendaActivity}>{item.activity}</Text>

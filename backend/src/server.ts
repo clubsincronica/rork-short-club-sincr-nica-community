@@ -7,6 +7,11 @@ import jwt from 'jsonwebtoken';
 import userRoutes from './routes/users';
 import messageRoutes from './routes/messages';
 import eventRoutes from './routes/events';
+import productRoutes from './routes/products';
+import reservationRoutes from './routes/reservations';
+import paymentsRoutes from './routes/payments';
+import webhooksRoutes from './routes/webhooks';
+import notificationRoutes from './routes/notifications';
 import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
@@ -69,6 +74,9 @@ const io = new Server(httpServer, {
 // This allows express-rate-limit to correctly identify users via X-Forwarded-For
 app.set('trust proxy', true);
 
+// Webhook endpoints (must be before body parsers for Stripe)
+app.use('/api/webhooks', webhooksRoutes);
+
 // Middleware
 app.use(cors(getCorsOptions()));
 app.use(express.json());
@@ -83,6 +91,10 @@ if (isProduction()) {
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/reservations', reservationRoutes);
+app.use('/api/payments', paymentsRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', require('./routes/admin').default);
 
 // Health check

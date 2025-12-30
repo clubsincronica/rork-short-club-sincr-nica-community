@@ -16,15 +16,20 @@ router.get('/', async (req, res) => {
 });
 
 // Create new event
+import { authenticateJWT } from '../middleware/security';
+
+// ... (imports remain)
+
+// Create new event
 router.post(
     '/',
+    authenticateJWT, // Protect this route
     [
         body('title').notEmpty().withMessage('Title is required'),
         body('category').notEmpty().withMessage('Category is required'),
         body('date').notEmpty().withMessage('Date is required (YYYY-MM-DD)'),
         body('startTime').notEmpty().withMessage('Start time is required (HH:MM)'),
         body('endTime').notEmpty().withMessage('End time is required (HH:MM)'),
-        // Add more validation as needed
     ],
     async (req: express.Request, res: express.Response) => {
         const errors = validationResult(req);
@@ -33,9 +38,11 @@ router.post(
         }
 
         try {
-            // In a real app, we'd get providerId from the authenticated user (req.user.id)
-            // For now, expect it in the body or default to a test user if not strictly enforced by auth middleware yet
-            const eventData = req.body;
+            // Enforce providerId from authenticated user
+            const eventData = {
+                ...req.body,
+                providerId: req.user?.userId
+            };
 
             const result = await eventQueries.createEvent(eventData);
             res.status(201).json({
