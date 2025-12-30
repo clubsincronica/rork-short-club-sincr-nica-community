@@ -7,20 +7,27 @@ const router = express.Router();
 import { createTransaction } from '../models/transaction';
 
 // Stripe setup
-// The user's installed stripe version is ^20.1.0 which seems to expect a specific version string
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+// Stripe setup
+// Initialize conditionally to prevent startup crash if key is missing
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeKey ? new Stripe(stripeKey, {
   apiVersion: '2025-12-15.clover' as any
-});
+}) : null;
 
 // MercadoPago setup (v2 SDK)
 import { MercadoPagoConfig, Preference } from 'mercadopago';
-const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN! });
-const preferenceClient = new Preference(mpClient);
+const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
+const preferenceClient = mpClient ? new Preference(mpClient) : null;
 
 // Create Stripe Payment Intent
 router.post('/stripe/create-intent', async (req: Request, res: Response) => {
   try {
     const { amount, currency, buyerId, providerId, bookingId, type } = req.body;
+
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe payments not configured' });
+    }
 
     // Create Stripe Intent
     const paymentIntent = await stripe.paymentIntents.create({
@@ -53,6 +60,10 @@ router.post('/stripe/create-intent', async (req: Request, res: Response) => {
 router.post('/mercadopago/create-preference', async (req: Request, res: Response) => {
   try {
     const { items, payer, back_urls, buyerId, providerId, bookingId, type } = req.body;
+
+    if (!preferenceClient) {
+      return res.status(503).json({ error: 'MercadoPago payments not configured' });
+    }
 
     const preference = await preferenceClient.create({
       body: {
