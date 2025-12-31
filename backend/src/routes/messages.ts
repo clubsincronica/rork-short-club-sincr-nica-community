@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { conversationQueries, messageQueries } from '../models/database-sqljs';
 import { parseIntSafe } from '../middleware/security';
 import {
@@ -13,7 +13,7 @@ import {
 const router = express.Router();
 
 // Get user's conversations
-router.get('/conversations/user/:id', (req, res, next) => {
+router.get('/conversations/user/:id', (req: Request, res: Response, next: NextFunction) => {
   console.log('🪪 [DEBUG] req.params.id:', req.params.id, 'type:', typeof req.params.id);
   // Extra debug: print raw params and check for edge cases
   try {
