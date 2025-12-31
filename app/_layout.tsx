@@ -13,6 +13,7 @@ import CustomSplashScreen from '@/components/SplashScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/app-settings-store';
 import { NotificationProvider } from '@/hooks/notification-store';
+import { useGlobalSocketConnection } from '@/hooks/useGlobalSocketConnection';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,6 +41,7 @@ const styles = StyleSheet.create({
 });
 
 function RootLayoutNav() {
+  useGlobalSocketConnection();
   const { settings, isLoading } = useAppSettings();
   const router = useRouter();
 

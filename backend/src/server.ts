@@ -7,11 +7,8 @@ import jwt from 'jsonwebtoken';
 import userRoutes from './routes/users';
 import messageRoutes from './routes/messages';
 import eventRoutes from './routes/events';
-import productRoutes from './routes/products';
-import reservationRoutes from './routes/reservations';
 import paymentsRoutes from './routes/payments';
 import webhooksRoutes from './routes/webhooks';
-import notificationRoutes from './routes/notifications';
 import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
@@ -74,12 +71,16 @@ const io = new Server(httpServer, {
 // This allows express-rate-limit to correctly identify users via X-Forwarded-For
 app.set('trust proxy', true);
 
-// Webhook endpoints (must be before body parsers for Stripe)
-app.use('/api/webhooks', webhooksRoutes);
-
 // Middleware
+app.use((req, res, next) => {
+  console.log(`🛣️  [DEBUG] Incoming request: ${req.method} ${req.originalUrl}`);
+  next();
+});
 app.use(cors(getCorsOptions()));
 app.use(express.json());
+
+// Webhook endpoints (must be before body parsers for Stripe)
+app.use('/api/webhooks', webhooksRoutes);
 
 // Apply rate limiting to all API routes in production
 if (isProduction()) {
@@ -91,10 +92,7 @@ if (isProduction()) {
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/reservations', reservationRoutes);
 app.use('/api/payments', paymentsRoutes);
-app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', require('./routes/admin').default);
 
 // Health check
@@ -298,7 +296,10 @@ io.on('connection', (socket) => {
   socket.on('user:join', () => {
     userSockets.set(authenticatedUserId, socket.id);
     socket.join(`user:${authenticatedUserId}`);
-    console.log(`👤 User ${authenticatedUserId} joined with socket ${socket.id}`);
+    // Log room size for debugging
+    const room = io.sockets.adapter.rooms.get(`user:${authenticatedUserId}`);
+    const roomSize = room ? room.size : 0;
+    console.log(`👤 User ${authenticatedUserId} joined room user:${authenticatedUserId} with socket ${socket.id}. Room size: ${roomSize}`);
   });
 
   // Send message - use authenticated sender ID

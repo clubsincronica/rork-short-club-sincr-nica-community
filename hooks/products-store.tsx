@@ -89,9 +89,13 @@ export const ProductsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const addProductMutation = useMutation({
     mutationFn: async (productData: any) => {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/products`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           ...productData,
           providerId: currentUser?.id
@@ -107,9 +111,13 @@ export const ProductsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const updateProductMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/products/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(updates),
       });
       if (!response.ok) throw new Error('Failed to update product');
@@ -121,8 +129,12 @@ export const ProductsProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const deleteProductMutation = useMutation({
     mutationFn: async (id: string) => {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/products/${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (!response.ok) throw new Error('Failed to delete product');
     },

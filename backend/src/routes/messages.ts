@@ -13,9 +13,20 @@ import {
 const router = express.Router();
 
 // Get user's conversations
-router.get('/conversations/user/:userId', validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
+router.get('/conversations/user/:id', (req, res, next) => {
+  console.log('🪪 [DEBUG] req.params.id:', req.params.id, 'type:', typeof req.params.id);
+  // Extra debug: print raw params and check for edge cases
   try {
-    const userId = parseIntSafe(req.params.userId, 'user ID');
+    const idVal = req.params.id;
+    console.log('🪪 [DEBUG] req.params:', req.params);
+    console.log('🪪 [DEBUG] idVal == Number(idVal):', idVal == Number(idVal), 'Number(idVal):', Number(idVal));
+    console.log('🪪 [DEBUG] isNaN(Number(idVal)):', isNaN(Number(idVal)));
+  } catch (e) {
+    console.error('🪪 [DEBUG] Error inspecting req.params.id:', e);
+  next();
+}, validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
+  try {
+    const userId = parseIntSafe(req.params.id, 'user ID');
     console.log('📬 Fetching conversations for user:', userId);
     const conversations: any[] = await conversationQueries.getUserConversations(userId);
 

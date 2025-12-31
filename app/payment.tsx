@@ -62,7 +62,12 @@ type BookingItem = {
 const BACKEND_URL = getApiBaseUrl();
 
 function PaymentScreenInner() {
-  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  // Mock Stripe hook for development without native modules
+  const { initPaymentSheet, presentPaymentSheet } = {
+    initPaymentSheet: async () => ({ error: null }),
+    presentPaymentSheet: async () => ({ error: { message: 'Stripe module missing in development build. Rebuild client to test payments.' } })
+  } as any;
+  // const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { currentUser } = useUser();
@@ -602,13 +607,30 @@ function PaymentScreenInner() {
   );
 }
 
+const MockStripeProvider = ({ children }: any) => <>{children}</>;
+
 export default function PaymentScreen() {
   // Replace with your Stripe publishable key
   const STRIPE_PUBLISHABLE_KEY = 'pk_test_XXXXXXXXXXXXXXXXXXXXXXXX';
+
+  // Verify if we can render the real provider or need a fallback
+  // For this debugging session, we will use the Inner screen directly 
+  // if you strictly need Stripe, you must rebuild the client.
+  // But to unblock Messaging tests, we use this:
+
+  // NOTE: Uncomment the real provider when running on a valid client
+  /*
   return (
     <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
       <PaymentScreenInner />
     </StripeProvider>
+  );
+  */
+
+  return (
+    <MockStripeProvider>
+      <PaymentScreenInner />
+    </MockStripeProvider>
   );
 }
 

@@ -6,6 +6,8 @@ import { useUser } from '@/hooks/user-store';
 import { useAppSettings } from '@/hooks/app-settings-store';
 import { Colors } from '@/constants/colors';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export default function Index() {
   const router = useRouter();
   const { currentUser, isLoading: userLoading, logout } = useUser();
@@ -18,6 +20,11 @@ export default function Index() {
   useEffect(() => {
     if (!userLoading && !settingsLoading) {
       console.log('Index - currentUser:', currentUser?.email, 'hasCompletedOnboarding:', settings.hasCompletedOnboarding);
+
+      // DEBUG: Print raw currentUser from AsyncStorage
+      AsyncStorage.getItem('currentUser').then(user => {
+        console.log('DEBUG: Raw currentUser from AsyncStorage:', user);
+      });
       
       // Force logout during testing if flag is enabled
       if (FORCE_LOGOUT_FOR_TESTING && currentUser) {

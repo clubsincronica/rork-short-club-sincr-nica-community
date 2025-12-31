@@ -154,9 +154,13 @@ const useCalendarHook = () => {
         tags: event.tags || []
       };
 
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/events`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(newEvent),
       });
 
@@ -171,8 +175,12 @@ const useCalendarHook = () => {
   // Delete Event Mutation
   const deleteEventMutation = useMutation({
     mutationFn: async (eventId: string) => {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/events/${eventId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (!response.ok) throw new Error('Failed to delete event');
     },
@@ -184,9 +192,13 @@ const useCalendarHook = () => {
   // Update Event Mutation
   const updateEventMutation = useMutation({
     mutationFn: async ({ eventId, updates }: { eventId: string, updates: Partial<CalendarEvent> }) => {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/events/${eventId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(updates),
       });
 
@@ -314,9 +326,13 @@ const useCalendarHook = () => {
     };
 
     try {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/reservations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(reservationData)
       });
 
@@ -394,9 +410,13 @@ const useCalendarHook = () => {
   // Update attendance
   const updateAttendance = useCallback(async (reservationId: string, attended: boolean) => {
     try {
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(`${getApiBaseUrl()}/api/reservations/${reservationId}/attendance`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ attended })
       });
 

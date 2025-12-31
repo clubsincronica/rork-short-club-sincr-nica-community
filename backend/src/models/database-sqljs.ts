@@ -61,10 +61,20 @@ export async function initializeDatabase() {
           interests TEXT,
           services TEXT,
           is_host INTEGER DEFAULT 0,
+          is_host INTEGER DEFAULT 0,
+          role TEXT DEFAULT 'user',
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         )
       `);
+
+      // Migration: Add role column if it doesn't exist
+      try {
+        await pgClient.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user'`);
+      } catch (e) {
+        // Ignore error if column exists
+        console.log('Role column check passed');
+      }
 
       await pgClient.query(`
         CREATE TABLE IF NOT EXISTS conversations (
@@ -241,7 +251,16 @@ export async function initializeDatabase() {
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_products_provider ON products(provider_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read)`);
 
-      console.log('Postgres events, bank_accounts, transactions, and reservations tables initialized');
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS blocked_emails (
+          id SERIAL PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          reason TEXT,
+          created_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      console.log('Postgres events, bank_accounts, transactions, reservations, notifications, and blocked_emails tables initialized');
     } else {
       // Use sql.js
       console.log('Using SQL.js database');
@@ -341,6 +360,15 @@ export async function initializeDatabase() {
           )
         `);
 
+        db.run(`
+          CREATE TABLE IF NOT EXISTS blocked_emails (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            reason TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
         // Create indexes for better query performance (SQLite)
         db.run(`CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at DESC)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_messages_receiver_unread ON messages(receiver_id, read)`);
@@ -371,11 +399,11 @@ export function getDb() {
 
 // User queries - conditional exports based on database type
 export const userQueries = usePostgres ? {
-  createUser: async (email: string, passwordHash: string | null, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number) => {
+  createUser: async (email: string, passwordHash: string | null, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number, role: string = 'user') => {
     const res = await pgClient.query(
-      `INSERT INTO users (email, password_hash, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
-      [email, passwordHash, name, avatar || null, bio || null, location || null, latitude || null, longitude || null, phone || null, website || null, interests || null, services || null, isHost || 0]
+      `INSERT INTO users (email, password_hash, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, role)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+      [email, passwordHash, name, avatar || null, bio || null, location || null, latitude || null, longitude || null, phone || null, website || null, interests || null, services || null, isHost || 0, role]
     );
     return { lastID: res[0]?.id ?? null };
   },
@@ -391,7 +419,7 @@ export const userQueries = usePostgres ? {
   },
 
   getUserById: async (id: number) => {
-    const rows = await pgClient.query(`SELECT id, email, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, created_at, updated_at FROM users WHERE id = $1 LIMIT 1`, [id]);
+    const rows = await pgClient.query(`SELECT id, email, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, role, created_at, updated_at FROM users WHERE id = $1 LIMIT 1`, [id]);
     return rows[0] ?? null;
   },
 
@@ -439,11 +467,11 @@ export const userQueries = usePostgres ? {
     const result = db.exec('SELECT * FROM users');
     return result[0]?.values.map((row: any) => rowToObject(result[0].columns, row)) || [];
   },
-  createUser: (email: string, passwordHash: string | null, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number) => {
+  createUser: (email: string, passwordHash: string | null, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number, role: string = 'user') => {
     db.run(
-      `INSERT INTO users (email, password_hash, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [email, passwordHash, name, avatar || null, bio || null, location || null, latitude || null, longitude || null, phone || null, website || null, interests || null, services || null, isHost || 0]
+      `INSERT INTO users (email, password_hash, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, role)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [email, passwordHash, name, avatar || null, bio || null, location || null, latitude || null, longitude || null, phone || null, website || null, interests || null, services || null, isHost || 0, role]
     );
     saveDatabase();
     return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
@@ -456,7 +484,7 @@ export const userQueries = usePostgres ? {
 
   getUserById: (id: number) => {
     const result = db.exec(
-      `SELECT id, email, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, created_at, updated_at
+      `SELECT id, email, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, is_host, role, created_at, updated_at
        FROM users WHERE id = ?`,
       [id]
     );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -59,15 +59,30 @@ export default function MessagesScreen() {
     conversationId: number;
   } | null>(null);
 
+  const socketRef = useRef<any>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+
   // Load conversations from backend
   const loadConversations = async () => {
-    if (!currentUser) return;
+
+    console.log('🔎 [DEBUG] loadConversations called. currentUser:', currentUser, 'currentUser.id:', currentUser?.id);
+    if (
+      !currentUser ||
+      currentUser.id === undefined ||
+      currentUser.id === null ||
+      currentUser.id === undefined || currentUser.id === null || isNaN(Number(currentUser.id)) ||
+      isNaN(Number(currentUser.id))
+    ) {
+      console.warn('⚠️ [loadConversations] Skipping API call: currentUser or currentUser.id is invalid:', currentUser);
+      return;
+    }
 
     setIsLoadingConversations(true);
     try {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
+        console.log('🔎 [DEBUG] Conversations API response:', data);
         if (__DEV__) {
           logger.debug('📬 Loaded conversations for user', currentUser.id, ':', data);
           logger.debug('📬 Current user name:', currentUser.name, 'ID:', currentUser.id);
@@ -83,11 +98,15 @@ export default function MessagesScreen() {
         if (Array.isArray(data)) {
           // Filter out any invalid items (null, undefined, or missing ID)
           const validConversations = data.filter((item: any) => item && typeof item === 'object' && item.id);
+          console.log('🔎 [DEBUG] Filtered valid conversations:', validConversations);
           setConversations(validConversations);
         } else {
           console.error('❌ Expected array of conversations but got:', typeof data, data);
           setConversations([]);
         }
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Conversations API error:', response.status, errorText);
       }
     } catch (error) {
       logger.error('Failed to load conversations:', error);
@@ -95,6 +114,10 @@ export default function MessagesScreen() {
       setIsLoadingConversations(false);
     }
   };
+
+  const onRefresh = React.useCallback(() => {
+    loadConversations();
+  }, [currentUser]);
 
   // Load conversations on mount and when user changes or tab becomes focused
   useEffect(() => {
@@ -138,6 +161,7 @@ export default function MessagesScreen() {
         if (currentConnectionState) {
           console.log('Socket already connected, joining room for user:', currentUser.id);
           socket.emit('user:join', currentUser.id);
+          console.log('[SOCKET] user:join emitted (already connected) for user:', currentUser.id);
         }
 
         // Set up connection event handlers
@@ -147,11 +171,13 @@ export default function MessagesScreen() {
           // Join user room
           console.log('Emitting user:join for user:', currentUser.id);
           socket.emit('user:join', currentUser.id);
+          console.log('[SOCKET] user:join emitted (on connect) for user:', currentUser.id);
         };
 
         const handleDisconnect = () => {
           console.log('Socket disconnected for user:', currentUser.id);
           setIsSocketConnected(false);
+          console.log('[SOCKET] Disconnected event for user:', currentUser.id);
         };
 
         // Always remove previous listeners before adding new ones
@@ -192,120 +218,59 @@ export default function MessagesScreen() {
         return false; // Let other handlers try
       }
 
-      // Always reload conversations list to show new message
+      // Only update local state for new messages, do not reload from backend
+      // Always reload conversations list to show new message in list preview
       loadConversations();
 
-      // Always reload messages if the active conversation matches
       if (activeConversation && message.conversation_id === activeConversation.conversationId) {
-        console.log('🔄 Reloading messages for active conversation:', activeConversation.conversationId);
-        loadConversationMessages(activeConversation.conversationId);
-      } else {
-        // If not the active conversation, clear messages to force reload when user opens it
-        setMessages([]);
-      }
-
-      // Check if this is a message I received (not sent by me)
-      const isReceivedByMe = message.receiver_id === currentUser.id;
-      const isSentByMe = message.sender_id === currentUser.id;
-
-      // Compute activeUserId and activeConvoId once for this message
-      const activeUserId = activeConversation ? parseInt(activeConversation.userId) : null;
-      const activeConvoId = activeConversation ? activeConversation.conversationId : null;
-
-      // Determine if we should handle this message (stop propagation)
-      let shouldStopPropagation = false;
-
-      if (isReceivedByMe && !isSentByMe) {
-        // Messages tab is focused - we handle all notifications
-        if (isFocused) {
-          shouldStopPropagation = true;
-
-          // Check if we're ACTIVELY VIEWING this specific conversation right now
-          const isActivelyViewingThisConversation =
-            activeConversation &&
-            activeUserId !== null &&
-            activeConvoId !== null &&
-            message.sender_id === activeUserId &&
-            message.conversation_id === activeConvoId;
-
-          console.log('📬 Notification check:', {
-            isTabFocused: isFocused,
-            hasActiveConversation: !!activeConversation,
-            activeConvoUserId: activeUserId,
-            activeConvoId: activeConvoId,
-            messageSenderId: message.sender_id,
-            messageConvoId: message.conversation_id,
-            isActivelyViewing: isActivelyViewingThisConversation,
-            senderName: message.sender_name,
-            senderIdMatch: activeUserId !== null && message.sender_id === activeUserId,
-            convoIdMatch: activeConvoId !== null && message.conversation_id === activeConvoId
-          });
-
-          if (!isActivelyViewingThisConversation) {
-            // Show notification modal - user is NOT actively viewing this conversation
-            console.log('📬 Showing notification from:', message.sender_name);
-
-            setNewMessageNotification({
-              senderName: message.sender_name || 'Usuario',
-              senderAvatar: message.sender_avatar,
-              messageText: message.text,
-              senderId: message.sender_id,
-              conversationId: message.conversation_id,
-            });
-          } else {
-            console.log('✅ User is actively viewing this conversation - NO modal, message will be added to chat');
-          }
-        } else {
-          // Messages tab NOT focused - let global Alert handle it
-          console.log('⏩ Messages tab not focused, let global Alert handle notification');
-          shouldStopPropagation = false;
-        }
-      }
-
-      if (isSentByMe) {
-        // Always handle messages sent by me
-        console.log('✅ Message sent by me, updating conversation list');
-        shouldStopPropagation = true;
-      }
-
-      // Add message to active conversation if applicable (always, regardless of notification)
-      setMessages(prev => {
-        if (activeConversation) {
-          const isFromActiveUser = message.sender_id === activeUserId;
-          const isToActiveUser = message.receiver_id === activeUserId;
-          const isSentByMe = message.sender_id === currentUser.id;
-          const isReceivedByMe = message.receiver_id === currentUser.id;
-
-          // Only add if message is between me and the active conversation user
-          if (!((isSentByMe && isToActiveUser) || (isReceivedByMe && isFromActiveUser))) {
-            console.log('⏭️ Message not for active conversation, ignoring');
+        setMessages(prev => {
+          const messageId = message.id?.toString();
+          if (messageId && prev.some(m => m.id === messageId)) {
+            console.log('⏭️ Duplicate message ID, ignoring');
             return prev;
           }
+          console.log('💬 Message added to local state (prepended for inverted list)');
+          return [{
+            id: message.id?.toString() || Date.now().toString(),
+            text: message.text,
+            senderId: message.sender_id?.toString(),
+            sender: message.sender_id === currentUser.id ? 'me' : 'other',
+            timestamp: new Date(message.created_at),
+          }, ...prev];
+        });
+      }
+
+      // Show notification modal if not actively viewing this conversation
+      const isReceivedByMe = message.receiver_id === currentUser.id;
+      const isSentByMe = message.sender_id === currentUser.id;
+      const activeUserId = activeConversation ? parseInt(activeConversation.userId) : null;
+      const activeConvoId = activeConversation ? activeConversation.conversationId : null;
+      let shouldStopPropagation = false;
+      if (isReceivedByMe && !isSentByMe && isFocused) {
+        const isActivelyViewingThisConversation =
+          activeConversation &&
+          activeUserId !== null &&
+          activeConvoId !== null &&
+          message.sender_id === activeUserId &&
+          message.conversation_id === activeConvoId;
+        if (!isActivelyViewingThisConversation) {
+          setNewMessageNotification({
+            senderName: message.sender_name || 'Usuario',
+            senderAvatar: message.sender_avatar,
+            messageText: message.text,
+            senderId: message.sender_id,
+            conversationId: message.conversation_id,
+          });
         }
-
-        // Check for duplicate by ID
-        const messageId = message.id?.toString();
-        if (messageId && prev.some(m => m.id === messageId)) {
-          console.log('⏭️ Duplicate message ID, ignoring');
-          return prev;
-        }
-
-        console.log('💬 Message added to local state (prepended for inverted list)');
-        return [{
-          id: message.id?.toString() || Date.now().toString(),
-          text: message.text,
-          senderId: message.sender_id?.toString(),
-          sender: message.sender_id === currentUser.id ? 'me' : 'other',
-          timestamp: new Date(message.created_at),
-        }, ...prev];
-      });
-
-      // Return early based on whether we handled the message
+        shouldStopPropagation = true;
+      }
+      if (isSentByMe) {
+        shouldStopPropagation = true;
+      }
       if (shouldStopPropagation) {
         console.log('🚫 Stopping propagation - Messages screen handled this message');
         return true;
       }
-
       console.log('⏩ Continuing propagation - Messages screen did not handle this message');
       return false;
     });
@@ -327,6 +292,7 @@ export default function MessagesScreen() {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversationId}/messages?page=${pageNum}&limit=20`);
       if (response.ok) {
         const data = await response.json();
+        console.log('🔎 [DEBUG] Messages API response:', data);
         // Backend returns { messages: [], page, limit, total }
         const messagesList = data.messages || [];
         console.log('💬 Loaded messages:', messagesList.length, 'page:', pageNum);
@@ -339,6 +305,7 @@ export default function MessagesScreen() {
           timestamp: new Date(msg.created_at),
         }));
 
+        console.log('🔎 [DEBUG] Parsed newMessages:', newMessages);
         setMessages(prev => {
           if (pageNum === 1) return newMessages;
           // Append older messages to the end of the newest-to-oldest list
@@ -347,6 +314,9 @@ export default function MessagesScreen() {
 
         setHasMore(messagesList.length === 20);
         setPage(pageNum);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Messages API error:', response.status, errorText);
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -856,6 +826,14 @@ export default function MessagesScreen() {
             keyExtractor={item => item.id.toString()}
             style={styles.conversationsList}
             ListEmptyComponent={renderEmptyState()}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoadingConversations}
+                onRefresh={onRefresh}
+                colors={[Colors.primary]}
+                tintColor={Colors.primary}
+              />
+            }
             initialNumToRender={10}
             maxToRenderPerBatch={10}
             windowSize={5}

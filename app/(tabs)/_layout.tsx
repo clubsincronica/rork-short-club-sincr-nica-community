@@ -2,15 +2,14 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Briefcase, MessageCircle, User, MapPin, Users, Shield } from '@/components/SmartIcons';
-import { useGlobalSocketConnection } from '@/hooks/useGlobalSocketConnection';
+
 import { useUser } from '@/hooks/user-store';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
 
-  // Initialize global socket connection for real-time messaging across all tabs
-  useGlobalSocketConnection();
+
 
   // Check if current user is a superuser
   const isSuperUser = currentUser?.role === 'superuser';
