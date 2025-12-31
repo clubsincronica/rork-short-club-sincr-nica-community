@@ -23,6 +23,7 @@ router.get('/conversations/user/:id', (req, res, next) => {
     console.log('🪪 [DEBUG] isNaN(Number(idVal)):', isNaN(Number(idVal)));
   } catch (e) {
     console.error('🪪 [DEBUG] Error inspecting req.params.id:', e);
+  }
   next();
 }, validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
   try {
