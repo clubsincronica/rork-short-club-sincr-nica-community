@@ -19,7 +19,7 @@ router.get('/conversations/user/:id', (req: Request, res: Response, next: NextFu
   try {
     const idVal = req.params.id;
     console.log('🪪 [DEBUG] req.params:', req.params);
-    console.log('🪪 [DEBUG] idVal == Number(idVal):', idVal == Number(idVal), 'Number(idVal):', Number(idVal));
+    console.log('🪪 [DEBUG] idVal:', idVal, 'Number(idVal):', Number(idVal), 'idVal type:', typeof idVal);
     console.log('🪪 [DEBUG] isNaN(Number(idVal)):', isNaN(Number(idVal)));
   } catch (e) {
     console.error('🪪 [DEBUG] Error inspecting req.params.id:', e);
