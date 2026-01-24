@@ -2,6 +2,7 @@ services:
   - type: web
     name: clubsincronica-backend
     rootDir: backend
+    plan: free # Explicitly request the Free tier
     env: node
     buildCommand: npm ci && npm run build
     startCommand: npm run start
