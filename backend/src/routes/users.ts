@@ -1,3 +1,14 @@
+// Delete user by ID (admin or script use)
+router.delete('/users/:id', async (req: Request, res: Response) => {
+  try {
+    const userId = parseIntSafe(req.params.id, 'user ID');
+    await userQueries.deleteUser(userId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
 import express, { Request, Response } from 'express';
 import { userQueries } from '../models/database-sqljs';
 import { getJWTSecret } from '../config/env';

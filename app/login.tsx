@@ -27,34 +27,34 @@ export default function LoginScreen() {
 
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
+
     if (!email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Please enter a valid email';
     }
-    
+
     if (!password) {
       newErrors.password = 'Password is required';
     } else if (password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleLogin = async () => {
     if (!validateForm()) return;
-    
+
     try {
       console.log('Attempting login with email:', email);
       await login({ email, password });
       console.log('Login successful, navigating to tabs');
       router.replace('/discover');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login error:', error);
-      Alert.alert('Login Failed', 'Please check your credentials and try again.');
+      Alert.alert('Login Failed', error.message || 'Please check your credentials and try again.');
     }
   };
 

@@ -6,79 +6,94 @@ import { Home, Briefcase, MessageCircle, User, MapPin, Users, Shield } from '@/c
 import { useUser } from '@/hooks/user-store';
 
 export default function TabLayout() {
+
   const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
 
-
-
-  // Check if current user is a superuser
+  // Debug logging for user role
+  console.log('[TabLayout] currentUser:', currentUser);
   const isSuperUser = currentUser?.role === 'superuser';
+  console.log('[TabLayout] isSuperUser:', isSuperUser);
 
+  const tabScreens = [
+    <Tabs.Screen
+      key="discover"
+      name="discover"
+      options={{
+        title: 'Descubrir',
+        tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+      }}
+    />,
+    <Tabs.Screen
+      key="near-me"
+      name="near-me"
+      options={{
+        title: 'Comunidad',
+        tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
+      }}
+    />,
+    <Tabs.Screen
+      key="messages"
+      name="messages"
+      options={{
+        title: 'Mensajes',
+        tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
+      }}
+    />,
+    <Tabs.Screen
+      key="services"
+      name="services"
+      options={{
+        title: 'Servicios',
+        tabBarIcon: ({ color, size }) => <Briefcase color={color} size={size} />,
+      }}
+    />,
+    <Tabs.Screen
+      key="profile"
+      name="profile"
+      options={{
+        title: 'Perfil',
+        tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
+      }}
+    />,
+  ];
+  if (isSuperUser) {
+    tabScreens.push(
+      <Tabs.Screen
+        key="admin"
+        name="admin"
+        options={{
+          title: 'Admin',
+          tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
+        }}
+      />
+    );
+  }
+  console.log('[TabLayout] Tab children count:', tabScreens.length);
+  tabScreens.forEach((child, idx) => {
+    console.log(`[TabLayout] Tab child ${idx}:`, child?.props?.name);
+  });
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#9bdbbf',  // Mint green for active tabs
-        tabBarInactiveTintColor: '#b8b0c4', // Lighter purple-gray for much better contrast
+        tabBarActiveTintColor: '#9bdbbf',
+        tabBarInactiveTintColor: '#b8b0c4',
         headerShown: false,
         tabBarStyle: {
           backgroundColor: '#1a0d2e',
           borderTopWidth: 1,
           borderTopColor: 'rgba(107, 76, 138, 0.3)',
-          paddingBottom: insets.bottom, // Fix Android navigation bar covering tabs
-          height: 60 + insets.bottom, // Adjust height for safe area
+          paddingBottom: insets.bottom,
+          height: 60 + insets.bottom,
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',  // Slightly bolder for better readability
+          fontWeight: '600',
           marginTop: 4,
         },
       }}
     >
-      <Tabs.Screen
-        name="discover"
-        options={{
-          title: 'Descubrir',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-        }}
-      />
-
-      <Tabs.Screen
-        name="near-me"
-        options={{
-          title: 'Comunidad',
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="messages"
-        options={{
-          title: 'Mensajes',
-          tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="services"
-        options={{
-          title: 'Servicios',
-          tabBarIcon: ({ color, size }) => <Briefcase color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
-        }}
-      />
-      {isSuperUser && (
-        <Tabs.Screen
-          name="admin"
-          options={{
-            title: 'Admin',
-            tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
-          }}
-        />
-      )}
+      {tabScreens}
     </Tabs>
   );
 }

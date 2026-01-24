@@ -21,4 +21,13 @@ async function resetPassword(email, newPassword) {
   }
 }
 
-resetPassword('tom_weasley@hotmail.com', 'Ballymote1.');
+
+// Reset passwords for all three users
+async function resetAll() {
+  await resetPassword('tom_weasley@hotmail.com', 'Ballymote1.');
+  await resetPassword('matias.cazeaux@gmail.com', 'Ballymote1.');
+  await resetPassword('eu.larra@gmail.com', 'Ballymote1.');
+  process.exit(0);
+}
+
+resetAll();

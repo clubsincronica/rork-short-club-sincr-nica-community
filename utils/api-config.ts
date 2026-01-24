@@ -43,6 +43,12 @@ const deriveSocketUrlFromHttp = (httpUrl: string) => {
 };
 
 export const getApiBaseUrl = (): string => {
+  // If in development, use local IP
+  if (__DEV__) {
+    // Return your local IP for physical device testing, or localhost for web
+    // Update API_CONFIG.LOCAL_IP at the top of this file if needed
+    return `http://${API_CONFIG.LOCAL_IP}:${API_CONFIG.PORT}`;
+  }
   // Always use the deployed Railway backend URL for all environments
   return 'https://rork-short-club-sincr-nica-community-production.up.railway.app';
 };

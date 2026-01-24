@@ -208,17 +208,16 @@ export default function MessagesScreen() {
     console.log('📬 [Messages Screen] Subscribing to message event bus');
 
     const unsubscribe = messageEventBus.onNewMessage((message) => {
-      console.log('📬 [Messages Screen] Received message from event bus:', message);
-      console.log('📬 [Messages Screen] Current user:', currentUser?.id, currentUser?.name);
-      console.log('📬 [Messages Screen] Message sender_id:', message.sender_id, 'receiver_id:', message.receiver_id);
+      console.log('📬 [Messages Screen] [DEBUG] Event bus fired:', JSON.stringify(message));
+      console.log('📬 [Messages Screen] [DEBUG] Current user:', currentUser?.id, currentUser?.name);
+      console.log('📬 [Messages Screen] [DEBUG] Message sender_id:', message.sender_id, 'receiver_id:', message.receiver_id);
 
       // Safety check
       if (!message || !message.text) {
-        console.warn('❌ Invalid message from event bus:', message);
+        console.warn('❌ [DEBUG] Invalid message from event bus:', message);
         return false; // Let other handlers try
       }
 
-      // Only update local state for new messages, do not reload from backend
       // Always reload conversations list to show new message in list preview
       loadConversations();
 
@@ -226,17 +225,19 @@ export default function MessagesScreen() {
         setMessages(prev => {
           const messageId = message.id?.toString();
           if (messageId && prev.some(m => m.id === messageId)) {
-            console.log('⏭️ Duplicate message ID, ignoring');
+            console.log('⏭️ [DEBUG] Duplicate message ID, ignoring:', messageId);
             return prev;
           }
-          console.log('💬 Message added to local state (prepended for inverted list)');
-          return [{
+          const newMsg = {
             id: message.id?.toString() || Date.now().toString(),
             text: message.text,
             senderId: message.sender_id?.toString(),
-            sender: message.sender_id === currentUser.id ? 'me' : 'other',
+            sender: message.sender_id === currentUser.id ? ('me' as 'me' | 'other') : ('other' as 'me' | 'other'),
             timestamp: new Date(message.created_at),
-          }, ...prev];
+          };
+          console.log('💬 [DEBUG] Adding message to local state:', newMsg);
+          console.log('💬 [DEBUG] Previous messages state:', prev);
+          return [newMsg, ...prev];
         });
       }
 
@@ -268,10 +269,10 @@ export default function MessagesScreen() {
         shouldStopPropagation = true;
       }
       if (shouldStopPropagation) {
-        console.log('🚫 Stopping propagation - Messages screen handled this message');
+        console.log('🚫 [DEBUG] Stopping propagation - Messages screen handled this message');
         return true;
       }
-      console.log('⏩ Continuing propagation - Messages screen did not handle this message');
+      console.log('⏩ [DEBUG] Continuing propagation - Messages screen did not handle this message');
       return false;
     });
 
@@ -294,8 +295,12 @@ export default function MessagesScreen() {
         const data = await response.json();
         console.log('🔎 [DEBUG] Messages API response:', data);
         // Backend returns { messages: [], page, limit, total }
-        const messagesList = data.messages || [];
+
+        let messagesList = data.messages || [];
         console.log('💬 Loaded messages:', messagesList.length, 'page:', pageNum);
+
+        // Reverse so newest messages are first (to match real-time prepend logic)
+        if (messagesList.length > 1) messagesList = messagesList.slice().reverse();
 
         const newMessages = messagesList.map((msg: any) => ({
           id: msg.id.toString(),
@@ -305,7 +310,7 @@ export default function MessagesScreen() {
           timestamp: new Date(msg.created_at),
         }));
 
-        console.log('🔎 [DEBUG] Parsed newMessages:', newMessages);
+        console.log('🔎 [DEBUG] Parsed newMessages (reversed):', newMessages);
         setMessages(prev => {
           if (pageNum === 1) return newMessages;
           // Append older messages to the end of the newest-to-oldest list
@@ -530,8 +535,7 @@ export default function MessagesScreen() {
       {/* Messages List */}
       <FlatList
         ref={flatListRef}
-        data={messages}
-        inverted
+        data={[...messages].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View
@@ -609,41 +613,15 @@ export default function MessagesScreen() {
     });
   };
 
-  const renderConversationItem = (conversation: Conversation) => (
-    <TouchableOpacity
-      key={conversation.id}
-      style={styles.conversationItem}
-      onPress={() => handleOpenConversation(conversation)}
-    >
-      <Image
-        source={{ uri: conversation.avatar || 'https://via.placeholder.com/50' }}
-        style={styles.avatar}
-      />
-      <View style={styles.conversationInfo}>
-        <View style={styles.conversationItemHeader}>
-          <Text style={styles.conversationName}>{conversation.name}</Text>
-          {conversation.last_message_time && (
-            <Text style={styles.timestamp}>
-              {new Date(conversation.last_message_time).toLocaleTimeString('es', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </Text>
-          )}
-        </View>
-        <View style={styles.lastMessageRow}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {conversation.last_message || 'Sin mensajes'}
-          </Text>
-          {conversation.unread_count > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{conversation.unread_count}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0 && flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
+// ...existing code...
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -819,8 +797,8 @@ export default function MessagesScreen() {
         ) : (
           <FlatList
             data={conversations.filter(c =>
-              c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              (c.last_message && c.last_message.toLowerCase().includes(searchQuery.toLowerCase()))
+              (typeof c.name === 'string' && c.name && c.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+              (typeof c.last_message === 'string' && c.last_message && c.last_message.toLowerCase().includes(searchQuery.toLowerCase()))
             )}
             renderItem={({ item }) => renderConversationItem(item)}
             keyExtractor={item => item.id.toString()}

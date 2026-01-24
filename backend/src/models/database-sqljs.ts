@@ -430,6 +430,13 @@ export const userQueries = usePostgres ? {
     );
   },
 
+  updatePassword: async (id: number, passwordHash: string) => {
+    await pgClient.query(
+      `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+      [passwordHash, id]
+    );
+  },
+
   getNearbyUsers: async (latitude: number, longitude: number, radiusKm: number, limit: number) => {
     const rows = await pgClient.query(
       `
@@ -460,6 +467,10 @@ export const userQueries = usePostgres ? {
       [searchTerm, searchTerm, searchTerm]
     );
     return rows || [];
+  }
+  ,
+  deleteUser: async (id: number) => {
+    await pgClient.query(`DELETE FROM users WHERE id = $1`, [id]);
   }
 } : {
   // Returns all users (for geocoding and admin scripts)
@@ -500,6 +511,14 @@ export const userQueries = usePostgres ? {
     saveDatabase();
   },
 
+  updatePassword: (id: number, passwordHash: string) => {
+    db.run(
+      `UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [passwordHash, id]
+    );
+    saveDatabase();
+  },
+
   getNearbyUsers: (latitude: number, longitude: number, radiusKm: number, limit: number) => {
     const result = db.exec(
       `SELECT id, email, name, avatar, bio, location, latitude, longitude, services, is_host,
@@ -524,6 +543,11 @@ export const userQueries = usePostgres ? {
       [searchTerm, searchTerm, searchTerm]
     );
     return result[0]?.values.map((row: any) => rowToObject(result[0].columns, row)) || [];
+  }
+  ,
+  deleteUser: (id: number) => {
+    db.run(`DELETE FROM users WHERE id = ?`, [id]);
+    saveDatabase();
   }
 };
 
