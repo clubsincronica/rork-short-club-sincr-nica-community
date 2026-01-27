@@ -4,7 +4,7 @@ services:
     rootDir: backend
     plan: free # Explicitly request the Free tier
     env: node
-    buildCommand: npm install && npm run build
+    buildCommand: npm install --production=false && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_ENV
