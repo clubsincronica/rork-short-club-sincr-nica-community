@@ -49,8 +49,8 @@ export const getApiBaseUrl = (): string => {
     // Update API_CONFIG.LOCAL_IP at the top of this file if needed
     return `http://${API_CONFIG.LOCAL_IP}:${API_CONFIG.PORT}`;
   }
-  // Always use the deployed Railway backend URL for all environments
-  return 'https://rork-short-club-sincr-nica-community-production.up.railway.app';
+  // Always use the deployed Render backend URL for all environments
+  return 'https://clubsincronica-backend.onrender.com';
 };
 
 export const API_BASE_URL = getApiBaseUrl();

@@ -621,7 +621,54 @@ export default function MessagesScreen() {
       }, 100);
     }
   }, [messages]);
-// ...existing code...
+
+  // Render individual conversation item
+  const renderConversationItem = (conversation: Conversation) => {
+    const formatTimestamp = (timestamp?: string) => {
+      if (!timestamp) return '';
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffMins < 1) return 'Ahora';
+      if (diffMins < 60) return `${diffMins}m`;
+      if (diffHours < 24) return `${diffHours}h`;
+      if (diffDays < 7) return `${diffDays}d`;
+      return date.toLocaleDateString('es', { day: 'numeric', month: 'short' });
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={() => handleOpenConversation(conversation)}
+      >
+        <Image
+          source={{ uri: conversation.avatar || 'https://via.placeholder.com/50' }}
+          style={styles.avatar}
+        />
+        <View style={styles.conversationInfo}>
+          <View style={styles.conversationItemHeader}>
+            <Text style={styles.conversationName}>{conversation.name}</Text>
+            <Text style={styles.timestamp}>{formatTimestamp(conversation.last_message_time)}</Text>
+          </View>
+          <View style={styles.lastMessageRow}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {conversation.last_message || 'Sin mensajes aún'}
+            </Text>
+            {conversation.unread_count > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>{conversation.unread_count}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+  // ...existing code...
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -1085,6 +1132,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  conversationName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.text,
   },
   timestamp: {
     fontSize: 12,

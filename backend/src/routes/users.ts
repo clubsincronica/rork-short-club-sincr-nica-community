@@ -21,6 +21,8 @@ import {
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
+import { getDefaultLocation, isBlocked } from '../config/user-overrides';
+
 const router = express.Router();
 
 // Register/Login - Create or get user (with rate limiting and validation)
@@ -32,18 +34,10 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
     console.log('[AUTH DEBUG] Raw request body:', req.body);
 
     // Default coordinates if not provided (so users are always discoverable)
-    if (latitude === undefined || latitude === null) {
-      // Example: assign by email for known users, else default to SF
-      if (email === 'matias.cazeaux@gmail.com') latitude = -38.02;
-      else if (email === 'eularra@gmail.com') latitude = 40.4168;
-      else if (email === 'tom_weasley@hotmail.com') latitude = 37.7749;
-      else latitude = 37.7749;
-    }
-    if (longitude === undefined || longitude === null) {
-      if (email === 'matias.cazeaux@gmail.com') longitude = -57.53;
-      else if (email === 'eularra@gmail.com') longitude = -3.7038;
-      else if (email === 'tom_weasley@hotmail.com') longitude = -122.4194;
-      else longitude = -122.4194;
+    if (latitude === undefined || latitude === null || longitude === undefined || longitude === null) {
+      const defaultLoc = getDefaultLocation(email);
+      latitude = latitude ?? defaultLoc.latitude;
+      longitude = longitude ?? defaultLoc.longitude;
     }
 
     if (!email) {
@@ -54,10 +48,10 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
     let user: any = await userQueries.getUserByEmail(email);
     let isNewUser = false;
 
-    // Block both creation and login for matiascazeaux@gmail.com (no-dot)
-    if (email === 'matiascazeaux@gmail.com') {
+    // Check for blocked email
+    if (isBlocked(email)) {
       console.warn(`[AUTH BLOCKED] Attempt to create or login blocked user: '${email}'. Returning error.`);
-      return res.status(403).json({ error: 'This user is blocked. Please use matias.cazeaux@gmail.com.' });
+      return res.status(403).json({ error: 'This user is blocked.' });
     }
     if (!user) {
       // Extra debug: If the login request is for matias.cazeaux@gmail.com, log if the no-dot user is being created

@@ -260,7 +260,25 @@ export async function initializeDatabase() {
         )
       `);
 
-      console.log('Postgres events, bank_accounts, transactions, reservations, notifications, and blocked_emails tables initialized');
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS system_config (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          description TEXT,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      // Initialize default config if empty
+      await pgClient.query(`
+        INSERT INTO system_config (key, value, description)
+        VALUES 
+          ('customer_fee_percent', '2.5', 'Percentage fee charged to customers'),
+          ('provider_fee_percent', '2.5', 'Percentage fee deducted from providers')
+        ON CONFLICT (key) DO NOTHING
+      `);
+
+      console.log('Postgres events, bank_accounts, transactions, reservations, notifications, blocked_emails, and system_config tables initialized');
     } else {
       // Use sql.js
       console.log('Using SQL.js database');
@@ -293,6 +311,22 @@ export async function initializeDatabase() {
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS system_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            description TEXT,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        db.run(`
+          INSERT OR IGNORE INTO system_config (key, value, description)
+          VALUES 
+            ('customer_fee_percent', '2.5', 'Percentage fee charged to customers'),
+            ('provider_fee_percent', '2.5', 'Percentage fee deducted from providers')
         `);
 
         db.run(`

@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 
 const connectionString = process.env.DATABASE_URL || '';
 const email = 'matias.cazeaux@gmail.com';
-const newPassword = 'Ballymote';
+const newPassword = 'Ballymote1';
 
 if (!connectionString) {
     console.error('❌ DATABASE_URL not set.');

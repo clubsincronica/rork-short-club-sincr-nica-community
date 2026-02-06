@@ -255,4 +255,33 @@ router.post('/unblock-user', async (req: Request, res: Response) => {
     }
 });
 
+// Config Management Endpoint
+router.get('/config', async (req: Request, res: Response) => {
+    try {
+        const { getAllConfig } = require('../models/system-config');
+        const config = await getAllConfig();
+        res.json(config);
+    } catch (error) {
+        console.error('Admin config error:', error);
+        res.status(500).json({ error: 'Failed to fetch config' });
+    }
+});
+
+router.put('/config', async (req: Request, res: Response) => {
+    try {
+        const { setConfigValue } = require('../models/system-config');
+        const { key, value, description } = req.body;
+
+        if (!key || value === undefined) {
+            return res.status(400).json({ error: 'Key and value required' });
+        }
+
+        await setConfigValue(key, value.toString(), description);
+        res.json({ success: true, key, value });
+    } catch (error) {
+        console.error('Admin update config error:', error);
+        res.status(500).json({ error: 'Failed to update config' });
+    }
+});
+
 export default router;
