@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { conversationQueries, messageQueries } from '../models/database-sqljs';
-import { parseIntSafe } from '../middleware/security';
+import { parseIntSafe, authenticateJWT } from '../middleware/security';
 import {
   validateConversationId,
   validateCreateConversation,
@@ -11,6 +11,9 @@ import {
 } from '../middleware/validation';
 
 const router = express.Router();
+
+// Apply JWT Authentication to ALL routes in this file
+router.use(authenticateJWT);
 
 // Get user's conversations
 router.get('/conversations/user/:id', (req: Request, res: Response, next: NextFunction) => {

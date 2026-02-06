@@ -30,8 +30,10 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
   try {
     let { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
     console.log(`[AUTH DEBUG] Received login request for email: '${email}'`);
-    // Log the raw request body for debugging
-    console.log('[AUTH DEBUG] Raw request body:', req.body);
+    // Log the raw request body (Sanitized)
+    const sanitizedBody = { ...req.body };
+    if (sanitizedBody.password) sanitizedBody.password = '***REDACTED***';
+    console.log('[AUTH DEBUG] Request body:', sanitizedBody);
 
     // Default coordinates if not provided (so users are always discoverable)
     if (latitude === undefined || latitude === null || longitude === undefined || longitude === null) {

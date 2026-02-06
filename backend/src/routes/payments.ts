@@ -2,8 +2,12 @@ import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
 import mercadopago from 'mercadopago';
 import { createTransaction, updateTransaction } from '../models/transaction';
+import { authenticateJWT } from '../middleware/security';
 
 const router = express.Router();
+
+// Validated: Only authenticated users can initiate payments
+router.use(authenticateJWT);
 
 // Stripe setup
 // Initialize conditionally to prevent startup crash if key is missing
