@@ -13,6 +13,8 @@ const requiredEnvVars = [
 const recommendedEnvVars = [
   'DATABASE_URL',
   'NODE_ENV',
+  'STRIPE_SECRET_KEY',
+  'MERCADOPAGO_ACCESS_TOKEN',
 ] as const;
 
 /**
@@ -21,20 +23,20 @@ const recommendedEnvVars = [
  */
 export function validateEnvironment(): void {
   const missingVars: string[] = [];
-  
+
   for (const varName of requiredEnvVars) {
     if (!process.env[varName]) {
       missingVars.push(varName);
     }
   }
-  
+
   if (missingVars.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missingVars.join(', ')}\n` +
       'Please check your .env file and ensure all required variables are set.'
     );
   }
-  
+
   // Warn about missing recommended variables
   const missingRecommended: string[] = [];
   for (const varName of recommendedEnvVars) {
@@ -42,13 +44,13 @@ export function validateEnvironment(): void {
       missingRecommended.push(varName);
     }
   }
-  
+
   if (missingRecommended.length > 0) {
     console.warn(
       `⚠️  Missing recommended environment variables: ${missingRecommended.join(', ')}`
     );
   }
-  
+
   console.log('✅ Environment variables validated successfully');
 }
 

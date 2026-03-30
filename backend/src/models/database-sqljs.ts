@@ -866,13 +866,142 @@ export const eventQueries = usePostgres ? {
     ]);
   }
 } : {
-  // SQLite fallback (minimal implementation for compilation, but we are using Postgres)
-  createEvent: (event: any) => { return { lastID: 0 }; },
-  getEvents: () => [],
-  getEventsByProvider: (id: number) => [],
-  getEventById: (id: number) => null,
-  deleteEvent: (id: number) => { },
-  updateEvent: (id: number, event: any) => { }
+  createEvent: (event: any) => {
+    db.run(
+      `INSERT INTO events (
+        provider_id, title, description, category, start_time, end_time, date, 
+        location, is_online, max_participants, current_participants, price, image, tags, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        event.providerId, event.title, event.description, event.category, event.startTime, event.endTime, event.date,
+        event.location, event.isOnline ? 1 : 0, event.maxParticipants, event.currentParticipants || 0, event.price, event.image,
+        event.tags ? JSON.stringify(event.tags) : null, event.status || 'upcoming'
+      ]
+    );
+    saveDatabase();
+    return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
+  },
+
+  getEvents: () => {
+    const result = db.exec(`
+      SELECT e.*, u.name as provider_name, u.avatar as provider_avatar, u.email as provider_email
+      FROM events e
+      LEFT JOIN users u ON u.id = e.provider_id
+      ORDER BY date ASC, start_time ASC
+    `);
+
+    if (!result[0]) return [];
+
+    return result[0].values.map((row: any) => {
+      const obj = rowToObject(result[0].columns, row);
+      return {
+        ...obj,
+        providerId: obj.provider_id,
+        startTime: obj.start_time,
+        endTime: obj.end_time,
+        isOnline: obj.is_online === 1 || obj.is_online === 'true' || obj.is_online === true,
+        maxParticipants: obj.max_participants,
+        currentParticipants: obj.current_participants,
+        tags: obj.tags ? JSON.parse(obj.tags) : [],
+        provider: {
+          id: obj.provider_id,
+          name: obj.provider_name,
+          avatar: obj.provider_avatar,
+          email: obj.provider_email,
+          isServiceProvider: true,
+          rating: 0,
+          reviewCount: 0,
+          specialties: [],
+          joinedDate: '',
+          verified: false
+        }
+      };
+    });
+  },
+
+  getEventsByProvider: (id: number) => {
+    const result = db.exec(`SELECT * FROM events WHERE provider_id = ? ORDER BY date ASC, start_time ASC`, [id]);
+    if (!result[0]) return [];
+
+    return result[0].values.map((row: any) => {
+      const obj = rowToObject(result[0].columns, row);
+      return {
+        ...obj,
+        providerId: obj.provider_id,
+        startTime: obj.start_time,
+        endTime: obj.end_time,
+        isOnline: obj.is_online === 1 || obj.is_online === 'true' || obj.is_online === true,
+        maxParticipants: obj.max_participants,
+        currentParticipants: obj.current_participants,
+        tags: obj.tags ? JSON.parse(obj.tags) : []
+      };
+    });
+  },
+
+  getEventById: (id: number) => {
+    const result = db.exec(`
+      SELECT e.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM events e
+      LEFT JOIN users u ON u.id = e.provider_id
+      WHERE e.id = ?
+    `, [id]);
+
+    if (!result[0] || !result[0].values[0]) return null;
+
+    const obj = rowToObject(result[0].columns, result[0].values[0]);
+    return {
+      ...obj,
+      providerId: obj.provider_id,
+      startTime: obj.start_time,
+      endTime: obj.end_time,
+      isOnline: obj.is_online === 1 || obj.is_online === 'true' || obj.is_online === true,
+      maxParticipants: obj.max_participants,
+      currentParticipants: obj.current_participants,
+      tags: obj.tags ? JSON.parse(obj.tags) : []
+    };
+  },
+
+  deleteEvent: (id: number) => {
+    db.run(`DELETE FROM events WHERE id = ?`, [id]);
+    saveDatabase();
+  },
+
+  updateEvent: (id: number, event: any) => {
+    db.run(`
+      UPDATE events SET 
+        title = COALESCE(?, title),
+        description = COALESCE(?, description),
+        category = COALESCE(?, category),
+        start_time = COALESCE(?, start_time),
+        end_time = COALESCE(?, end_time),
+        date = COALESCE(?, date),
+        location = COALESCE(?, location),
+        is_online = COALESCE(?, is_online),
+        max_participants = COALESCE(?, max_participants),
+        price = COALESCE(?, price),
+        image = COALESCE(?, image),
+        tags = COALESCE(?, tags),
+        status = COALESCE(?, status),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      event.title !== undefined ? event.title : null, 
+      event.description !== undefined ? event.description : null, 
+      event.category !== undefined ? event.category : null, 
+      event.startTime !== undefined ? event.startTime : null, 
+      event.endTime !== undefined ? event.endTime : null, 
+      event.date !== undefined ? event.date : null,
+      event.location !== undefined ? event.location : null, 
+      event.isOnline !== undefined ? (event.isOnline ? 1 : 0) : null, 
+      event.maxParticipants !== undefined ? event.maxParticipants : null, 
+      event.price !== undefined ? event.price : null, 
+      event.image !== undefined ? event.image : null,
+      event.tags ? JSON.stringify(event.tags) : null, 
+      event.status !== undefined ? event.status : null, 
+      id
+    ]);
+    saveDatabase();
+  }
 };
 
 // Product queries
@@ -977,12 +1106,124 @@ export const productQueries = usePostgres ? {
     await pgClient.query(`DELETE FROM products WHERE id = $1`, [id]);
   }
 } : {
-  createProduct: (product: any) => ({ lastID: 0 }),
-  getProducts: () => [],
-  getProductById: (id: number) => null,
-  getProductsByProvider: (id: number) => [],
-  updateProduct: (id: number, product: any) => { },
-  deleteProduct: (id: number) => { }
+  createProduct: (product: any) => {
+    db.run(
+      `INSERT INTO products (
+        provider_id, title, description, category, price, images, tags, 
+        specifications, features, in_stock, stock_count, shipping_info
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        product.providerId, product.title, product.description, product.category, product.price,
+        JSON.stringify(product.images || []), JSON.stringify(product.tags || []),
+        product.specifications, product.features, product.inStock !== false ? 1 : 0,
+        product.stockCount || 0, product.shippingInfo
+      ]
+    );
+    saveDatabase();
+    return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
+  },
+
+  getProducts: () => {
+    const result = db.exec(`
+      SELECT p.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM products p
+      LEFT JOIN users u ON u.id = p.provider_id
+      ORDER BY p.created_at DESC
+    `);
+    
+    if (!result[0]) return [];
+    
+    return result[0].values.map((row: any) => {
+      const obj = rowToObject(result[0].columns, row);
+      return {
+        ...obj,
+        providerId: obj.provider_id,
+        inStock: obj.in_stock === 1,
+        stockCount: obj.stock_count,
+        shippingInfo: obj.shipping_info,
+        images: obj.images ? JSON.parse(obj.images) : [],
+        tags: obj.tags ? JSON.parse(obj.tags) : []
+      };
+    });
+  },
+
+  getProductById: (id: number) => {
+    const result = db.exec(`
+      SELECT p.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM products p
+      LEFT JOIN users u ON u.id = p.provider_id
+      WHERE p.id = ?
+    `, [id]);
+    
+    if (!result[0] || !result[0].values[0]) return null;
+    
+    const obj = rowToObject(result[0].columns, result[0].values[0]);
+    return {
+      ...obj,
+      providerId: obj.provider_id,
+      inStock: obj.in_stock === 1,
+      stockCount: obj.stock_count,
+      shippingInfo: obj.shipping_info,
+      images: obj.images ? JSON.parse(obj.images) : [],
+      tags: obj.tags ? JSON.parse(obj.tags) : []
+    };
+  },
+
+  getProductsByProvider: (id: number) => {
+    const result = db.exec(`SELECT * FROM products WHERE provider_id = ? ORDER BY created_at DESC`, [id]);
+    if (!result[0]) return [];
+    
+    return result[0].values.map((row: any) => {
+      const obj = rowToObject(result[0].columns, row);
+      return {
+        ...obj,
+        providerId: obj.provider_id,
+        inStock: obj.in_stock === 1,
+        stockCount: obj.stock_count,
+        shippingInfo: obj.shipping_info,
+        images: obj.images ? JSON.parse(obj.images) : [],
+        tags: obj.tags ? JSON.parse(obj.tags) : []
+      };
+    });
+  },
+
+  updateProduct: (id: number, product: any) => {
+    db.run(`
+      UPDATE products SET
+        title = COALESCE(?, title),
+        description = COALESCE(?, description),
+        category = COALESCE(?, category),
+        price = COALESCE(?, price),
+        images = COALESCE(?, images),
+        tags = COALESCE(?, tags),
+        specifications = COALESCE(?, specifications),
+        features = COALESCE(?, features),
+        in_stock = COALESCE(?, in_stock),
+        stock_count = COALESCE(?, stock_count),
+        shipping_info = COALESCE(?, shipping_info),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `, [
+      product.title !== undefined ? product.title : null, 
+      product.description !== undefined ? product.description : null, 
+      product.category !== undefined ? product.category : null, 
+      product.price !== undefined ? product.price : null,
+      product.images ? JSON.stringify(product.images) : null,
+      product.tags ? JSON.stringify(product.tags) : null,
+      product.specifications !== undefined ? product.specifications : null, 
+      product.features !== undefined ? product.features : null, 
+      product.inStock !== undefined ? (product.inStock ? 1 : 0) : null,
+      product.stockCount !== undefined ? product.stockCount : null, 
+      product.shippingInfo !== undefined ? product.shippingInfo : null, 
+      id
+    ]);
+    saveDatabase();
+  },
+
+  deleteProduct: (id: number) => {
+    db.run(`DELETE FROM products WHERE id = ?`, [id]);
+    saveDatabase();
+  }
 };
 
 // Notification queries
@@ -1024,9 +1265,42 @@ export const notificationQueries = usePostgres ? {
     return res[0]?.count ?? 0;
   }
 } : {
-  createNotification: (notif: any) => ({ lastID: 0 }),
-  getUserNotifications: (userId: number) => [],
-  markAsRead: (id: number) => { },
-  markAllAsRead: (userId: number) => { },
-  getUnreadCount: (userId: number) => 0
+  createNotification: (notif: any) => {
+    db.run(
+      `INSERT INTO notifications (user_id, type, title, message, data)
+       VALUES (?, ?, ?, ?, ?)`,
+      [notif.userId, notif.type, notif.title, notif.message, notif.data ? JSON.stringify(notif.data) : null]
+    );
+    saveDatabase();
+    return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
+  },
+
+  getUserNotifications: (userId: number) => {
+    const result = db.exec(`SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`, [userId]);
+    if (!result[0]) return [];
+    
+    return result[0].values.map((row: any) => {
+      const obj = rowToObject(result[0].columns, row);
+      return {
+        ...obj,
+        userId: obj.user_id,
+        data: obj.data ? JSON.parse(obj.data) : null
+      };
+    });
+  },
+
+  markAsRead: (id: number) => {
+    db.run(`UPDATE notifications SET read = 1 WHERE id = ?`, [id]);
+    saveDatabase();
+  },
+
+  markAllAsRead: (userId: number) => {
+    db.run(`UPDATE notifications SET read = 1 WHERE user_id = ?`, [userId]);
+    saveDatabase();
+  },
+
+  getUnreadCount: (userId: number) => {
+    const result = db.exec(`SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0`, [userId]);
+    return (result[0]?.values[0]?.[0] as number) || 0;
+  }
 };

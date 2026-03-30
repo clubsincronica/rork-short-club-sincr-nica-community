@@ -82,33 +82,33 @@ export const validateUpdateUser: ValidationChain[] = [
     .isLength({ min: 1, max: 100 })
     .withMessage('Name must be 1-100 characters'),
   body('avatar')
-    .optional()
-    .isURL()
-    .withMessage('Avatar must be valid URL'),
+    .optional({ checkFalsy: true })
+    .isString()
+    .withMessage('Avatar must be a valid string or URI'),
   body('bio')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 500 })
     .withMessage('Bio must be max 500 characters'),
   body('location')
-    .optional()
+    .optional({ checkFalsy: true })
     .trim()
     .isLength({ max: 100 })
     .withMessage('Location must be max 100 characters'),
   body('latitude')
-    .optional()
+    .optional({ nullable: true })
     .isFloat({ min: -90, max: 90 })
     .withMessage('Latitude must be between -90 and 90'),
   body('longitude')
-    .optional()
+    .optional({ nullable: true })
     .isFloat({ min: -180, max: 180 })
     .withMessage('Longitude must be between -180 and 180'),
   body('phone')
-    .optional()
+    .optional({ checkFalsy: true })
     .matches(/^\+?[1-9]\d{1,14}$/)
     .withMessage('Invalid phone number format'),
   body('website')
-    .optional()
+    .optional({ checkFalsy: true })
     .isURL({ protocols: ['http', 'https'] })
     .withMessage('Invalid website URL'),
 ];
