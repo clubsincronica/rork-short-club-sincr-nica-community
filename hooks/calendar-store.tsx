@@ -456,7 +456,7 @@ const useCalendarHook = () => {
   // Get user's events
   const userEvents = useMemo(() => {
     if (!currentUser) return [];
-    return events.filter((event: CalendarEvent) => event.providerId === currentUser.id.toString());
+    return events.filter((event: CalendarEvent) => String(event.providerId) === String(currentUser.id));
   }, [events, currentUser]);
 
   // Get user's reservations

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getApiBaseUrl } from '@/utils/api-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Shield, Users, DollarSign, TrendingUp, MessageSquare } from '@/components/SmartIcons';
+import { Shield, Users, DollarSign, TrendingUp, MessageSquare, Settings, Save, Edit3, Plus, Trash2 } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 
 export default function AdminScreen() {
@@ -12,6 +12,19 @@ export default function AdminScreen() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [users, setUsers] = useState<any[]>([]);
+    const [config, setConfig] = useState<any[]>([]);
+    const [profitDestinations, setProfitDestinations] = useState({
+        stripe_id: '',
+        cvu: '',
+        alias: '',
+        cbu: ''
+    });
+    // For generic config editing
+    const [editingConfig, setEditingConfig] = useState<any>(null);
+    const [newConfigKey, setNewConfigKey] = useState('');
+    const [newConfigValue, setNewConfigValue] = useState('');
+    const [showAddConfig, setShowAddConfig] = useState(false);
+
     const [error, setError] = useState('');
 
     const loadAdminData = async () => {
@@ -56,6 +69,21 @@ export default function AdminScreen() {
                 setUsers(usersWithBlocked);
             }
 
+            // Load Config
+            const configResponse = await fetch(`${getApiBaseUrl()}/api/admin/config`, { headers });
+            if (configResponse.ok) {
+                const configData = await configResponse.json();
+                setConfig(configData);
+
+                // Parse profit destinations
+                setProfitDestinations({
+                    stripe_id: configData.find((c: any) => c.key === 'profit_dest_stripe_id')?.value || '',
+                    cvu: configData.find((c: any) => c.key === 'profit_dest_cvu')?.value || '',
+                    alias: configData.find((c: any) => c.key === 'profit_dest_alias')?.value || '',
+                    cbu: configData.find((c: any) => c.key === 'profit_dest_cbu')?.value || ''
+                });
+            }
+
         } catch (err: any) {
             console.error('Admin data load error:', err);
             setError(err.message || 'Error al cargar datos de administrador');
@@ -67,6 +95,72 @@ export default function AdminScreen() {
     useEffect(() => {
         loadAdminData();
     }, []);
+
+    const saveConfigValue = async (key: string, value: string, description?: string) => {
+        try {
+            setLoading(true);
+            const token = await AsyncStorage.getItem('authToken');
+            const response = await fetch(`${getApiBaseUrl()}/api/admin/config`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ key, value, description })
+            });
+
+            if (response.ok) {
+                // Update local state
+                const newConfig = [...config];
+                const index = newConfig.findIndex(c => c.key === key);
+                if (index >= 0) {
+                    newConfig[index] = { ...newConfig[index], value, description: description || newConfig[index].description };
+                } else {
+                    newConfig.push({ key, value, description });
+                }
+                setConfig(newConfig);
+                Alert.alert('Éxito', 'Configuración guardada correctamente');
+                setEditingConfig(null);
+                setShowAddConfig(false);
+                setNewConfigKey('');
+                setNewConfigValue('');
+            } else {
+                Alert.alert('Error', 'No se pudo guardar la configuración');
+            }
+        } catch (err) {
+            console.error(err);
+            Alert.alert('Error', 'Error de conexión');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const saveProfitDestinations = async () => {
+        try {
+            setLoading(true);
+            const token = await AsyncStorage.getItem('authToken');
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Save all 4 fields independently
+            await Promise.all([
+                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_stripe_id', value: profitDestinations.stripe_id, description: 'Stripe Account ID for Profit Split' }) }),
+                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_cvu', value: profitDestinations.cvu, description: 'MercadoPago CVU for Profit Split' }) }),
+                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_alias', value: profitDestinations.alias, description: 'MercadoPago Alias for Profit Split' }) }),
+                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_cbu', value: profitDestinations.cbu, description: 'Bank CBU for Profit Split' }) })
+            ]);
+
+            Alert.alert('Éxito', 'Cuentas de destino actualizadas');
+            // Reload to be sure
+            loadAdminData();
+        } catch (err) {
+            Alert.alert('Error', 'Error al guardar destinos');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (error) {
         return (
@@ -133,6 +227,126 @@ export default function AdminScreen() {
                             </Text>
                             <Text style={styles.statLabel}>Ingresos ({stats.revenue?.currency})</Text>
                         </View>
+                    </View>
+
+                    {/* Configuration Section */}
+                    <View style={styles.section}>
+                        <View style={styles.sectionHeaderRow}>
+                            <Settings size={20} color={Colors.text} />
+                            <Text style={styles.sectionTitleWithIcon}>Configuración del Sistema</Text>
+                        </View>
+
+                        {/* Profit Destinations */}
+                        <Text style={styles.subsectionTitle}>Destinos de Ganancias (Split Payment)</Text>
+                        <View style={styles.configGroup}>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Stripe Account ID</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={profitDestinations.stripe_id}
+                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, stripe_id: text })}
+                                    placeholder="acct_..."
+                                />
+                            </View>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>MercadoPago CVU</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={profitDestinations.cvu}
+                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, cvu: text })}
+                                    placeholder="00000031000..."
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>MercadoPago Alias</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={profitDestinations.alias}
+                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, alias: text })}
+                                    placeholder="mi.alias.mp"
+                                    autoCapitalize="none"
+                                />
+                            </View>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>CBU Bancario</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={profitDestinations.cbu}
+                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, cbu: text })}
+                                    placeholder="01700..."
+                                    keyboardType="numeric"
+                                />
+                            </View>
+                            <TouchableOpacity style={styles.saveButton} onPress={saveProfitDestinations}>
+                                <Save size={18} color="white" />
+                                <Text style={styles.saveButtonText}>Guardar Destinos</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Generic Config */}
+                        <View style={styles.subsectionHeaderRow}>
+                            <Text style={styles.subsectionTitle}>Configuración Avanzada</Text>
+                            <TouchableOpacity onPress={() => setShowAddConfig(!showAddConfig)} style={styles.iconButton}>
+                                <Plus size={20} color={Colors.primary} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {showAddConfig && (
+                            <View style={styles.addConfigForm}>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Clave (Key)"
+                                    value={newConfigKey}
+                                    onChangeText={setNewConfigKey}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Valor"
+                                    value={newConfigValue}
+                                    onChangeText={setNewConfigValue}
+                                />
+                                <TouchableOpacity
+                                    style={styles.saveButton}
+                                    onPress={() => saveConfigValue(newConfigKey, newConfigValue)}
+                                >
+                                    <Text style={styles.saveButtonText}>Añadir Configuración</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {config.filter(c => !c.key.startsWith('profit_dest_')).map((item) => (
+                            <View key={item.key} style={styles.configItem}>
+                                <View style={styles.configInfo}>
+                                    <Text style={styles.configKey}>{item.key}</Text>
+                                    {editingConfig === item.key ? (
+                                        <TextInput
+                                            style={styles.inputSmall}
+                                            value={newConfigValue || item.value}
+                                            onChangeText={setNewConfigValue}
+                                            autoFocus
+                                        />
+                                    ) : (
+                                        <Text style={styles.configValue}>{item.value}</Text>
+                                    )}
+                                    {item.description && <Text style={styles.configDesc}>{item.description}</Text>}
+                                </View>
+                                <View style={styles.configActions}>
+                                    {editingConfig === item.key ? (
+                                        <TouchableOpacity onPress={() => saveConfigValue(item.key, newConfigValue)}>
+                                            <Save size={18} color={Colors.primary} />
+                                        </TouchableOpacity>
+                                    ) : (
+                                        <TouchableOpacity onPress={() => {
+                                            setEditingConfig(item.key);
+                                            setNewConfigValue(item.value);
+                                        }}>
+                                            <Edit3 size={18} color={Colors.textLight} />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+                            </View>
+                        ))}
                     </View>
 
                     {/* Recent Users */}
@@ -441,5 +655,113 @@ const styles = StyleSheet.create({
     retryButtonText: {
         color: 'white',
         fontWeight: '600',
+    },
+    sectionHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    sectionTitleWithIcon: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: Colors.text,
+        marginLeft: 10,
+    },
+    subsectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.textSecondary,
+        marginTop: 10,
+        marginBottom: 10,
+        textTransform: 'uppercase',
+    },
+    configGroup: {
+        marginBottom: 20,
+    },
+    inputContainer: {
+        marginBottom: 12,
+    },
+    label: {
+        fontSize: 12,
+        color: Colors.textLight,
+        marginBottom: 4,
+    },
+    input: {
+        backgroundColor: Colors.background,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        borderRadius: 8,
+        padding: 10,
+        fontSize: 14,
+        color: Colors.text,
+    },
+    saveButton: {
+        backgroundColor: Colors.primary,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 10,
+    },
+    saveButtonText: {
+        color: 'white',
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    subsectionHeaderRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    iconButton: {
+        padding: 4,
+    },
+    addConfigForm: {
+        backgroundColor: Colors.background,
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 10,
+        gap: 8,
+    },
+    configItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+    },
+    configInfo: {
+        flex: 1,
+    },
+    configKey: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.text,
+    },
+    configValue: {
+        fontSize: 14,
+        color: Colors.textLight,
+        marginTop: 2,
+    },
+    configDesc: {
+        fontSize: 10,
+        color: Colors.textSecondary,
+        marginTop: 2,
+        fontStyle: 'italic',
+    },
+    inputSmall: {
+        backgroundColor: Colors.white,
+        borderWidth: 1,
+        borderColor: Colors.primary,
+        borderRadius: 4,
+        padding: 4,
+        fontSize: 14,
+        color: Colors.text,
+    },
+    configActions: {
+        marginLeft: 10,
     },
 });

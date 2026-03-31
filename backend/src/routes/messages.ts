@@ -12,11 +12,8 @@ import {
 
 const router = express.Router();
 
-// Apply JWT Authentication to ALL routes in this file
-router.use(authenticateJWT);
-
 // Get user's conversations
-router.get('/conversations/user/:id', (req: Request, res: Response, next: NextFunction) => {
+router.get('/conversations/user/:id', authenticateJWT, (req: Request, res: Response, next: NextFunction) => {
   console.log('🪪 [DEBUG] req.params.id:', req.params.id, 'type:', typeof req.params.id);
   // Extra debug: print raw params and check for edge cases
   try {
@@ -49,7 +46,7 @@ router.get('/conversations/user/:id', (req: Request, res: Response, next: NextFu
 // ... (other routes) ...
 
 // Get unread message count
-router.get('/messages/unread/:userId', validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
+router.get('/messages/unread/:userId', authenticateJWT, validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.userId, 'user ID');
     const result: any = await messageQueries.getUnreadCount(userId);
@@ -61,7 +58,7 @@ router.get('/messages/unread/:userId', validateUserId, handleValidationErrors, a
 });
 
 // Get conversation messages (with pagination)
-router.get('/conversations/:conversationId/messages', validateConversationId, validateMessagePagination, handleValidationErrors, async (req: Request, res: Response) => {
+router.get('/conversations/:conversationId/messages', authenticateJWT, validateConversationId, validateMessagePagination, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
     const page = req.query.page ? parseIntSafe(req.query.page, 'page', 1) : 1;
@@ -88,7 +85,7 @@ router.get('/conversations/:conversationId/messages', validateConversationId, va
 });
 
 // Create or get conversation between two users
-router.post('/conversations', validateCreateConversation, handleValidationErrors, async (req: Request, res: Response) => {
+router.post('/conversations', authenticateJWT, validateCreateConversation, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const user1Id = parseIntSafe(req.body.user1Id, 'user1Id');
     const user2Id = parseIntSafe(req.body.user2Id, 'user2Id');
@@ -113,7 +110,7 @@ router.post('/conversations', validateCreateConversation, handleValidationErrors
 });
 
 // Mark messages as read
-router.post('/conversations/:conversationId/read', validateConversationId, validateMarkAsRead, handleValidationErrors, async (req: Request, res: Response) => {
+router.post('/conversations/:conversationId/read', authenticateJWT, validateConversationId, validateMarkAsRead, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
     const userId = parseIntSafe(req.body.userId, 'user ID');
@@ -126,7 +123,7 @@ router.post('/conversations/:conversationId/read', validateConversationId, valid
 });
 
 // Get unread message count
-router.get('/messages/unread/:userId', async (req: Request, res: Response) => {
+router.get('/messages/unread/:userId', authenticateJWT, async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.userId, 'user ID');
     const result: any = await messageQueries.getUnreadCount(userId);
