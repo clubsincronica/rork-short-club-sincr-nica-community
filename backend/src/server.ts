@@ -9,6 +9,9 @@ import messageRoutes from './routes/messages';
 import eventRoutes from './routes/events';
 import paymentsRoutes from './routes/payments';
 import webhooksRoutes from './routes/webhooks';
+import productRoutes from './routes/products';
+import reservationRoutes from './routes/reservations';
+import notificationRoutes from './routes/notifications';
 import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
@@ -92,6 +95,9 @@ if (isProduction()) {
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/reservations', reservationRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/admin', require('./routes/admin').default);
 

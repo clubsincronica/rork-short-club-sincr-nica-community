@@ -462,7 +462,7 @@ const useCalendarHook = () => {
   // Get user's reservations
   const userReservations = useMemo(() => {
     if (!currentUser) return [];
-    return reservations.filter((r: Reservation) => r.userId === currentUser.id.toString());
+    return reservations.filter((r: Reservation) => String(r.userId) === String(currentUser.id));
   }, [reservations, currentUser]);
 
   // Helper function to parse dates in multiple formats
