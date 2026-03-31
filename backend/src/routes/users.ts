@@ -116,6 +116,16 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
       role: user.role || 'user'
     }, jwtSecret, { expiresIn: '30d' });
     console.log(`[AUTH DEBUG] Email returned in token: '${user.email}'`);
+
+    // Fetch and attach bank accounts for frontend persistence
+    try {
+      const bankAccounts = await getBankAccountsByUserId(user.id);
+      user.bankAccounts = bankAccounts;
+    } catch (err) {
+      console.warn(`[AUTH DEBUG] Failed to get bank accounts on login:`, err);
+      user.bankAccounts = [];
+    }
+
     res.json({ user, token, isNewUser });
   } catch (error) {
     console.error('Auth error:', error);
@@ -165,7 +175,7 @@ router.get('/users/:id', validateUserId, handleValidationErrors, async (req: Req
 });
 
 // Update user profile (with stricter rate limiting for security)
-router.put('/users/:id', strictLimiter, validateUserId, validateUpdateUser, handleValidationErrors, async (req: Request, res: Response) => {
+router.put('/users/:id', strictLimiter, authenticateJWT, validateUserId, validateUpdateUser, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.id, 'user ID');
     const { name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;

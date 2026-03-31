@@ -201,40 +201,44 @@ const useUserStore = () => {
     }
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (updates: Partial<User>) => {
-      if (!currentUser) throw new Error('No user logged in');
-      const updatedUser = { ...currentUser, ...updates };
+    const updateProfileMutation = useMutation({
+      mutationFn: async (updates: Partial<User>) => {
+        if (!currentUser) throw new Error('No user logged in');
+        const updatedUser = { ...currentUser, ...updates };
 
-      // Save to backend database so changes sync across devices
-      try {
-        const response = await fetch(`${getApiBaseUrl()}/api/users/${currentUser.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: updatedUser.name,
-            avatar: updatedUser.avatar,
-            bio: updatedUser.bio,
-            location: updatedUser.location,
-            latitude: updatedUser.coordinates?.latitude,
-            longitude: updatedUser.coordinates?.longitude,
-            phone: updatedUser.phone,
-            website: '', // Not in User type, send empty string
-            interests: updatedUser.specialties,
-            services: updatedUser.specialties,
-            isHost: updatedUser.isServiceProvider,
-          }),
-        });
+        // Save to backend database so changes sync across devices
+        try {
+          const token = await AsyncStorage.getItem('authToken');
+          const response = await fetch(`${getApiBaseUrl()}/api/users/${currentUser.id}`, {
+            method: 'PUT',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              name: updatedUser.name,
+              avatar: updatedUser.avatar,
+              bio: updatedUser.bio,
+              location: updatedUser.location,
+              latitude: updatedUser.coordinates?.latitude,
+              longitude: updatedUser.coordinates?.longitude,
+              phone: updatedUser.phone,
+              website: '', // Not in User type, send empty string
+              interests: updatedUser.specialties,
+              services: updatedUser.specialties,
+              isHost: updatedUser.isServiceProvider,
+            }),
+          });
 
-        if (response.ok) {
-          console.log('✅ Profile updated in backend database');
-        } else {
-          console.warn('⚠️ Failed to update backend, status:', response.status);
+          if (response.ok) {
+            console.log('✅ Profile updated in backend database');
+          } else {
+            console.warn('⚠️ Failed to update backend, status:', response.status);
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to sync profile to backend:', error);
+          // Continue anyway - at least save locally
         }
-      } catch (error) {
-        console.warn('⚠️ Failed to sync profile to backend:', error);
-        // Continue anyway - at least save locally
-      }
 
       await AsyncStorage.setItem('currentUser', JSON.stringify(updatedUser));
 
