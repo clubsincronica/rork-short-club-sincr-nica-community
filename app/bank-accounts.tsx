@@ -294,15 +294,15 @@ export default function BankAccountsManagement() {
 
               {/* Account Number */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Número de Cuenta *</Text>
-                <Text style={styles.inputHelper}>Tu número de cuenta bancaria</Text>
+                <Text style={styles.inputLabel}>Número de Cuenta / IBAN *</Text>
+                <Text style={styles.inputHelper}>Tu número de cuenta bancaria o IBAN</Text>
                 <TextInput
                   style={styles.input}
                   defaultValue={formData.accountNumber}
                   onChangeText={(text: string) => updateFormField('accountNumber', text)}
-                  placeholder="0000 0000 0000 0000"
+                  placeholder="Ej: ES00 0000 0000 0000"
                   placeholderTextColor={Colors.textLight}
-                  keyboardType="numeric"
+                  autoCapitalize="characters"
                 />
               </View>
 
