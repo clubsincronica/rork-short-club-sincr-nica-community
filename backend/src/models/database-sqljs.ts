@@ -61,7 +61,6 @@ export async function initializeDatabase() {
           interests TEXT,
           services TEXT,
           is_host INTEGER DEFAULT 0,
-          is_host INTEGER DEFAULT 0,
           role TEXT DEFAULT 'user',
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
