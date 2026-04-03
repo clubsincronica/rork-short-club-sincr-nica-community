@@ -275,7 +275,7 @@ export default function MiTableroScreen() {
     }
 
     return ultraSafeOfferings;
-  }, [currentUser, events]);
+  }, [currentUser, events, services, products, getUserProducts]);
 
   // Check if user has hosted events to show attendance dashboard
   const hasHostedEvents = useMemo(() => {

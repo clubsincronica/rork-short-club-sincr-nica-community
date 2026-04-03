@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { FloatingCard } from './FloatingCard';
 import { Colors } from '@/constants/colors';
-import { ProfilePriorityItem, ProfileCustomization } from '@/types/user';
+import { ProfilePriorityItem } from '@/types/user';
 
 interface ProfilePriorityBoardProps {
   items: ProfilePriorityItem[];
-  customization: ProfileCustomization;
+  customization: Record<string, any>;
   isEditing?: boolean;
   isOwnProfile?: boolean;
   onEditItem?: (item: ProfilePriorityItem) => void;
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
   cardContent: { 
     padding: 20, 
     flex: 1, 
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     alignItems: 'stretch',
     minHeight: 400,
     backgroundColor: 'transparent'
@@ -152,7 +152,8 @@ const styles = StyleSheet.create({
     color: Colors.textLight, 
     marginBottom: 12,
     lineHeight: 20,
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
+    flexShrink: 1
   },
   itemType: { 
     fontSize: 12, 
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     color: Colors.primary, 
     fontWeight: '700', 
-    marginTop: 'auto'
+    marginTop: 8
   },
   editHint: {
     fontSize: 12,
