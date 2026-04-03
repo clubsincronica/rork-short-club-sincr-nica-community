@@ -1,6 +1,7 @@
 import express from 'express';
 import { body, param, validationResult } from 'express-validator';
-import { eventQueries } from '../models/database-sqljs'; // Ensure this matches userQueries export
+import { eventQueries } from '../models/database-sqljs';
+import { authenticateJWT } from '../middleware/security';
 
 const router = express.Router();
 
@@ -16,14 +17,9 @@ router.get('/', async (req, res) => {
 });
 
 // Create new event
-import { authenticateJWT } from '../middleware/security';
-
-// ... (imports remain)
-
-// Create new event
 router.post(
     '/',
-    authenticateJWT, // Protect this route
+    authenticateJWT,
     [
         body('title').notEmpty().withMessage('Title is required'),
         body('category').notEmpty().withMessage('Category is required'),
@@ -31,17 +27,16 @@ router.post(
         body('startTime').notEmpty().withMessage('Start time is required (HH:MM)'),
         body('endTime').notEmpty().withMessage('End time is required (HH:MM)'),
     ],
-    async (req: express.Request, res: express.Response) => {
+    async (req: any, res: express.Response) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
         }
 
         try {
-            // Enforce providerId from authenticated user
             const eventData = {
                 ...req.body,
-                providerId: req.user?.userId
+                providerId: req.user.userId
             };
 
             const result = await eventQueries.createEvent(eventData);
@@ -50,9 +45,9 @@ router.post(
                 id: result.lastID,
                 ...eventData
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error creating event:', error);
-            res.status(500).json({ error: 'Failed to create event' });
+            res.status(500).json({ error: error.message });
         }
     }
 );
@@ -70,26 +65,26 @@ router.get('/provider/:userId', async (req, res) => {
 });
 
 // Update event
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         await eventQueries.updateEvent(id, req.body);
-        res.json({ message: 'Event updated' });
-    } catch (error) {
+        res.json({ message: 'Event updated successfully' });
+    } catch (error: any) {
         console.error('Error updating event:', error);
-        res.status(500).json({ error: 'Failed to update event' });
+        res.status(500).json({ error: error.message });
     }
 });
 
 // Delete event
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         await eventQueries.deleteEvent(id);
-        res.json({ message: 'Event deleted' });
-    } catch (error) {
+        res.json({ message: 'Event deleted successfully' });
+    } catch (error: any) {
         console.error('Error deleting event:', error);
-        res.status(500).json({ error: 'Failed to delete event' });
+        res.status(500).json({ error: error.message });
     }
 });
 

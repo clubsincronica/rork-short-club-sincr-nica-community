@@ -1,5 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getApiBaseUrl } from '@/utils/api-config';
+import { useUser } from '@/hooks/user-store';
 
 export interface ServiceSchedule {
   dayOfWeek: number; // 0-6 (Sunday-Saturday)
@@ -62,6 +65,7 @@ interface ServicesContextType {
   updateReservationStatus: (id: string, status: ServiceReservation['status']) => Promise<void>;
   getServiceReservations: (serviceId: string) => ServiceReservation[];
   getUserReservations: (userId: string, type: 'provider' | 'client') => ServiceReservation[];
+  isLoading: boolean;
 }
 
 const ServicesContext = createContext<ServicesContextType | undefined>(undefined);
@@ -70,127 +74,115 @@ const SERVICES_STORAGE_KEY = '@rork_services';
 const RESERVATIONS_STORAGE_KEY = '@rork_reservations';
 
 export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [services, setServices] = useState<Service[]>([]);
+  const queryClient = useQueryClient();
+  const { currentUser } = useUser();
   const [reservations, setReservations] = useState<ServiceReservation[]>([]);
 
-  // Load services from storage
+  // Fetch services from API
+  const { data: services = [], isLoading } = useQuery({
+    queryKey: ['services'],
+    queryFn: async () => {
+      const response = await fetch(`${getApiBaseUrl()}/api/services`);
+      if (!response.ok) throw new Error('Failed to fetch services');
+      return await response.json();
+    }
+  });
+
+  // Load reservations from storage (keeping them local for now as per plan focus)
   useEffect(() => {
-    loadServices();
+    const loadReservations = async () => {
+      try {
+        const storedReservations = await AsyncStorage.getItem(RESERVATIONS_STORAGE_KEY);
+        if (storedReservations) {
+          setReservations(JSON.parse(storedReservations));
+        }
+      } catch (error) {
+        console.error('📋 Services Store: Error loading reservations:', error);
+      }
+    };
     loadReservations();
   }, []);
-
-  const loadServices = async () => {
-    try {
-      const storedServices = await AsyncStorage.getItem(SERVICES_STORAGE_KEY);
-      if (storedServices) {
-        const parsedServices = JSON.parse(storedServices);
-        console.log('📋 Services Store: Loaded', parsedServices.length, 'services');
-        console.log('📋 Services Store: Service details:', parsedServices.map((s: any) => ({ 
-          id: s.id, 
-          title: s.title, 
-          isScheduled: s.isScheduled, 
-          startDate: s.startDate, 
-          endDate: s.endDate,
-          schedule: s.schedule 
-        })));
-        setServices(parsedServices);
-      }
-    } catch (error) {
-      console.error('📋 Services Store: Error loading services:', error);
-    }
-  };
-
-  const loadReservations = async () => {
-    try {
-      const storedReservations = await AsyncStorage.getItem(RESERVATIONS_STORAGE_KEY);
-      if (storedReservations) {
-        const parsedReservations = JSON.parse(storedReservations);
-        console.log('📋 Services Store: Loaded', parsedReservations.length, 'reservations');
-        setReservations(parsedReservations);
-      }
-    } catch (error) {
-      console.error('📋 Services Store: Error loading reservations:', error);
-    }
-  };
-
-  const saveServices = async (updatedServices: Service[]) => {
-    try {
-      await AsyncStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(updatedServices));
-      console.log('📋 Services Store: Saved', updatedServices.length, 'services');
-    } catch (error) {
-      console.error('📋 Services Store: Error saving services:', error);
-    }
-  };
 
   const saveReservations = async (updatedReservations: ServiceReservation[]) => {
     try {
       await AsyncStorage.setItem(RESERVATIONS_STORAGE_KEY, JSON.stringify(updatedReservations));
-      console.log('📋 Services Store: Saved', updatedReservations.length, 'reservations');
     } catch (error) {
       console.error('📋 Services Store: Error saving reservations:', error);
     }
   };
 
-  const addService = async (serviceData: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) => {
-    try {
-      const newService: Service = {
-        ...serviceData,
-        id: `service-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const updatedServices = [...services, newService];
-      setServices(updatedServices);
-      await saveServices(updatedServices);
-      
-      console.log('✅ Services Store: Service created:', newService.title);
-    } catch (error) {
-      console.error('📋 Services Store: Error creating service:', error);
-      throw error;
+  const addServiceMutation = useMutation({
+    mutationFn: async (serviceData: any) => {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/services`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(serviceData),
+      });
+      if (!response.ok) throw new Error('Failed to create service');
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
     }
+  });
+
+  const updateServiceMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string, updates: any }) => {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) throw new Error('Failed to update service');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+    }
+  });
+
+  const deleteServiceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/services/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Failed to delete service');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['services'] });
+    }
+  });
+
+  const addService = async (serviceData: Omit<Service, 'id' | 'createdAt' | 'updatedAt'>) => {
+    await addServiceMutation.mutateAsync(serviceData);
   };
 
   const updateService = async (id: string, updates: Partial<Service>) => {
-    try {
-      const updatedServices = services.map(service =>
-        service.id === id
-          ? { ...service, ...updates, updatedAt: new Date().toISOString() }
-          : service
-      );
-      
-      setServices(updatedServices);
-      await saveServices(updatedServices);
-      
-      console.log('✅ Services Store: Service updated:', id);
-    } catch (error) {
-      console.error('📋 Services Store: Error updating service:', error);
-      throw error;
-    }
+    await updateServiceMutation.mutateAsync({ id, updates });
   };
 
   const deleteService = async (id: string) => {
-    try {
-      const updatedServices = services.filter(service => service.id !== id);
-      setServices(updatedServices);
-      await saveServices(updatedServices);
-      
-      console.log('✅ Services Store: Service deleted:', id);
-    } catch (error) {
-      console.error('📋 Services Store: Error deleting service:', error);
-      throw error;
-    }
+    await deleteServiceMutation.mutateAsync(id);
   };
 
   const getUserServices = (userId: string): Service[] => {
-    const userServices = services.filter(service => service.providerId === userId);
-    console.log('🔍 Services Store: getUserServices for', userId, '- found', userServices.length, 'services');
-    console.log('🔍 Services Store: All services in store:', services.length);
+    const userServices = services.filter((service: Service) => service.providerId === userId);
     return userServices;
   };
 
   const getServicesByCategory = (category: string): Service[] => {
-    return services.filter(service => service.category === category);
+    return services.filter((service: Service) => service.category === category);
   };
 
   const createReservation = async (reservationData: Omit<ServiceReservation, 'id' | 'createdAt'>) => {
@@ -204,8 +196,6 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
       const updatedReservations = [...reservations, newReservation];
       setReservations(updatedReservations);
       await saveReservations(updatedReservations);
-      
-      console.log('✅ Services Store: Reservation created:', newReservation.id);
     } catch (error) {
       console.error('📋 Services Store: Error creating reservation:', error);
       throw error;
@@ -214,7 +204,7 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const updateReservationStatus = async (id: string, status: ServiceReservation['status']) => {
     try {
-      const updatedReservations = reservations.map(reservation =>
+      const updatedReservations = reservations.map((reservation: ServiceReservation) =>
         reservation.id === id
           ? { ...reservation, status }
           : reservation
@@ -222,8 +212,6 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setReservations(updatedReservations);
       await saveReservations(updatedReservations);
-      
-      console.log('✅ Services Store: Reservation status updated:', id, status);
     } catch (error) {
       console.error('📋 Services Store: Error updating reservation status:', error);
       throw error;
@@ -231,12 +219,12 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getServiceReservations = (serviceId: string): ServiceReservation[] => {
-    return reservations.filter(reservation => reservation.serviceId === serviceId);
+    return reservations.filter((reservation: ServiceReservation) => reservation.serviceId === serviceId);
   };
 
   const getUserReservations = (userId: string, type: 'provider' | 'client'): ServiceReservation[] => {
     const key = type === 'provider' ? 'providerId' : 'clientId';
-    return reservations.filter(reservation => reservation[key] === userId);
+    return reservations.filter((reservation: ServiceReservation) => reservation[key] === userId);
   };
 
   // Generate calendar events from service schedules
@@ -281,13 +269,11 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getServiceCalendarEvents = (serviceId: string): any[] => {
-    const service = services.find(s => s.id === serviceId);
+    const service = services.find((s: Service) => s.id === serviceId);
     if (!service || !service.isScheduled || !service.schedule || !service.startDate || !service.endDate) {
       return [];
     }
 
-    console.log('📅 Generating calendar events for service:', service.title);
-    
     const events: any[] = [];
     const dates = generateDatesBetween(service.startDate, service.endDate);
     
@@ -295,9 +281,9 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
       const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
       
       // Find schedules for this day of week
-      const daySchedules = service.schedule!.filter(schedule => schedule.dayOfWeek === dayOfWeek);
+      const daySchedules = service.schedule!.filter((schedule: ServiceSchedule) => schedule.dayOfWeek === dayOfWeek);
       
-      daySchedules.forEach(schedule => {
+      daySchedules.forEach((schedule: ServiceSchedule) => {
         const eventDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
         
         events.push({
@@ -327,7 +313,7 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getAllServiceCalendarEvents = (userId: string): any[] => {
-    const userServices = getUserServices(userId).filter(service => service.isScheduled);
+    const userServices = getUserServices(userId).filter((service: Service) => service.isScheduled);
     const allEvents: any[] = [];
     
     console.log('🔍 Services Store: Getting calendar events for userId:', userId);
@@ -358,6 +344,7 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateReservationStatus,
       getServiceReservations,
       getUserReservations,
+      isLoading,
     }}>
       {children}
     </ServicesContext.Provider>
@@ -393,6 +380,7 @@ export const useServices = (): ServicesContextType => {
       },
       getServiceReservations: () => [],
       getUserReservations: () => [],
+      isLoading: false,
     };
   }
   return context;

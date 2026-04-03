@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Filter } from '@/components/SmartIcons';
@@ -24,11 +24,15 @@ export default function DiscoverScreen() {
   const { upcomingEvents } = useCalendar();
   const { currentUser } = useUser();
   const { services: allServices } = useServices();
-  const { lodgings: allLodgings } = useLodging();
+  const { lodgings: allLodgings, fetchLodgings } = useLodging();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('services');
   const [isLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetchLodgings();
+  }, [fetchLodgings]);
 
   if (__DEV__) {
     console.log('DiscoverScreen rendered - this should appear in Rork preview');

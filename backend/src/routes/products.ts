@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { productQueries } from '../models/database-sqljs';
+import { authenticateJWT } from '../middleware/security';
 
 const router = Router();
 
@@ -37,9 +38,12 @@ router.get('/:id', async (req, res) => {
 });
 
 // Create product
-router.post('/', async (req, res) => {
+router.post('/', authenticateJWT, async (req: any, res) => {
     try {
-        const result = await productQueries.createProduct(req.body);
+        const result = await productQueries.createProduct({
+            ...req.body,
+            providerId: req.user.userId
+        });
         res.status(201).json({ id: result.lastID, message: 'Product created successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -47,7 +51,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update product
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateJWT, async (req, res) => {
     try {
         await productQueries.updateProduct(parseInt(req.params.id), req.body);
         res.json({ message: 'Product updated successfully' });
@@ -57,7 +61,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // Delete product
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req, res) => {
     try {
         await productQueries.deleteProduct(parseInt(req.params.id));
         res.json({ message: 'Product deleted successfully' });

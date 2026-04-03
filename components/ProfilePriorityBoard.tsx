@@ -63,13 +63,14 @@ export function ProfilePriorityBoard({
       >
         {sortedItems.map((item) => {
           // Ensure all values are safe for rendering
-          const safeTitle = item.title ? String(item.title) : 'Sin título';
-          const safeDescription = item.description ? String(item.description) : 'Sin descripción';
-          const safeType = item.type ? String(item.type) : 'tipo desconocido';
-          const safePrice = item.price ? String(item.price) : null;
-          const safeDate = item.metadata?.date ? String(item.metadata.date) : null;
+          const safeTitle = item?.title ? String(item.title) : 'Sin título';
+          const safeDescription = item?.description ? String(item.description) : 'Sin descripción';
+          const safeType = item?.type ? String(item.type) : 'tipo desconocido';
+          const safePrice = (item?.price !== undefined && item?.price !== null) ? String(item.price) : null;
+          const safeDate = item?.metadata?.date ? String(item.metadata.date) : null;
           
           const handlePress = () => {
+            if (!item) return;
             if (isEditing && isOwnProfile && onEditItem) {
               console.log('ProfilePriorityBoard: Edit mode - navigating to edit for:', safeTitle);
               onEditItem(item);

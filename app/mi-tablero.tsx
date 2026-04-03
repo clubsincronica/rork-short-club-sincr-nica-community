@@ -18,7 +18,7 @@ import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useServices } from '@/hooks/services-store';
 import { useProducts } from '@/hooks/products-store';
-// import { mockServices } from '@/mocks/data';
+import { useLodging } from '@/hooks/lodging-store';
 import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -36,6 +36,7 @@ export default function MiTableroScreen() {
   const { events, addEvent, updateEvent } = useCalendar();
   const { services, updateService } = useServices();
   const { products, getUserProducts, updateProduct } = useProducts();
+  const { lodgings, fetchLodgings, updateLodging } = useLodging();
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPriorityItemModalVisible, setIsPriorityItemModalVisible] = useState(false);
@@ -48,9 +49,11 @@ export default function MiTableroScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Simulate data refresh
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // In a real app, you'd refresh all data sources here
+      // Refresh all data sources
+      await Promise.all([
+        fetchLodgings(),
+        // services-store and calendar-store refetch automatically or can be refetched if they expose refetch
+      ]);
     } catch (error) {
       console.error('Error refreshing Mi Tablero:', error);
     } finally {
@@ -70,6 +73,11 @@ export default function MiTableroScreen() {
       }
     }
   }, [currentUser?.id]); // Only run when user changes
+
+  // Fetch lodgings on mount
+  useEffect(() => {
+    fetchLodgings();
+  }, [fetchLodgings]);
 
   // Create comprehensive offerings from all sources - simplified approach
   const userOfferings = useMemo(() => {
@@ -117,7 +125,31 @@ export default function MiTableroScreen() {
           duration: service.duration,
           category: service.category,
           isOnline: service.isOnline,
-          location: service.location
+          location: service.location,
+          date: service.startDate
+        }
+      });
+    });
+
+    // 1.5 Add lodging from lodging store
+    const userLodgings = lodgings.filter(lodging => String(lodging.hostId) === String(currentUser.id));
+    userLodgings.forEach(lodging => {
+      offerings.push({
+        id: lodging.id,
+        type: 'lodging' as any,
+        title: lodging.title,
+        description: lodging.description,
+        price: lodging.pricePerNight,
+        image: lodging.images?.[0],
+        priority: 1,
+        isActive: true,
+        createdAt: new Date().toISOString(), // Fallback
+        updatedAt: new Date().toISOString(),
+        tags: lodging.amenities,
+        metadata: {
+          location: lodging.location,
+          maxGuests: lodging.maxGuests,
+          type: lodging.type
         }
       });
     });
