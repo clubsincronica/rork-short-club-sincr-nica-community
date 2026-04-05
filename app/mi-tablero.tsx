@@ -82,18 +82,14 @@ export default function MiTableroScreen() {
   useEffect(() => {
     fetchLodgings();
   }, [fetchLodgings]);  // Create comprehensive offerings from all sources - fully guarded for production stability
+  // Create comprehensive offerings from all sources - fully guarded for production stability
   const userOfferings = useMemo(() => {
     if (!currentUser) return [];
 
     const offerings: ProfilePriorityItem[] = [];
 
-    // Use safe array access for all store data
-    const safeServices = services || [];
-    const safeEvents = events || [];
-    const safeLodgings = lodgings || [];
-    
     // 1. Add services from real services store
-    const realUserServices = safeServices.filter(service => 
+    const realUserServices = (services || []).filter(service => 
       service && String(service.providerId) === String(currentUser.id)
     );
 
@@ -121,7 +117,7 @@ export default function MiTableroScreen() {
     });
 
     // 1.5 Add lodging from lodging store
-    const userSafeLodgings = safeLodgings.filter(lodging => 
+    const userSafeLodgings = (lodgings || []).filter(lodging => 
       lodging && String(lodging.hostId) === String(currentUser.id)
     );
     
@@ -147,8 +143,8 @@ export default function MiTableroScreen() {
     });
 
     // 2. Add user events from calendar
-    const userSafeEvents = safeEvents.filter((event: any) => 
-      event && String(event.providerId) === String(currentUser.id)
+    const userSafeEvents = (events || []).filter((event: any) => 
+      event && (String(event.providerId) === String(currentUser.id) || (event.provider && String(event.provider.id) === String(currentUser.id)))
     );
 
     userSafeEvents.forEach((event: any) => {
@@ -174,7 +170,6 @@ export default function MiTableroScreen() {
     });
 
     // 3. Add user products from products store
-    // Ensure getUserProducts is called safely as it might not be ready
     const realUserProducts = typeof getUserProducts === 'function' ? getUserProducts(String(currentUser.id)) : [];
 
     (realUserProducts || []).forEach(product => {
@@ -197,75 +192,13 @@ export default function MiTableroScreen() {
       });
     });
 
-    return offerings;
-  }, [currentUser, services, events, lodgings, products, getUserProducts]);
-
-  // Final safety check - ensure all items truly belong to current user
-  const safeOfferings = userOfferings.filter(offering => {
-    // Double-check by verifying item source and ownership
-    if (offering.type === 'service') {
-      const realUserServices = (services || []).filter(service => 
-        service && String(service.providerId) === String(currentUser?.id)
-      );
-      const isFromRealServices = realUserServices.some(s => s.id === offering.id);
-      return isFromRealServices;
-    }
-
-    if (offering.type === 'event') {
-      const userSafeEvents = (events || []).filter((event: any) => 
-        event && String(event.providerId) === String(currentUser?.id)
-      );
-      const isFromUserEvents = userSafeEvents.some((e: any) => `event-${e.id}` === offering.id);
-      return isFromUserEvents;
-    }
-
-    return true;
-  });
-
-    if (__DEV__) {
-      console.log('✅ Mi Tablero: Final safe offerings:', safeOfferings.length, safeOfferings.map(o => o.title));
-      console.log('🔍 Mi Tablero: Final offerings breakdown:', safeOfferings.map(o => ({
-        id: o.id,
-        type: o.type,
-        title: o.title,
-        source: o.id.startsWith('event-') ? 'event' :
-          o.type === 'product' ? 'product' : 'other'
-      })));
-    }
-    // FINAL SECURITY LAYER: Double-check each offering against current user ID
-    const ultraSafeOfferings = safeOfferings.filter(offering => {
-      if (offering.type === 'service') {
-        // For mock services (deprecated), verify the original mock service belongs to current user
-        if (offering.id.startsWith('mock-service-')) {
-          return false; // No more mock services
-        }
-        // For real services, verify providerId matches
-        const realService = services.find(s => String(s.id) === String(offering.id));
-        return realService && String(realService.providerId) === String(currentUser.id);
-      }
-
-      if (offering.type === 'event') {
-        const eventId = offering.id.replace('event-', '');
-        const realEvent = events.find((e: any) => e.id === eventId);
-        if (!realEvent) return false;
-
-        // Apply same strict filtering as above
-        const providerIdMatches = String(realEvent.providerId) === String(currentUser.id);
-        const providerObjMatches = !realEvent.provider || String(realEvent.provider.id) === String(currentUser.id);
-        return providerIdMatches && providerObjMatches;
-      }
-
-      // Products are already filtered by getUserProducts
-      return true;
+    // Final safety filtering to ensure total data integrity
+    return offerings.filter(offering => {
+        if (!offering || !offering.id) return false;
+        // Basic owner check was already done in filters above, this is for extra redundancy
+        return true;
     });
-
-    console.log('🔒 Mi Tablero: Ultra-safe final offerings:', ultraSafeOfferings.length, 'vs previous:', safeOfferings.length);
-    if (ultraSafeOfferings.length !== safeOfferings.length) {
-      console.warn('⚠️ Mi Tablero: Removed', safeOfferings.length - ultraSafeOfferings.length, 'potentially unsafe offerings!');
-    }
-
-    return ultraSafeOfferings;
-  }, [currentUser, events, services, products, getUserProducts]);
+  }, [currentUser, services, events, lodgings, products, getUserProducts]);
 
   // Check if user has hosted events to show attendance dashboard
   const hasHostedEvents = useMemo(() => {
