@@ -17,50 +17,56 @@ export function ServiceCard({ service, onPress }: ServiceCardProps) {
       intensity="medium"
     >
       <TouchableOpacity style={styles.container} onPress={onPress} testID="service-card">
-        <Image source={{ uri: service.images[0] }} style={styles.image} />
+        <Image 
+          source={{ uri: (service?.images && service.images.length > 0) ? service.images[0] : 'https://via.placeholder.com/400x200?text=No+Image' }} 
+          style={styles.image} 
+        />
         
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={styles.title} numberOfLines={2}>{service.title}</Text>
+            <Text style={styles.title} numberOfLines={2}>{service?.title || 'Servicio sin título'}</Text>
             <View style={styles.priceContainer}>
-              <Text style={styles.price}>${service.price}</Text>
+              <Text style={styles.price}>${service?.price || 0}</Text>
             </View>
           </View>
           
           <View style={styles.providerInfo}>
-            <Image source={{ uri: service.provider.avatar }} style={styles.avatar} />
-            <Text style={styles.providerName}>{service.provider.name}</Text>
+            <Image 
+              source={{ uri: service?.provider?.avatar || 'https://via.placeholder.com/50?text=U' }} 
+              style={styles.avatar} 
+            />
+            <Text style={styles.providerName}>{service?.provider?.name || 'Proveedor'}</Text>
           </View>
           
           <Text style={styles.description} numberOfLines={2}>
-            {service.description}
+            {service?.description || 'Sin descripción disponible'}
           </Text>
           
           <View style={styles.footer}>
             <View style={styles.rating}>
               <Star size={14} color={Colors.warning} fill={Colors.warning} />
-              <Text style={styles.ratingText}>{service.rating}</Text>
-              <Text style={styles.reviewCount}>({service.reviewCount})</Text>
+              <Text style={styles.ratingText}>{service?.rating || 0}</Text>
+              <Text style={styles.reviewCount}>({service?.reviewCount || 0})</Text>
             </View>
             
             <View style={styles.details}>
               <View style={styles.detailItem}>
                 <Clock size={12} color={Colors.textLight} />
-                <Text style={styles.detailText}>{service.duration}min</Text>
+                <Text style={styles.detailText}>{service?.duration || 0}min</Text>
               </View>
               
               <View style={styles.detailItem}>
-                {service.isOnline ? (
+                {service?.isOnline ? (
                   <Wifi size={12} color={Colors.success} />
                 ) : (
                   <WifiOff size={12} color={Colors.textLight} />
                 )}
                 <Text style={styles.detailText}>
-                  {service.isOnline ? 'En línea' : 'Presencial'}
+                  {service?.isOnline ? 'En línea' : 'Presencial'}
                 </Text>
               </View>
               
-              {service.location && (
+              {service?.location && (
                 <View style={styles.detailItem}>
                   <MapPin size={12} color={Colors.textLight} />
                   <Text style={styles.detailText} numberOfLines={1}>
