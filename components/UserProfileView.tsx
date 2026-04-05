@@ -159,7 +159,10 @@ export function UserProfileView({ user, onClose }: UserProfileViewProps) {
             
             <View style={styles.profileSection}>
               <View style={styles.avatarContainer}>
-                <Image source={{ uri: user.avatar }} style={styles.avatar} />
+                <Image 
+                  source={{ uri: user?.avatar || 'https://via.placeholder.com/150?text=U' }} 
+                  style={styles.avatar} 
+                />
                 {user.verified && (
                   <View style={styles.verifiedBadge}>
                     <Award size={16} color={Colors.white} />

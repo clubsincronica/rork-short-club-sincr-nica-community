@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Search, Filter } from '@/components/SmartIcons';
 import { ServiceCard } from '@/components/ServiceCard';
 import { LodgingCard } from '@/components/LodgingCard';
+import { OfferingCard } from '@/components/OfferingCard';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { OnTodayBoard } from '@/components/OnTodayBoard';
 import { TouchableScale } from '@/components/TouchableScale';
@@ -14,45 +15,37 @@ import { useCalendar } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
 import { useServices } from '@/hooks/services-store';
 import { useLodging } from '@/hooks/lodging-store';
-import { ServiceCategory, Service, Lodging } from '@/types/user';
+import { useProducts } from '@/hooks/products-store';
+import { ServiceCategory } from '@/types/user';
 import { Colors } from '@/constants/colors';
+import { router } from 'expo-router';
 
-type ViewMode = 'services' | 'lodging';
+type ViewMode = 'services' | 'lodging' | 'products';
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
-  const { upcomingEvents } = useCalendar();
+  const { events, upcomingEvents } = useCalendar();
   const { currentUser } = useUser();
-  const { services: allServices } = useServices();
-  const { lodgings: allLodgings, fetchLodgings } = useLodging();
+  const { services: allServices, isLoading: isServicesLoading } = useServices();
+  const { lodgings: allLodgings, fetchLodgings, isLoading: isLodgingLoading } = useLodging();
+  const { products: allProducts, isLoading: isProductsLoading } = useProducts();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('services');
-  const [isLoading] = useState<boolean>(false);
+
+  const isLoading = isServicesLoading || isLodgingLoading || isProductsLoading;
 
   useEffect(() => {
     fetchLodgings();
   }, [fetchLodgings]);
 
-  if (__DEV__) {
-    console.log('DiscoverScreen rendered - this should appear in Rork preview');
-    console.log('Current user:', currentUser);
-    console.log('Upcoming events count:', upcomingEvents.length);
-    console.log('Upcoming events:', upcomingEvents);
-    console.log('Search query:', searchQuery);
-    console.log('Selected category:', selectedCategory);
-    console.log('View mode:', viewMode);
-  }
-
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const filteredServices = useMemo(() => {
     let filtered = allServices as any[];
-
     if (selectedCategory !== 'all') {
       filtered = filtered.filter((service: any) => service.category === selectedCategory);
     }
-
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter((service: any) =>
@@ -61,13 +54,11 @@ export default function DiscoverScreen() {
         (service.tags && service.tags.some((tag: string) => tag.toLowerCase().includes(query)))
       );
     }
-
     return filtered;
   }, [debouncedSearchQuery, selectedCategory, allServices]);
 
   const filteredLodging = useMemo(() => {
     let filtered = allLodgings as any[];
-
     if (debouncedSearchQuery.trim()) {
       const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter((lodging: any) =>
@@ -76,9 +67,20 @@ export default function DiscoverScreen() {
         lodging.location.toLowerCase().includes(query)
       );
     }
-
     return filtered;
   }, [debouncedSearchQuery, allLodgings]);
+
+  const filteredProducts = useMemo(() => {
+    let filtered = allProducts as any[];
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter((product: any) =>
+        product.title.toLowerCase().includes(query) ||
+        product.description.toLowerCase().includes(query)
+      );
+    }
+    return filtered;
+  }, [debouncedSearchQuery, allProducts]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -106,8 +108,6 @@ export default function DiscoverScreen() {
               <TouchableScale
                 style={styles.filterButton}
                 testID="filter-button"
-                accessibilityLabel="Filtros de búsqueda"
-                accessibilityHint="Abre las opciones de filtrado"
               >
                 <Filter size={20} color={Colors.gold} />
               </TouchableScale>
@@ -117,9 +117,6 @@ export default function DiscoverScreen() {
               <TouchableScale
                 style={[styles.viewModeButton, viewMode === 'services' && styles.activeViewMode]}
                 onPress={() => setViewMode('services')}
-                testID="services-tab"
-                accessibilityLabel="Ver servicios"
-                accessibilityState={{ selected: viewMode === 'services' }}
               >
                 <AccessibleText style={[styles.viewModeText, viewMode === 'services' && styles.activeViewModeText]}>
                   Servicios
@@ -128,12 +125,17 @@ export default function DiscoverScreen() {
               <TouchableScale
                 style={[styles.viewModeButton, viewMode === 'lodging' && styles.activeViewMode]}
                 onPress={() => setViewMode('lodging')}
-                testID="lodging-tab"
-                accessibilityLabel="Ver alojamientos"
-                accessibilityState={{ selected: viewMode === 'lodging' }}
               >
                 <AccessibleText style={[styles.viewModeText, viewMode === 'lodging' && styles.activeViewModeText]}>
                   Alojamiento
+                </AccessibleText>
+              </TouchableScale>
+              <TouchableScale
+                style={[styles.viewModeButton, viewMode === 'products' && styles.activeViewMode]}
+                onPress={() => setViewMode('products')}
+              >
+                <AccessibleText style={[styles.viewModeText, viewMode === 'products' && styles.activeViewModeText]}>
+                  Productos
                 </AccessibleText>
               </TouchableScale>
             </View>
@@ -142,53 +144,78 @@ export default function DiscoverScreen() {
 
         <View style={styles.content}>
           <OnTodayBoard
-            events={upcomingEvents}
+            events={upcomingEvents.length > 0 ? upcomingEvents : (events || [])}
             onEventPress={() => { }}
           />
 
           {viewMode === 'services' && (
-            <CategoryFilter
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-            />
+            <>
+              <CategoryFilter
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+              />
+              <View style={styles.resultsContainer}>
+                <AccessibleText style={styles.resultsText}>
+                  {filteredServices.length} servicios encontrados
+                </AccessibleText>
+              </View>
+              <View style={styles.servicesContainer}>
+                {filteredServices.map((service) => (
+                  <ServiceCard key={service.id} service={service} onPress={() => { }} />
+                ))}
+              </View>
+            </>
           )}
 
-          <View style={styles.resultsContainer}>
-            <AccessibleText
-              style={styles.resultsText}
-              accessibilityLiveRegion="polite"
-            >
-              {viewMode === 'services'
-                ? `${filteredServices.length} servicios encontrados`
-                : `${filteredLodging.length} lugares encontrados`
-              }
-            </AccessibleText>
-          </View>
+          {viewMode === 'lodging' && (
+            <>
+              <View style={styles.resultsContainer}>
+                <AccessibleText style={styles.resultsText}>
+                  {filteredLodging.length} lugares encontrados
+                </AccessibleText>
+              </View>
+              <View style={styles.lodgingContainer}>
+                {filteredLodging.map((lodging) => (
+                  <LodgingCard key={lodging.id} lodging={lodging} onPress={() => { }} />
+                ))}
+              </View>
+            </>
+          )}
 
-          {isLoading ? (
+          {viewMode === 'products' && (
+            <>
+              <View style={styles.resultsContainer}>
+                <AccessibleText style={styles.resultsText}>
+                  {filteredProducts.length} productos encontrados
+                </AccessibleText>
+              </View>
+              <View style={styles.servicesContainer}>
+                {filteredProducts.map((product) => (
+                  <OfferingCard
+                    key={product.id}
+                    offering={{
+                      id: product.id,
+                      type: 'product',
+                      title: product.title,
+                      description: product.description,
+                      price: product.price,
+                      image: product.images?.[0],
+                      location: 'Envíos disponibles'
+                    }}
+                    onPress={() => router.push({
+                      pathname: '/product-detail',
+                      params: { id: product.id }
+                    })}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
+          {isLoading && (
             <View style={styles.loadingContainer}>
               {Array.from({ length: 3 }).map((_, index) => (
                 <SkeletonCard key={`skeleton-${index}`} showAvatar={true} lines={3} />
-              ))}
-            </View>
-          ) : viewMode === 'services' ? (
-            <View style={styles.servicesContainer}>
-              {filteredServices.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  onPress={() => { }}
-                />
-              ))}
-            </View>
-          ) : (
-            <View style={styles.lodgingContainer}>
-              {filteredLodging.map((lodging) => (
-                <LodgingCard
-                  key={lodging.id}
-                  lodging={lodging}
-                  onPress={() => { }}
-                />
               ))}
             </View>
           )}

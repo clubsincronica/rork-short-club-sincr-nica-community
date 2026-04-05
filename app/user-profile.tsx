@@ -280,8 +280,8 @@ export default function UserProfileScreen() {
         params: {
           startConversationWith: user.id,
           userName: user.name,
-          userAvatar: user.avatar,
-          userBio: user.bio
+          userAvatar: user?.avatar || '',
+          userBio: user?.bio || ''
         }
       });
     }

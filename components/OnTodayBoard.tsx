@@ -46,23 +46,26 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
         return true;
       }
       
-      // Also check if event time is in the future (more strict check)
+      // RELAXED FILTERING: Also show upcoming events even if they are not today,
+      // but happening in the next 7 days, to avoid empty board in Discover tab
+      if (isUpcoming) {
+        const eventDate = new Date(event.date);
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        if (eventDate <= nextWeek && eventDate >= today) {
+          return true;
+        }
+      }
+
+      // Final check for future events today
       try {
         const [hours, minutes] = event.startTime.split(':').map(Number);
         const eventDate = new Date(event.date);
         eventDate.setHours(hours, minutes, 0, 0);
         
         const isInFuture = eventDate > now;
-        if (__DEV__) {
-          console.log('OnTodayBoard: Event datetime:', eventDate.toISOString(), 'isInFuture:', isInFuture);
-        }
-        
         return isToday && isUpcoming && isInFuture;
       } catch (error) {
-        if (__DEV__) {
-          console.log('OnTodayBoard: Error parsing date for event:', event.title, error);
-        }
-        // If we can't parse the date, show the event anyway for demo purposes
         return isToday && isUpcoming;
       }
     });

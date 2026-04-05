@@ -66,6 +66,7 @@ interface ServicesContextType {
   getServiceReservations: (serviceId: string) => ServiceReservation[];
   getUserReservations: (userId: string, type: 'provider' | 'client') => ServiceReservation[];
   isLoading: boolean;
+  refetch: () => Promise<any>;
 }
 
 const ServicesContext = createContext<ServicesContextType | undefined>(undefined);
@@ -79,7 +80,7 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [reservations, setReservations] = useState<ServiceReservation[]>([]);
 
   // Fetch services from API
-  const { data: services = [], isLoading } = useQuery({
+  const { data: services = [], isLoading, refetch } = useQuery({
     queryKey: ['services'],
     queryFn: async () => {
       const response = await fetch(`${getApiBaseUrl()}/api/services`);
@@ -228,44 +229,28 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   // Generate calendar events from service schedules
-  const generateDatesBetween = (startDate: string, endDate: string): Date[] => {
-    const dates: Date[] = [];
-    
-    // Convert DD/MM/YYYY to YYYY-MM-DD format for proper Date parsing
-    const convertDate = (dateStr: string): Date => {
-      if (dateStr.includes('/')) {
-        // DD/MM/YYYY format
-        const [day, month, year] = dateStr.split('/');
-        return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
-      } else {
-        // Already in YYYY-MM-DD format
-        return new Date(dateStr);
+  const generateDatesBetween = (startDateStr: string, endDateStr: string): Date[] => {
+    try {
+      const dates: Date[] = [];
+      const start = new Date(startDateStr);
+      const end = new Date(endDateStr);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
+      
+      const current = new Date(start);
+      // Safety cap: max 90 days to prevent infinite loops or memory issues
+      const maxDays = 90;
+      let dayCount = 0;
+      
+      while (current <= end && dayCount < maxDays) {
+        dates.push(new Date(current));
+        current.setDate(current.getDate() + 1);
+        dayCount++;
       }
-    };
-    
-    const start = convertDate(startDate);
-    const end = convertDate(endDate);
-    
-    console.log('🔍 generateDatesBetween: Converting dates', {
-      startDate,
-      endDate,
-      startConverted: start.toISOString(),
-      endConverted: end.toISOString(),
-      isValidStart: !isNaN(start.getTime()),
-      isValidEnd: !isNaN(end.getTime())
-    });
-    
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      console.warn('🔍 generateDatesBetween: Invalid date format', { startDate, endDate });
       return dates;
+    } catch (e) {
+      return [];
     }
-    
-    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
-      dates.push(new Date(date));
-    }
-    
-    console.log('🔍 generateDatesBetween: Generated', dates.length, 'dates');
-    return dates;
   };
 
   const getServiceCalendarEvents = (serviceId: string): any[] => {
@@ -278,37 +263,34 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
     const dates = generateDatesBetween(service.startDate, service.endDate);
     
     dates.forEach(date => {
-      const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      
-      // Find schedules for this day of week
-      const daySchedules = service.schedule!.filter((schedule: ServiceSchedule) => schedule.dayOfWeek === dayOfWeek);
+      const dayOfWeek = date.getDay();
+      const daySchedules = service.schedule!.filter((s: ServiceSchedule) => s.dayOfWeek === dayOfWeek);
       
       daySchedules.forEach((schedule: ServiceSchedule) => {
+        if (!schedule.startTime) return;
         const eventDate = date.toISOString().split('T')[0]; // YYYY-MM-DD format
         
         events.push({
           id: `service-slot-${service.id}-${eventDate}-${schedule.startTime}`,
-          serviceId: service.id,
-          providerId: service.providerId,
           title: service.title,
           description: service.description,
-          category: service.category,
           date: eventDate,
           startTime: schedule.startTime,
-          endTime: schedule.endTime,
+          endTime: schedule.endTime || '',
           location: service.location,
           isOnline: service.isOnline,
-          price: service.price,
-          duration: service.duration,
           maxParticipants: schedule.maxSlots || 1,
-          currentParticipants: 0, // TODO: Calculate from reservations
+          currentParticipants: 0,
+          price: service.price,
+          category: service.category,
+          providerId: service.providerId,
+          tags: ['service-slot', `serviceId:${service.id}`],
           isServiceSlot: true,
-          tags: ['service-slot', ...service.tags]
+          serviceId: service.id,
         });
       });
     });
     
-    console.log('📅 Generated', events.length, 'calendar events for service:', service.title);
     return events;
   };
 
@@ -345,6 +327,7 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
       getServiceReservations,
       getUserReservations,
       isLoading,
+      refetch,
     }}>
       {children}
     </ServicesContext.Provider>
@@ -381,6 +364,7 @@ export const useServices = (): ServicesContextType => {
       getServiceReservations: () => [],
       getUserReservations: () => [],
       isLoading: false,
+      refetch: async () => { console.warn('refetch called without provider'); },
     };
   }
   return context;

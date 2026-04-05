@@ -29,8 +29,11 @@ export function LodgingCard({ lodging, onPress }: LodgingCardProps) {
         </View>
         
         <View style={styles.hostInfo}>
-          <Image source={{ uri: lodging.host.avatar }} style={styles.avatar} />
-          <Text style={styles.hostName}>Anfitrión: {lodging.host.name}</Text>
+          <Image 
+            source={{ uri: lodging?.host?.avatar || 'https://via.placeholder.com/50?text=H' }} 
+            style={styles.avatar} 
+          />
+          <Text style={styles.hostName}>{lodging?.host?.name || 'Anfitrión'}</Text>
         </View>
         
         <Text style={styles.description} numberOfLines={2}>

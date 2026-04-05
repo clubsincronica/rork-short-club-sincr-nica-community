@@ -15,15 +15,25 @@ interface ServiceReservationModalProps {
     price: number;
     duration: number;
     location?: string;
-    providerId?: string; // Add providerId
+    providerId?: string;
     provider?: {
       name: string;
       avatar?: string;
-      id?: string; // Add provider id
+      id?: string;
     };
     rating?: number;
     reviewCount?: number;
     isOnline?: boolean;
+    // Schedule fields
+    isScheduled?: boolean;
+    schedule?: Array<{
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+      maxSlots?: number;
+    }>;
+    startDate?: string;
+    endDate?: string;
   } | null;
 }
 
@@ -45,7 +55,7 @@ export function ServiceReservationModal({
   const [isBooking, setIsBooking] = useState(false);
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
 
-  // Generate available dates with simple time slots
+  // Generate available dates with schedule-based time slots
   const availableDates = useMemo(() => {
     if (!service) {
       return [];
@@ -61,34 +71,67 @@ export function ServiceReservationModal({
       }>;
     }> = [];
 
+    // If service doesn't have a schedule, we can't book specific slots
+    if (!service.isScheduled || !service.schedule || service.schedule.length === 0) {
+      console.log('📋 ServiceReservationModal: Service has no schedule, cannot generate slots');
+      return [];
+    }
+
     const currentDate = new Date();
     
-    // Generate simple time slots for next 7 days
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(currentDate);
-      date.setDate(date.getDate() + i);
-      
-      const dayOfWeek = date.getDay();
-      // Skip Sundays for simplicity (you can modify this)
-      if (dayOfWeek === 0) continue;
+    // Helper to parse DD/MM/YYYY or YYYY-MM-DD
+    const parseDate = (d: string) => {
+      try {
+        if (!d) return new Date();
+        if (d.includes('/')) {
+          const [day, month, year] = d.split('/');
+          return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+        }
+        const parsed = new Date(d);
+        return isNaN(parsed.getTime()) ? new Date() : parsed;
+      } catch (e) {
+        return new Date();
+      }
+    };
 
-      // Generate morning and afternoon slots
-      const morningSlots = [
-        { startTime: '09:00', endTime: '10:30', available: true },
-        { startTime: '11:00', endTime: '12:30', available: true },
-      ];
-      
-      const afternoonSlots = [
-        { startTime: '14:00', endTime: '15:30', available: Math.random() > 0.3 },
-        { startTime: '16:00', endTime: '17:30', available: Math.random() > 0.2 },
-        { startTime: '18:00', endTime: '19:30', available: Math.random() > 0.4 },
-      ];
+    const serviceStart = service.startDate ? parseDate(service.startDate) : new Date();
+    const serviceEnd = service.endDate ? parseDate(service.endDate) : new Date(currentDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    // We only show slots for the next 14 days or until service end
+    const lastDayToShow = new Date(currentDate.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const endBoundary = serviceEnd < lastDayToShow ? serviceEnd : lastDayToShow;
 
-      dates.push({
-        date: date.toISOString().split('T')[0],
-        dayName: DAYS_OF_WEEK[dayOfWeek],
-        slots: [...morningSlots, ...afternoonSlots]
-      });
+    // Safety cap for the loop
+    const maxDateCount = 30;
+    let dateCount = 0;
+
+    for (let d = new Date(currentDate); d <= endBoundary && dateCount < maxDateCount; d.setDate(d.getDate() + 1)) {
+      dateCount++;
+      // Don't show past dates
+      if (d < currentDate && d.toDateString() !== currentDate.toDateString()) continue;
+      
+      const dayOfWeek = d.getDay();
+      
+      // Find all schedule items for this day of week
+      const daySchedule = (service.schedule || []).filter(s => s.dayOfWeek === dayOfWeek);
+      
+      if (daySchedule.length > 0) {
+        const slots = daySchedule
+          .filter(s => s.startTime && s.endTime) // Only valid slots
+          .map(s => ({
+            startTime: s.startTime,
+            endTime: s.endTime,
+            available: true
+          })).sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+        if (slots.length > 0) {
+          dates.push({
+            date: d.toISOString().split('T')[0],
+            dayName: DAYS_OF_WEEK[dayOfWeek],
+            slots
+          });
+        }
+      }
     }
 
     return dates;

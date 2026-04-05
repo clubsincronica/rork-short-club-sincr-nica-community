@@ -52,6 +52,7 @@ export const useCalendar = () => {
       removeFromCart: () => { },
       clearCart: () => { },
       updateSettings: () => Promise.resolve(false),
+      refetch: () => Promise.resolve(),
     };
   }
   return context;
@@ -96,7 +97,7 @@ const useCalendarHook = () => {
   });
 
   // Fetch provider reservations
-  const { data: providerReservations = [], isLoading: isProviderReservationsLoading } = useQuery({
+  const { data: providerReservations = [], isLoading: isProviderReservationsLoading, refetch: refetchProviderReservations } = useQuery({
     queryKey: ['provider-reservations', currentUser?.id],
     queryFn: async () => {
       if (!currentUser) return [];
@@ -111,6 +112,10 @@ const useCalendarHook = () => {
     },
     enabled: !!currentUser
   });
+
+  const refetch = async () => {
+    await Promise.all([refetchEvents(), refetchProviderReservations()]);
+  };
 
   // Load other local data
   useEffect(() => {
@@ -468,77 +473,45 @@ const useCalendarHook = () => {
   // Helper function to parse dates in multiple formats
   const parseEventDate = (dateString: string, timeString: string): Date | null => {
     try {
-      if (__DEV__) {
-        console.log('Calendar Store: parseEventDate called with:', dateString, timeString);
-      }
-
       // Early validation
       if (!dateString || !timeString) {
-        if (__DEV__) {
-          console.warn('Calendar Store: Missing date or time string');
-        }
         return null;
       }
 
-      let finalDateString: string;
+      let finalDateString: string = dateString;
 
-      // Check for DD/MM/YYYY format first to avoid the "Date value out of bounds" error
-      if (dateString.includes('/')) {
-        const dateParts = dateString.split('/');
-        if (dateParts.length === 3 && dateParts[0].length <= 2) {
-          // This looks like DD/MM/YYYY format, convert it first
-          const [day, month, year] = dateParts;
-
-          // Validate the parts before conversion
-          const dayNum = parseInt(day, 10);
-          const monthNum = parseInt(month, 10);
-          const yearNum = parseInt(year, 10);
-
-          if (dayNum < 1 || dayNum > 31 || monthNum < 1 || monthNum > 12 || yearNum < 1900 || yearNum > 2100) {
-            if (__DEV__) {
-              console.warn('Calendar Store: Invalid DD/MM/YYYY date parts:', day, month, year);
-            }
-            return null;
+      // Handle common date separators and formats (DD/MM/YYYY or DD-MM-YYYY)
+      if (dateString.includes('/') || (dateString.includes('-') && dateString.split('-')[0].length <= 2)) {
+        const separator = dateString.includes('/') ? '/' : '-';
+        const dateParts = dateString.split(separator);
+        
+        if (dateParts.length === 3) {
+          // If first part is not a 4-digit year, it's likely DD/MM/YYYY
+          if (dateParts[0].length !== 4) {
+            const [day, month, year] = dateParts;
+            finalDateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
           }
-
-          finalDateString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-          if (__DEV__) {
-            console.log('Calendar Store: Converting DD/MM/YYYY to ISO:', dateString, '->', finalDateString);
-          }
-        } else {
-          if (__DEV__) {
-            console.warn('Calendar Store: Invalid date format with slashes:', dateString);
-          }
-          return null;
         }
-      } else {
-        // Assume ISO format (YYYY-MM-DD)
-        finalDateString = dateString;
       }
 
-      // Create the full date-time string
-      const fullDateTimeString = `${finalDateString}T${timeString}:00`;
-
-      if (__DEV__) {
-        console.log('Calendar Store: Creating Date object from:', fullDateTimeString);
-      }
-
-      // Create the Date object with additional protection
+      // Create the full ISO date-time string
+      // Append 'Z' or use local date parsing depending on the environment
+      // Using a space instead of 'T' can be more reliable on some JS engines
+      const fullDateTimeString = `${finalDateString.replace(/\//g, '-')}T${timeString}:00`;
       const eventDate = new Date(fullDateTimeString);
 
       // Validate the created date
       if (isNaN(eventDate.getTime())) {
-        if (__DEV__) {
-          console.warn('Calendar Store: Invalid date created from:', fullDateTimeString);
+        // Fallback for some environments that don't like 'T' separator
+        const fallbackDate = new Date(finalDateString.replace(/\//g, '-') + ' ' + timeString);
+        if (!isNaN(fallbackDate.getTime())) {
+          return fallbackDate;
         }
         return null;
       }
 
       return eventDate;
     } catch (error) {
-      if (__DEV__) {
-        console.error('Calendar Store: Error in parseEventDate:', error, 'Date:', dateString, 'Time:', timeString);
-      }
       return null;
     }
   };
@@ -546,40 +519,25 @@ const useCalendarHook = () => {
   // Get upcoming events
   const upcomingEvents = useMemo(() => {
     const now = new Date();
-    if (__DEV__) {
-      console.log('Calendar Store: Computing upcoming events');
-      console.log('Calendar Store: Total events:', events.length);
-      console.log('Calendar Store: Current time:', now.toISOString());
-    }
-
+    
+    // Sort and filter events
     const filtered = events.filter((event: CalendarEvent) => {
-      if (__DEV__) {
-        console.log('Calendar Store: Checking event:', event.title, 'Date:', event.date, 'Time:', event.startTime, 'Status:', event.status);
-      }
-
-      let eventDate: Date | null;
-      eventDate = parseEventDate(event.date, event.startTime);
-
+      let eventDate: Date | null = parseEventDate(event.date, event.startTime);
+      const isUpcoming = event.status === 'upcoming';
+      
+      // If we can't parse the date, trust the 'upcoming' status
       if (!eventDate) {
-        if (__DEV__) {
-          console.warn('Calendar Store: Failed to parse date for event:', event.title, 'Date:', event.date, 'Time:', event.startTime);
-        }
-        return false;
+        return isUpcoming;
       }
 
       const isInFuture = eventDate > now;
-      const isUpcoming = event.status === 'upcoming';
-
-      if (__DEV__) {
-        console.log('Calendar Store: Event date:', eventDate.toISOString(), 'isInFuture:', isInFuture, 'isUpcoming:', isUpcoming);
-      }
-
-      return isInFuture && isUpcoming;
+      
+      // Show if it's in the future OR if it's explicitly marked as upcoming
+      return isInFuture || isUpcoming;
     }).sort((a: CalendarEvent, b: CalendarEvent) => {
       const dateA = parseEventDate(a.date, a.startTime);
       const dateB = parseEventDate(b.date, b.startTime);
 
-      // Handle invalid dates by putting them at the end
       if (!dateA && !dateB) return 0;
       if (!dateA) return 1;
       if (!dateB) return -1;
@@ -587,9 +545,6 @@ const useCalendarHook = () => {
       return dateA.getTime() - dateB.getTime();
     });
 
-    if (__DEV__) {
-      console.log('Calendar Store: Filtered upcoming events:', filtered.length);
-    }
     return filtered;
   }, [events]);
 
@@ -664,6 +619,7 @@ const useCalendarHook = () => {
     updateSettings,
     checkoutCart,
     updateAttendance,
+    refetch,
   };
 };
 

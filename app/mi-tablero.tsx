@@ -46,20 +46,24 @@ export default function MiTableroScreen() {
   const [showOrganizerDashboard, setShowOrganizerDashboard] = useState(false);
 
   // Pull-to-refresh handler
+  const { refetch: refetchEvents } = useCalendar();
+  const { refetch: refetchServices } = useServices();
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       // Refresh all data sources
       await Promise.all([
         fetchLodgings(),
-        // services-store and calendar-store refetch automatically or can be refetched if they expose refetch
+        refetchEvents(),
+        refetchServices(),
       ]);
     } catch (error) {
       console.error('Error refreshing Mi Tablero:', error);
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [fetchLodgings, refetchEvents, refetchServices]);
 
   // One-time cleanup: Remove event-type items from priority board since events are now managed by calendar
   useEffect(() => {
@@ -94,10 +98,28 @@ export default function MiTableroScreen() {
 
     // const mockUserServices = mockServices.filter(service => service.providerId === currentUser.id);
     const mockUserServices: any[] = []; // Empty for compatibility
-    const realUserServices = services.filter(service => String(service.providerId) === String(currentUser.id));
+    if (__DEV__) {
+      console.log('📋 Mi Tablero: Services from store count:', services.length);
+      console.log('📋 Mi Tablero: Current User ID:', currentUser.id, typeof currentUser.id);
+      if (services.length > 0) {
+        console.log('📋 Mi Tablero: First service sample:', {
+          id: services[0].id,
+          providerId: services[0].providerId,
+          providerIdType: typeof services[0].providerId
+        });
+      }
+    }
+
+    const realUserServices = services.filter(service => {
+      const match = String(service.providerId) === String(currentUser.id);
+      if (__DEV__) {
+        // console.log(`🔍 Service "${service.title}": match=${match} (id=${service.providerId} vs ${currentUser.id})`);
+      }
+       return match;
+    });
 
     if (__DEV__) {
-      console.log('✅ Mi Tablero: Real services found:', realUserServices.length, realUserServices.map(s => s.title));
+      console.log('✅ Mi Tablero: Filtered user services count:', realUserServices.length);
     }
 
     // Mock services injection removed
@@ -167,17 +189,11 @@ export default function MiTableroScreen() {
       })));
     }
 
-    const userEvents = events.filter((event: any) => {
-      // STRICT FILTERING: Only include events where providerId matches current user AND no provider object exists OR provider.id also matches
-      const providerIdMatches = String(event.providerId) === String(currentUser.id);
-      const providerObjMatches = !event.provider || String(event.provider.id) === String(currentUser.id);
-      const isOwner = providerIdMatches && providerObjMatches;
+    const userEvents = events.filter((event: any) => String(event.providerId) === String(currentUser.id));
 
-      if (__DEV__) {
-        console.log(`🔍 Event "${event.title}": providerId=${event.providerId}, provider.id=${event.provider?.id}, currentUserId=${currentUser.id}, providerIdMatches=${providerIdMatches}, providerObjMatches=${providerObjMatches}, isOwner=${isOwner}`);
-      }
-      return isOwner;
-    });
+    if (__DEV__) {
+      console.log('✅ Mi Tablero: Filtered user events count:', userEvents.length);
+    }
     if (__DEV__) {
       console.log('✅ Mi Tablero: User events found:', userEvents.length, userEvents.map((e: any) => e.title));
     }
@@ -292,8 +308,8 @@ export default function MiTableroScreen() {
         if (!realEvent) return false;
 
         // Apply same strict filtering as above
-        const providerIdMatches = realEvent.providerId === currentUser.id;
-        const providerObjMatches = !realEvent.provider || realEvent.provider.id === currentUser.id;
+        const providerIdMatches = String(realEvent.providerId) === String(currentUser.id);
+        const providerObjMatches = !realEvent.provider || String(realEvent.provider.id) === String(currentUser.id);
         return providerIdMatches && providerObjMatches;
       }
 

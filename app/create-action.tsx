@@ -393,6 +393,11 @@ export default function CreateActionScreen() {
   };
 
   const handleSubmit = async () => {
+    if (!currentUser) {
+      Alert.alert('Error', 'Debes estar iniciado sesión para realizar esta acción');
+      return;
+    }
+    
     try {
       if (!currentUser) {
         Alert.alert('Error', 'Usuario no encontrado');
@@ -536,7 +541,10 @@ export default function CreateActionScreen() {
           serviceSchedule = actionData.selectedDays.map(day => {
             const dayIndex = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(day);
             return actionData.timeSlots.map(slot => {
-              const [startTime, endTime] = slot.split('-');
+              const parts = slot.split('-');
+              const startTime = parts[0] || '09:00';
+              const endTime = parts[1] || calculateEndTime(startTime, parseInt(actionData.duration) || 60);
+              
               return {
                 dayOfWeek: dayIndex,
                 startTime,
@@ -547,13 +555,18 @@ export default function CreateActionScreen() {
           }).flat();
         }
 
+        const price = actionData.isFree ? 0 : (parseFloat(actionData.price) || 0);
+        const duration = parseInt(actionData.duration) || 60;
+        const maxParticipants = parseInt(actionData.maxParticipants) || 10;
+        const availableSpots = parseInt(actionData.availableSpots) || maxParticipants;
+
         const serviceData = {
           providerId: String(currentUser.id),
           title: actionData.title.trim(),
           description: actionData.description.trim(),
           category: categoryMap[actionData.category] || 'otros',
-          price: actionData.isFree ? 0 : (parseFloat(actionData.price) || 0),
-          duration: parseInt(actionData.duration) || 60,
+          price,
+          duration,
           isOnline: actionData.isOnline,
           location: actionData.location || 'Por definir',
           tags: [],
@@ -561,12 +574,13 @@ export default function CreateActionScreen() {
           startDate: actionData.hasSchedule ? actionData.startDate : undefined,
           endDate: actionData.hasSchedule ? actionData.endDate : undefined,
           schedule: serviceSchedule,
-          permissions: actionData.permissions, // Include permissions
-          isActive: actionData.isActive, // Include isActive
+          permissions: actionData.permissions,
+          isActive: actionData.isActive,
+          maxParticipants,
+          availableSpots
         };
 
         console.log('📋 Create Action: Service data with permissions:', serviceData);
-        console.log('📋 Create Action: Permissions array:', actionData.permissions);
 
         if (isEditMode && editItemId) {
           // Strip prefix and timestamp suffix from ID if present
@@ -710,11 +724,18 @@ export default function CreateActionScreen() {
   };
 
   const calculateEndTime = (startTime: string, durationMinutes: number) => {
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const startDate = new Date();
-    startDate.setHours(hours, minutes, 0, 0);
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
-    return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+    try {
+      if (!startTime || !startTime.includes(':')) return '10:00';
+      const [hours, minutes] = startTime.split(':').map(Number);
+      if (isNaN(hours) || isNaN(minutes)) return '10:00';
+      
+      const startDate = new Date();
+      startDate.setHours(hours, minutes, 0, 0);
+      const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+      return `${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}`;
+    } catch (e) {
+      return '10:00';
+    }
   };
 
   const renderProgressBar = () => (

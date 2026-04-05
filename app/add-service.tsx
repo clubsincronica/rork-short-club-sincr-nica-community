@@ -10,6 +10,8 @@ import { FloatingCard } from '@/components/FloatingCard';
 import { TouchableScale } from '@/components/TouchableScale';
 import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
+import { useServices } from '@/hooks/services-store';
+import { useProducts } from '@/hooks/products-store';
 
 type ServiceType = 'service' | 'event' | 'product';
 
@@ -46,6 +48,8 @@ export default function AddServiceScreen() {
   const insets = useSafeAreaInsets();
   const { currentUser } = useUser();
   const { addEvent } = useCalendar();
+  const { addService } = useServices();
+  const { addProduct } = useProducts();
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 4;
 
@@ -129,21 +133,17 @@ export default function AddServiceScreen() {
         }
         
         console.log('📅 Add Service: Creating event for calendar...');
-        console.log('📅 Add Service: This is an event with date, adding to calendar...');
         
         // Convert date format if needed (DD/MM/YYYY -> YYYY-MM-DD)
         let normalizedDate = formData.eventDate;
         if (formData.eventDate.includes('/')) {
           const parts = formData.eventDate.split('/');
           if (parts.length === 3 && parts[0].length <= 2) {
-            // This is DD/MM/YYYY format, convert to YYYY-MM-DD
             const [day, month, year] = parts;
             normalizedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-            console.log('🔄 Add Service: Converted date format:', formData.eventDate, '->', normalizedDate);
           }
         }
         
-        // Map category to calendar categories
         const categoryMap: { [key: string]: string } = {
           'Talleres': 'yoga',
           'Ceremonias': 'spiritual-guidance',
@@ -165,7 +165,7 @@ export default function AddServiceScreen() {
           title: formData.title.trim(),
           description: formData.description.trim(),
           category: categoryMap[formData.category] || 'meditation',
-          date: normalizedDate, // Use normalized date
+          date: normalizedDate,
           startTime: formData.eventTime,
           endTime: calculateEndTime(formData.eventTime, parseInt(formData.duration) || 60),
           location: formData.location || 'Por definir',
@@ -175,12 +175,41 @@ export default function AddServiceScreen() {
           tags: []
         };
 
-        console.log('📝 Add Service: Calendar event prepared with normalized date:', calendarEvent);
         await addEvent(calendarEvent);
-        console.log('✅ Add Service: Event added to calendar successfully');
-      } else {
-        // For services and products, add to their respective stores (future implementation)
-        console.log('📋 Add Service: Service/Product created (will be added to services store in future)');
+      } else if (formData.type === 'service') {
+        const serviceData = {
+          providerId: String(currentUser.id),
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          category: formData.category,
+          price: parseFloat(formData.price) || 0,
+          duration: parseInt(formData.duration) || 60,
+          isOnline: formData.isOnline,
+          location: formData.location || 'Por definir',
+          tags: [],
+          isActive: true,
+          isScheduled: false
+        };
+        
+        console.log('📋 Add Service: Calling addService store method');
+        await addService(serviceData);
+        console.log('✅ Add Service: Service added successfully');
+      } else if (formData.type === 'product') {
+        const productData = {
+          providerId: String(currentUser.id),
+          title: formData.title.trim(),
+          description: formData.description.trim(),
+          category: formData.category,
+          price: parseFloat(formData.price) || 0,
+          tags: [],
+          images: formData.images,
+          isActive: true,
+          inStock: true,
+          stockCount: 99
+        };
+        console.log('🛍️ Add Service: Calling addProduct store method');
+        await addProduct(productData);
+        console.log('✅ Add Service: Product added successfully');
       }
 
       const itemType = formData.type === 'event' ? 'evento' : formData.type === 'service' ? 'servicio' : 'producto';
