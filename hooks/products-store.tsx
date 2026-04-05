@@ -156,7 +156,7 @@ export const ProductsProvider: React.FC<{ children: ReactNode }> = ({ children }
   };
 
   const getUserProducts = (userId: string): Product[] => {
-    return products.filter((p: Product) => p.providerId.toString() === userId);
+    return (products || []).filter((p: Product) => p?.providerId?.toString() === userId);
   };
 
   // Cart Logic

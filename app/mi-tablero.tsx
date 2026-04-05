@@ -81,68 +81,35 @@ export default function MiTableroScreen() {
   // Fetch lodgings on mount
   useEffect(() => {
     fetchLodgings();
-  }, [fetchLodgings]);
-
-  // Create comprehensive offerings from all sources - simplified approach
+  }, [fetchLodgings]);  // Create comprehensive offerings from all sources - fully guarded for production stability
   const userOfferings = useMemo(() => {
     if (!currentUser) return [];
 
-    console.log('Mi Tablero: Current user:', currentUser.id, currentUser.name);
-    // 1. Add services from real services store
-    /*
-    console.log('Mi Tablero: Total mockServices: 0 (Disabled)');
-    console.log('Mi Tablero: Total events:', events.length);
-    */
-
     const offerings: ProfilePriorityItem[] = [];
 
-    // const mockUserServices = mockServices.filter(service => service.providerId === currentUser.id);
-    const mockUserServices: any[] = []; // Empty for compatibility
-    if (__DEV__) {
-      console.log('📋 Mi Tablero: Services from store count:', services.length);
-      console.log('📋 Mi Tablero: Current User ID:', currentUser.id, typeof currentUser.id);
-      if (services.length > 0) {
-        console.log('📋 Mi Tablero: First service sample:', {
-          id: services[0].id,
-          providerId: services[0].providerId,
-          providerIdType: typeof services[0].providerId
-        });
-      }
-    }
+    // Use safe array access for all store data
+    const safeServices = services || [];
+    const safeEvents = events || [];
+    const safeLodgings = lodgings || [];
+    
+    // 1. Add services from real services store
+    const realUserServices = safeServices.filter(service => 
+      service && String(service.providerId) === String(currentUser.id)
+    );
 
-    const realUserServices = services.filter(service => {
-      const match = String(service.providerId) === String(currentUser.id);
-      if (__DEV__) {
-        // console.log(`🔍 Service "${service.title}": match=${match} (id=${service.providerId} vs ${currentUser.id})`);
-      }
-       return match;
-    });
-
-    if (__DEV__) {
-      console.log('✅ Mi Tablero: Filtered user services count:', realUserServices.length);
-    }
-
-    // Mock services injection removed
-    /*
-    mockUserServices.forEach(service => {
-       // ...
-    });
-    */
-
-    // Add real services from services store
     realUserServices.forEach(service => {
       offerings.push({
         id: service.id,
         type: 'service',
-        title: service.title,
-        description: service.description,
-        price: service.price,
+        title: service.title || 'Servicio sin título',
+        description: service.description || '',
+        price: service.price || 0,
         image: service.images?.[0],
         priority: 1,
-        isActive: service.isActive !== false, // Default to true if not specified
-        createdAt: service.createdAt,
-        updatedAt: service.updatedAt,
-        tags: service.tags,
+        isActive: service.isActive !== false,
+        createdAt: service.createdAt || new Date().toISOString(),
+        updatedAt: service.updatedAt || new Date().toISOString(),
+        tags: service.tags || [],
         metadata: {
           duration: service.duration,
           category: service.category,
@@ -154,20 +121,23 @@ export default function MiTableroScreen() {
     });
 
     // 1.5 Add lodging from lodging store
-    const userLodgings = lodgings.filter(lodging => String(lodging.hostId) === String(currentUser.id));
-    userLodgings.forEach(lodging => {
+    const userSafeLodgings = safeLodgings.filter(lodging => 
+      lodging && String(lodging.hostId) === String(currentUser.id)
+    );
+    
+    userSafeLodgings.forEach(lodging => {
       offerings.push({
         id: lodging.id,
         type: 'lodging' as any,
-        title: lodging.title,
-        description: lodging.description,
-        price: lodging.pricePerNight,
+        title: lodging.title || 'Alojamiento sin título',
+        description: lodging.description || '',
+        price: lodging.pricePerNight || 0,
         image: lodging.images?.[0],
         priority: 1,
         isActive: true,
-        createdAt: new Date().toISOString(), // Fallback
+        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        tags: lodging.amenities,
+        tags: lodging.amenities || [],
         metadata: {
           location: lodging.location,
           maxGuests: lodging.maxGuests,
@@ -176,71 +146,50 @@ export default function MiTableroScreen() {
       });
     });
 
-    // 2. Add ONLY user events from calendar (strict filtering)
-    if (__DEV__) {
-      console.log('🔍 Mi Tablero: All events:', events.map((e: any) => ({
-        id: e.id,
-        title: e.title,
-        providerId: e.providerId,
-        providerIdType: typeof e.providerId,
-        providerIdFromObj: e.provider?.id,
-        currentUserId: currentUser.id,
-        currentUserIdType: typeof currentUser.id
-      })));
-    }
+    // 2. Add user events from calendar
+    const userSafeEvents = safeEvents.filter((event: any) => 
+      event && String(event.providerId) === String(currentUser.id)
+    );
 
-    const userEvents = events.filter((event: any) => String(event.providerId) === String(currentUser.id));
-
-    if (__DEV__) {
-      console.log('✅ Mi Tablero: Filtered user events count:', userEvents.length);
-    }
-    if (__DEV__) {
-      console.log('✅ Mi Tablero: User events found:', userEvents.length, userEvents.map((e: any) => e.title));
-    }
-
-    userEvents.forEach((event: any) => {
-      console.log('✅ Mi Tablero: Adding calendar event:', event.title);
+    userSafeEvents.forEach((event: any) => {
       offerings.push({
         id: `event-${event.id}`,
         type: 'event',
-        title: event.title,
+        title: event.title || 'Evento sin título',
         description: event.description || '',
         price: event.price || 0,
-        image: undefined,
+        image: event.image,
         priority: 1,
         isActive: true,
-        createdAt: new Date().toISOString(),
+        createdAt: event.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         tags: [],
         metadata: {
           date: event.date,
           startTime: event.startTime,
           endTime: event.endTime,
-          location: event.location,
-          maxParticipants: event.maxParticipants,
-          currentParticipants: event.currentParticipants,
-          isOnline: event.isOnline
+          location: event.location
         }
       });
     });
 
     // 3. Add user products from products store
-    const realUserProducts = getUserProducts(String(currentUser.id));
-    console.log('Mi Tablero: Real products found:', realUserProducts.length, realUserProducts.map(p => p.title));
+    // Ensure getUserProducts is called safely as it might not be ready
+    const realUserProducts = typeof getUserProducts === 'function' ? getUserProducts(String(currentUser.id)) : [];
 
-    realUserProducts.forEach(product => {
+    (realUserProducts || []).forEach(product => {
       offerings.push({
         id: product.id,
         type: 'product',
-        title: product.title,
-        description: product.description,
-        price: product.price,
+        title: product.title || 'Producto sin título',
+        description: product.description || '',
+        price: product.price || 0,
         image: product.images?.[0],
         priority: 1,
-        isActive: product.inStock,
+        isActive: product.inStock !== false,
         createdAt: product.createdAt,
         updatedAt: product.updatedAt,
-        tags: product.tags,
+        tags: product.tags || [],
         metadata: {
           category: product.category,
           createdAt: product.createdAt
@@ -248,7 +197,8 @@ export default function MiTableroScreen() {
       });
     });
 
-    console.log('Mi Tablero: Total offerings:', offerings.length, offerings.map(o => o.title));
+    return offerings;
+  }, [currentUser, services, events, lodgings, products, getUserProducts]);erings.map(o => o.title));
 
     // Final safety check - ensure all items truly belong to current user
     const safeOfferings = offerings.filter(offering => {

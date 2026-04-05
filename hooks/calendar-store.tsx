@@ -516,27 +516,23 @@ const useCalendarHook = () => {
     }
   };
 
-  // Get upcoming events
   const upcomingEvents = useMemo(() => {
     const now = new Date();
     
-    // Sort and filter events
-    const filtered = events.filter((event: CalendarEvent) => {
-      let eventDate: Date | null = parseEventDate(event.date, event.startTime);
-      const isUpcoming = event.status === 'upcoming';
+    // Use safe array access
+    const filtered = (events || []).filter((event: CalendarEvent) => {
+      let eventDate: Date | null = parseEventDate(event?.date || '', event?.startTime || '');
+      const isUpcoming = event?.status === 'upcoming';
       
-      // If we can't parse the date, trust the 'upcoming' status
       if (!eventDate) {
         return isUpcoming;
       }
 
       const isInFuture = eventDate > now;
-      
-      // Show if it's in the future OR if it's explicitly marked as upcoming
       return isInFuture || isUpcoming;
     }).sort((a: CalendarEvent, b: CalendarEvent) => {
-      const dateA = parseEventDate(a.date, a.startTime);
-      const dateB = parseEventDate(b.date, b.startTime);
+      const dateA = parseEventDate(a?.date || '', a?.startTime || '');
+      const dateB = parseEventDate(b?.date || '', b?.startTime || '');
 
       if (!dateA && !dateB) return 0;
       if (!dateA) return 1;
