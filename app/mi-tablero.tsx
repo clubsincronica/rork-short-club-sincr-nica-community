@@ -198,37 +198,29 @@ export default function MiTableroScreen() {
     });
 
     return offerings;
-  }, [currentUser, services, events, lodgings, products, getUserProducts]);erings.map(o => o.title));
+  }, [currentUser, services, events, lodgings, products, getUserProducts]);
 
-    // Final safety check - ensure all items truly belong to current user
-    const safeOfferings = offerings.filter(offering => {
-      // Double-check by verifying item source and ownership
-      if (offering.type === 'service') {
-        // Check if this service ID exists in our filtered services
-        const isFromRealServices = realUserServices.some(s => s.id === offering.id);
-        if (!isFromRealServices) {
-          console.warn('⚠️ Mi Tablero: Filtering out unauthorized service:', offering.title, offering.id);
-        }
-        return isFromRealServices;
-      }
+  // Final safety check - ensure all items truly belong to current user
+  const safeOfferings = userOfferings.filter(offering => {
+    // Double-check by verifying item source and ownership
+    if (offering.type === 'service') {
+      const realUserServices = (services || []).filter(service => 
+        service && String(service.providerId) === String(currentUser?.id)
+      );
+      const isFromRealServices = realUserServices.some(s => s.id === offering.id);
+      return isFromRealServices;
+    }
 
-      if (offering.type === 'event') {
-        // Check if this event ID exists in our filtered events
-        const isFromUserEvents = userEvents.some((e: any) => `event-${e.id}` === offering.id);
-        if (!isFromUserEvents) {
-          console.warn('⚠️ Mi Tablero: Filtering out unauthorized event:', offering.title, offering.id);
-        }
-        return isFromUserEvents;
-      }
+    if (offering.type === 'event') {
+      const userSafeEvents = (events || []).filter((event: any) => 
+        event && String(event.providerId) === String(currentUser?.id)
+      );
+      const isFromUserEvents = userSafeEvents.some((e: any) => `event-${e.id}` === offering.id);
+      return isFromUserEvents;
+    }
 
-      if (offering.type === 'product') {
-        // Products are already safely filtered via getUserProducts
-        return true;
-      }
-
-      // Default: allow other types (priority items, etc.)
-      return true;
-    });
+    return true;
+  });
 
     if (__DEV__) {
       console.log('✅ Mi Tablero: Final safe offerings:', safeOfferings.length, safeOfferings.map(o => o.title));
