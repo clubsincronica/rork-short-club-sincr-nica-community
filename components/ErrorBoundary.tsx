@@ -72,7 +72,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 <Text style={styles.resetButtonText}>Reintentar</Text>
               </TouchableOpacity>
 
-              {__DEV__ && this.state.error && (
+              {this.state.error && (
                 <View style={styles.debugInfo}>
                   <Text style={styles.debugTitle}>Información de depuración:</Text>
                   <Text style={styles.debugText}>{this.state.error.toString()}</Text>
