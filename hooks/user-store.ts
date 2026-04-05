@@ -77,12 +77,13 @@ const useUserStore = () => {
         user = userData;
         // If user object is provided directly, block if not numeric id
         if (typeof user.id !== 'number') {
-          throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
+          throw new Error(`Inicio de sesión fallido: ID no numérico en objeto (tipo: ${typeof user.id}).`);
         }
       } else {
+        const apiUrl = `${getApiBaseUrl()}/api/auth`;
+
         // Try backend auth only
         try {
-          const apiUrl = `${getApiBaseUrl()}/api/auth`;
           if (__DEV__) {
             console.log('🔐 Attempting backend auth to:', apiUrl);
           }
@@ -112,20 +113,26 @@ const useUserStore = () => {
             }
             // Block if user id is not numeric
             if (typeof user.id !== 'number') {
-              throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
+              throw new Error(`Inicio de sesión fallido: ID no numérico (tipo: ${typeof user.id}).`);
             }
           } else {
             const errorText = await response.text();
-            if (__DEV__) {
-              console.warn('❌ Backend auth failed with status', response.status, ':', errorText);
+            let errorMessage = 'Error en el servidor';
+            try {
+              const errorJson = JSON.parse(errorText);
+              errorMessage = errorJson.error || errorJson.message || errorText;
+            } catch (e) {
+              errorMessage = errorText || `HTTP ${response.status}`;
             }
-            throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
+            throw new Error(`Inicio de sesión fallido (Status ${response.status}): ${errorMessage} [URL: ${apiUrl}]`);
           }
-        } catch (error) {
+        } catch (error: any) {
           if (__DEV__) {
             console.warn('❌ Backend auth error, blocking fallback:', error);
           }
-          throw new Error('Inicio de sesión fallido. Solo se permiten usuarios registrados en el backend.');
+          // Preserve the original error message if it was thrown above
+          const msg = error.message || 'Error de conexión';
+          throw new Error(msg.includes('Inicio de sesión fallido') ? msg : `Error de red: ${msg} [URL: ${apiUrl}]`);
         }
       }
 

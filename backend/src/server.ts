@@ -52,9 +52,14 @@ function getCorsOptions() {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1) {
+      // Normalize origin for comparison (remove trailing slashes)
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isAllowed = allowedOrigins.some(ao => ao.replace(/\/$/, '') === normalizedOrigin);
+
+      if (isAllowed) {
         callback(null, true);
       } else {
+        console.warn(`🚨 Blocked CORS origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
