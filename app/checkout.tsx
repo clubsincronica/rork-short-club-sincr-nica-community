@@ -1,3 +1,11 @@
+/*
+ * ==========================================
+ * DEAD CODE — FOOD ORDERING NOT YET LAUNCHED
+ * ==========================================
+ * This file is scaffolded for a future food/product ordering feature.
+ * It is currently disconnected from real payment flows.
+ * DO NOT use this for live payments. See app/payment.tsx for real payments.
+ */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';

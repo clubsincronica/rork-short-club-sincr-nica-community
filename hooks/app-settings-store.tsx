@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 export interface Currency {
   code: string;
@@ -45,14 +46,17 @@ export const useAppSettings = () => {
 };
 
 const useAppSettingsHook = () => {
-  // Check if we're in a preview environment
+  // Check if we're in a web preview environment
   const isPreview = (() => {
     try {
-      return typeof window !== 'undefined' && (
-        window.location?.hostname?.includes('rork') || 
-        window.location?.hostname?.includes('localhost') ||
-        window.location?.hostname?.includes('expo.dev')
-      );
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+        return (
+          window.location?.hostname?.includes('rork') || 
+          window.location?.hostname?.includes('localhost') ||
+          window.location?.hostname?.includes('expo.dev')
+        );
+      }
+      return false;
     } catch (error) {
       console.log('Error checking preview environment:', error);
       return false;
@@ -146,16 +150,6 @@ const useAppSettingsHook = () => {
     isLoading,
     updateLanguage,
     updateLocation,
-    updateCurrency,
-    completeOnboarding,
-    resetSettings,
-  };
-
-  return {
-    settings,
-    isLoading,
-    updateLanguage,
-    updateLocation, 
     updateCurrency,
     completeOnboarding,
     resetSettings,

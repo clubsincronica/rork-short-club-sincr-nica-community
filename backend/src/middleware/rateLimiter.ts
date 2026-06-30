@@ -26,7 +26,7 @@ export const authLimiter = rateLimit({
 // Stricter rate limiter for sensitive operations
 export const strictLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // Limit each IP to 10 requests per hour
+  max: 100, // Limit each IP to 100 requests per hour (increased to avoid blocking valid traffic)
   message: 'Too many requests, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,

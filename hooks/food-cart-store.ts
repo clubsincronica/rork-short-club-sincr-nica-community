@@ -1,3 +1,10 @@
+/*
+ * ==========================================
+ * DEAD CODE — FOOD ORDERING NOT YET LAUNCHED
+ * ==========================================
+ * This store is scaffolded for a future food/product ordering feature.
+ * It is currently disconnected from real payment flows.
+ */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import createContextHook from '@nkzw/create-context-hook';

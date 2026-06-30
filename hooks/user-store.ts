@@ -18,9 +18,8 @@ export const useUser = () => {
 };
 
 const useUserStore = () => {
-  // Development mode: Use mock data for UI testing, but allow real login
-  // Set to true to test UI features, false to test backend integration
-  const isDevelopment = false;  // Using Railway backend with PostgreSQL
+
+  // Production mode: always talk to Railway backend with PostgreSQL
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -30,6 +29,7 @@ const useUserStore = () => {
     language: 'es',
     theme: 'light',
     autoBooking: false,
+    preferredCurrency: 'ARS',
   });
   const queryClient = useQueryClient();
 
@@ -59,6 +59,7 @@ const useUserStore = () => {
         language: 'es',
         theme: 'light',
         autoBooking: false,
+        preferredCurrency: 'ARS',
       };
     }
   });
@@ -231,7 +232,7 @@ const useUserStore = () => {
               longitude: updatedUser.coordinates?.longitude,
               phone: updatedUser.phone,
               website: '', // Not in User type, send empty string
-              interests: updatedUser.specialties,
+              interests: updatedUser.interests || updatedUser.specialties,
               services: updatedUser.specialties,
               isHost: updatedUser.isServiceProvider,
             }),

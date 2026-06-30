@@ -59,9 +59,6 @@ interface PaymentPreference {
 }
 
 export class MercadoPagoService {
-  // App commission rate (2.5%)
-  private static readonly COMMISSION_RATE = 0.025;
-
   /**
    * Get MercadoPago configuration for a specific country
    */
@@ -75,83 +72,6 @@ export class MercadoPagoService {
    */
   static isAvailable(countryCode: string): boolean {
     return countryCode.toUpperCase() in MERCADOPAGO_CONFIG;
-  }
-
-  /**
-   * Calculate commission amount
-   */
-  static calculateCommission(amount: number): number {
-    return Math.round(amount * this.COMMISSION_RATE * 100) / 100;
-  }
-
-  /**
-   * Calculate provider's net amount (after commission)
-   */
-  static calculateProviderAmount(amount: number): number {
-    return amount - this.calculateCommission(amount);
-  }
-
-  /**
-   * Create a simple MercadoPago payment link (without backend)
-   * This generates a basic payment link that the user can share
-   */
-  static async createSimplePaymentLink(
-    preference: PaymentPreference,
-    countryCode: string
-  ): Promise<string | null> {
-    const config = this.getConfig(countryCode);
-    if (!config) {
-      Alert.alert(
-        'MercadoPago no disponible',
-        `MercadoPago no está disponible en tu país. Por favor, contacta al proveedor del servicio.`
-      );
-      return null;
-    }
-
-    try {
-      // For now, generate a payment link (requires backend for full implementation)
-      // This is a placeholder - actual implementation needs MercadoPago SDK + backend
-      
-      console.log('Creating MercadoPago payment:', {
-        ...preference,
-        currency: config.currency,
-        commission: this.calculateCommission(preference.amount),
-        providerAmount: this.calculateProviderAmount(preference.amount),
-      });
-
-      // TODO: When backend is ready, call:
-      // const response = await fetch(`${API_URL}/create-mercadopago-payment`, {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ...preference,
-      //     currency: config.currency,
-      //     marketplace_fee: this.calculateCommission(preference.amount),
-      //   })
-      // });
-      // const { init_point } = await response.json();
-      // return init_point;
-
-      // For now, show info to user
-      Alert.alert(
-        'Pago con MercadoPago',
-        `Para completar el pago:\n\n` +
-        `💰 Monto: ${config.symbol}${preference.amount}\n` +
-        `💼 Comisión (2.5%): ${config.symbol}${this.calculateCommission(preference.amount)}\n` +
-        `✅ El proveedor recibirá: ${config.symbol}${this.calculateProviderAmount(preference.amount)}\n\n` +
-        `Próximamente podrás pagar directamente con MercadoPago en la app.`,
-        [{ text: 'Entendido' }]
-      );
-
-      return null;
-    } catch (error) {
-      console.error('Error creating MercadoPago payment:', error);
-      Alert.alert(
-        'Error',
-        'No se pudo crear el pago. Por favor, intenta nuevamente.'
-      );
-      return null;
-    }
   }
 
   /**
@@ -224,6 +144,4 @@ export class MercadoPagoService {
 
 // Export helper functions
 export const isMercadoPagoAvailable = MercadoPagoService.isAvailable;
-export const createMercadoPagoPayment = MercadoPagoService.createSimplePaymentLink;
 export const formatMercadoPagoAmount = MercadoPagoService.formatAmount;
-export const calculateCommission = MercadoPagoService.calculateCommission;

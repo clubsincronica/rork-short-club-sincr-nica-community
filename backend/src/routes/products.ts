@@ -51,9 +51,18 @@ router.post('/', authenticateJWT, async (req: any, res) => {
 });
 
 // Update product
-router.put('/:id', authenticateJWT, async (req, res) => {
+router.put('/:id', authenticateJWT, async (req: any, res) => {
     try {
-        await productQueries.updateProduct(parseInt(req.params.id), req.body);
+        const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const product = await productQueries.getProductById(id);
+        if (!product) return res.status(404).json({ error: 'Product not found' });
+        if (product.provider_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this product' });
+        }
+
+        await productQueries.updateProduct(id, req.body);
         res.json({ message: 'Product updated successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -61,9 +70,18 @@ router.put('/:id', authenticateJWT, async (req, res) => {
 });
 
 // Delete product
-router.delete('/:id', authenticateJWT, async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req: any, res) => {
     try {
-        await productQueries.deleteProduct(parseInt(req.params.id));
+        const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const product = await productQueries.getProductById(id);
+        if (!product) return res.status(404).json({ error: 'Product not found' });
+        if (product.provider_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this product' });
+        }
+
+        await productQueries.deleteProduct(id);
         res.json({ message: 'Product deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

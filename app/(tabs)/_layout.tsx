@@ -11,9 +11,9 @@ export default function TabLayout() {
   const { currentUser } = useUser();
 
   // Debug logging for user role
-  console.log('[TabLayout] currentUser:', currentUser);
+  if (__DEV__) console.log('[TabLayout] currentUser:', currentUser);
   const isSuperUser = currentUser?.role === 'superuser';
-  console.log('[TabLayout] isSuperUser:', isSuperUser);
+  if (__DEV__) console.log('[TabLayout] isSuperUser:', isSuperUser);
 
   const tabScreens = [
     <Tabs.Screen
@@ -69,10 +69,12 @@ export default function TabLayout() {
       />
     );
   }
-  console.log('[TabLayout] Tab children count:', tabScreens.length);
-  tabScreens.forEach((child, idx) => {
-    console.log(`[TabLayout] Tab child ${idx}:`, child?.props?.name);
-  });
+  if (__DEV__) {
+    console.log('[TabLayout] Tab children count:', tabScreens.length);
+    tabScreens.forEach((child, idx) => {
+      console.log(`[TabLayout] Tab child ${idx}:`, child?.props?.name);
+    });
+  }
   return (
     <Tabs
       screenOptions={{

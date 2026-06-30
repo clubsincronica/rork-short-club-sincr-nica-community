@@ -44,7 +44,7 @@ export function useGlobalSocketConnection() {
           socket.on('connect', () => {
             console.log('🌐 Global socket connected');
             console.log('🌐 Socket ID:', socket.id);
-            socket.emit('user:join', currentUser.id);
+            socket.emit('user:join'); // server uses JWT-verified ID — no client arg needed
             console.log('🌐 Joined room: user:' + currentUser.id);
           });
           socket.on('disconnect', () => {
@@ -58,8 +58,8 @@ export function useGlobalSocketConnection() {
             socket.on('message:new', (message: any) => {
               console.log('🌐 [GLOBAL] Received message:new event:', message);
 
-              const isForMe = message.receiver_id === currentUser.id;
-              const isSentByMe = message.sender_id === currentUser.id;
+              const isForMe = Number(message.receiver_id) === Number(currentUser.id);
+              const isSentByMe = Number(message.sender_id) === Number(currentUser.id);
 
               if (isForMe && !isSentByMe) {
                 console.log('🌐 [GLOBAL] Message for current user - emitting to event bus');
@@ -77,15 +77,15 @@ export function useGlobalSocketConnection() {
 
           if (existingSocket.connected) {
             console.log('🌐 Joining user room for user:', currentUser.id);
-            existingSocket.emit('user:join', currentUser.id);
+            existingSocket.emit('user:join'); // server uses JWT-verified ID
           }
 
           if (!messageHandlerSet.current && existingSocket) {
             existingSocket.on('message:new', (message: any) => {
               console.log('🌐 [GLOBAL] Received message:new event:', message);
 
-              const isForMe = message.receiver_id === currentUser.id;
-              const isSentByMe = message.sender_id === currentUser.id;
+              const isForMe = Number(message.receiver_id) === Number(currentUser.id);
+              const isSentByMe = Number(message.sender_id) === Number(currentUser.id);
 
               if (isForMe && !isSentByMe) {
                 console.log('🌐 [GLOBAL] Message for current user - emitting to event bus');
@@ -128,8 +128,8 @@ export function useGlobalSocketConnection() {
 
       // Show Alert as fallback notification ONLY when user is NOT on Messages tab
       // Messages screen will handle notifications when tab is active
-      const isForMe = message.receiver_id === currentUser.id;
-      const isSentByMe = message.sender_id === currentUser.id;
+      const isForMe = Number(message.receiver_id) === Number(currentUser.id);
+      const isSentByMe = Number(message.sender_id) === Number(currentUser.id);
 
       if (isForMe && !isSentByMe && !isOnMessagesTab) {
         console.log('🌐 [GLOBAL] User NOT on Messages tab - showing Alert fallback');

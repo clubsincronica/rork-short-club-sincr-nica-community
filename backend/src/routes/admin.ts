@@ -4,12 +4,9 @@ import { requireSuperUser } from '../middleware/roles';
 
 const router = express.Router();
 
-// Middleware alias for consistency
-const requireAdmin = requireSuperUser();
-
 // All admin routes require authentication and superuser role
 router.use(authenticateJWT);
-router.use(requireAdmin);
+router.use(requireSuperUser());
 
 /**
  * GET /api/admin/stats
@@ -24,11 +21,11 @@ router.get('/stats', async (req: Request, res: Response) => {
         const totalUsers = parseInt(usersResult[0]?.count || '0');
 
         // Get total transactions
-        const transactionsResult = await pgClient.query('SELECT COUNT(*) as count FROM transactions WHERE status = $1', ['completed']);
+        const transactionsResult = await pgClient.query("SELECT COUNT(*) as count FROM transactions WHERE status IN ($1, $2, $3)", ['completed', 'succeeded', 'approved']);
         const totalTransactions = parseInt(transactionsResult[0]?.count || '0');
 
         // Get total revenue (app fees)
-        const revenueResult = await pgClient.query('SELECT SUM(app_fee_amount) as total FROM transactions WHERE status = $1', ['completed']);
+        const revenueResult = await pgClient.query("SELECT SUM(app_fee_amount) as total FROM transactions WHERE status IN ($1, $2, $3)", ['completed', 'succeeded', 'approved']);
         const totalRevenue = parseFloat(revenueResult[0]?.total || '0');
 
         // Get total events
@@ -79,9 +76,9 @@ router.get('/revenue', async (req: Request, res: Response) => {
         SUM(app_fee_amount) as total_fees,
         SUM(total_amount) as total_volume
       FROM transactions
-      WHERE status = $1
+      WHERE status IN ($1, $2, $3)
       GROUP BY payment_provider
-    `, ['completed']);
+    `, ['completed', 'succeeded', 'approved']);
 
         // Get revenue by month (last 12 months)
         const byMonthResult = await pgClient.query(`
@@ -91,10 +88,10 @@ router.get('/revenue', async (req: Request, res: Response) => {
         SUM(app_fee_amount) as total_fees,
         SUM(total_amount) as total_volume
       FROM transactions
-      WHERE status = $1 AND created_at >= NOW() - INTERVAL '12 months'
+      WHERE status IN ($1, $2, $3) AND created_at >= NOW() - INTERVAL '12 months'
       GROUP BY month
       ORDER BY month DESC
-    `, ['completed']);
+    `, ['completed', 'succeeded', 'approved']);
 
         res.json({
             byProvider: byProviderResult || [],
@@ -184,44 +181,22 @@ router.get('/transactions', async (req: Request, res: Response) => {
 });
 
 /**
- * GET /api/admin/blocked-emails
- * Returns list of blocked email addresses
- */
-router.get('/blocked-emails', async (req: Request, res: Response) => {
-    try {
-        const pgClient = require('../db/postgres-client');
-        const result = await pgClient.query('SELECT email FROM blocked_emails');
-        res.json({ emails: result.map((r: any) => r.email) });
-    } catch (error) {
-        console.error('Error fetching blocked emails:', error);
-        res.status(500).json({ error: 'Error fetching blocked emails' });
-    }
-});
-
-/**
  * POST /api/admin/remove-user
- * Blocks and deletes a user by email
+ * Blocks a user's email and deletes their account
  */
 router.post('/remove-user', async (req: Request, res: Response) => {
     try {
         const pgClient = require('../db/postgres-client');
         const { email } = req.body;
-
         if (!email || typeof email !== 'string') {
-            return res.status(400).json({ error: 'Valid email required' });
+            return res.status(400).json({ error: 'Email is required' });
         }
-
-        // Block user by adding to blocked_emails table (create if not exists)
         await pgClient.query(`CREATE TABLE IF NOT EXISTS blocked_emails (email TEXT PRIMARY KEY, blocked_at TIMESTAMP DEFAULT NOW())`);
         await pgClient.query(`INSERT INTO blocked_emails (email) VALUES ($1) ON CONFLICT (email) DO NOTHING`, [email]);
-
-        // Delete user from users table
         const result = await pgClient.query('DELETE FROM users WHERE email = $1 RETURNING id, email, name', [email]);
-
         if (result.rowCount === 0) {
             return res.status(404).json({ error: 'No user found for email' });
         }
-
         res.json({ success: true, deleted: result.rows[0] });
     } catch (error) {
         console.error('Admin remove-user error:', error);
@@ -231,56 +206,84 @@ router.post('/remove-user', async (req: Request, res: Response) => {
 
 /**
  * POST /api/admin/unblock-user
- * Unblocks a user by removing from blocked_emails
+ * Removes a user's email from the blocked list
  */
 router.post('/unblock-user', async (req: Request, res: Response) => {
     try {
         const pgClient = require('../db/postgres-client');
         const { email } = req.body;
-
         if (!email || typeof email !== 'string') {
-            return res.status(400).json({ error: 'Valid email required' });
+            return res.status(400).json({ error: 'Email is required' });
         }
-
-        const result = await pgClient.query('DELETE FROM blocked_emails WHERE email = $1 RETURNING email', [email]);
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ error: 'Email not found in blocked list' });
-        }
-
-        res.json({ success: true, unblocked: result.rows[0].email });
+        await pgClient.query('DELETE FROM blocked_emails WHERE email = $1', [email]);
+        res.json({ success: true });
     } catch (error) {
         console.error('Admin unblock-user error:', error);
         res.status(500).json({ error: 'Failed to unblock user' });
     }
 });
 
-// Config Management Endpoint
-router.get('/config', async (req: Request, res: Response) => {
+/**
+ * GET /api/admin/settings
+ * Returns current platform settings (commission rate, etc.)
+ */
+router.get('/settings', async (req: Request, res: Response) => {
     try {
-        const { getAllConfig } = require('../models/system-config');
-        const config = await getAllConfig();
-        res.json(config);
+        const pgClient = require('../db/postgres-client');
+        const rows = await pgClient.query('SELECT key, value FROM platform_settings');
+        const settings = Object.fromEntries((rows || []).map((r: any) => [r.key, r.value]));
+        res.json(settings);
     } catch (error) {
-        console.error('Admin config error:', error);
-        res.status(500).json({ error: 'Failed to fetch config' });
+        console.error('Admin settings GET error:', error);
+        res.status(500).json({ error: 'Failed to fetch settings' });
     }
 });
 
-router.put('/config', async (req: Request, res: Response) => {
+/**
+ * PUT /api/admin/settings
+ * Updates platform settings. Accepts { commission_rate: number (0–1) }.
+ */
+router.put('/settings', async (req: Request, res: Response) => {
     try {
-        const { setConfigValue } = require('../models/system-config');
-        const { key, value, description } = req.body;
+        const pgClient = require('../db/postgres-client');
+        const { commission_rate } = req.body;
 
-        if (!key || value === undefined) {
-            return res.status(400).json({ error: 'Key and value required' });
+        if (commission_rate === undefined) {
+            return res.status(400).json({ error: 'commission_rate is required' });
         }
 
-        await setConfigValue(key, value.toString(), description);
-        res.json({ success: true, key, value });
+        const rate = parseFloat(commission_rate);
+        if (isNaN(rate) || rate < 0 || rate > 1) {
+            return res.status(400).json({ error: 'commission_rate must be a number between 0 and 1' });
+        }
+
+        await pgClient.query(
+            `INSERT INTO platform_settings (key, value, updated_at)
+             VALUES ('commission_rate', $1, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+            [rate.toString()]
+        );
+
+        res.json({ success: true, commission_rate: rate });
     } catch (error) {
-        console.error('Admin update config error:', error);
-        res.status(500).json({ error: 'Failed to update config' });
+        console.error('Admin settings PUT error:', error);
+        res.status(500).json({ error: 'Failed to update settings' });
+    }
+});
+
+/**
+ * GET /api/admin/blocked-emails
+ * Returns list of blocked emails
+ */
+router.get('/blocked-emails', async (req: Request, res: Response) => {
+    try {
+        const pgClient = require('../db/postgres-client');
+        const result = await pgClient.query('SELECT email FROM blocked_emails');
+        const rows: any[] = Array.isArray(result) ? result : (result.rows || []);
+        return res.json({ emails: rows.map((r: any) => r.email) });
+    } catch (err) {
+        console.error('Error fetching blocked emails:', err);
+        return res.status(500).json({ error: 'Error fetching blocked emails' });
     }
 });
 

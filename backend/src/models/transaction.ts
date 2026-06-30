@@ -1,17 +1,37 @@
 import { query } from '../db/postgres-client';
 
+/**
+ * Get the platform commission rate.
+ * Reads from the platform_settings table first (admin-controlled),
+ * falls back to the COMMISSION_RATE env var, then to 0.05.
+ */
+export async function getCommissionRate(): Promise<number> {
+  try {
+    const rows = await query(
+      `SELECT value FROM platform_settings WHERE key = 'commission_rate' LIMIT 1`
+    );
+    if (rows[0]?.value) {
+      return parseFloat(rows[0].value);
+    }
+  } catch {
+    // Fall through to env fallback if table doesn't exist yet
+  }
+  return parseFloat(process.env.COMMISSION_RATE || '0.05');
+}
+
+// Create a new transaction with commission splitting
 export async function createTransaction({
   paymentProvider,
   paymentId,
   status = 'pending',
-  amount, // This is the TOTAL amount charged to the customer
+  amount,
   currency,
   buyerId = null,
   providerId = null,
   bookingId = null,
   metadata = null,
-  appFeeAmount = null, // Optional explicit fee
-  providerAmount = null // Optional explicit provider amount
+  appFeeAmount: providedAppFee,
+  providerAmount: providedProviderAmount,
 }: {
   paymentProvider: string;
   paymentId: string;
@@ -22,25 +42,35 @@ export async function createTransaction({
   providerId?: string | number | null;
   bookingId?: string | number | null;
   metadata?: any;
-  appFeeAmount?: number | null;
-  providerAmount?: number | null;
+  appFeeAmount?: number;
+  providerAmount?: number;
 }) {
-  // If explicit amounts are provided, use them. Otherwise default to 5% calculation for backward compatibility.
-  const finalAppFee = appFeeAmount !== null ? appFeeAmount : (amount * 0.05);
-  const finalProviderAmount = providerAmount !== null ? providerAmount : (amount - finalAppFee);
+  // Use pre-calculated values when provided (set by payments route),
+  // otherwise fall back to reading the rate from DB/env.
+  let appFeeAmount: number;
+  let providerAmount: number;
 
-  const res = await query(
+  if (providedAppFee !== undefined && providedProviderAmount !== undefined) {
+    appFeeAmount = providedAppFee;
+    providerAmount = providedProviderAmount;
+  } else {
+    const commissionRate = await getCommissionRate();
+    appFeeAmount = Math.round(amount * commissionRate * 100) / 100;
+    providerAmount = Math.round((amount - appFeeAmount) * 100) / 100;
+  }
+
+  await query(
     `INSERT INTO transactions (
       payment_provider, payment_id, status, total_amount, app_fee_amount, 
       provider_amount, buyer_id, provider_id, booking_id, currency, metadata, created_at, updated_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()) RETURNING *`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())`,
     [
       paymentProvider,
       paymentId,
       status,
       amount,
-      finalAppFee,
-      finalProviderAmount,
+      appFeeAmount,
+      providerAmount,
       buyerId,
       providerId,
       bookingId,
@@ -48,8 +78,6 @@ export async function createTransaction({
       metadata ? JSON.stringify(metadata) : null
     ]
   );
-
-  return res[0];
 }
 
 export async function updateTransactionStatus(paymentProvider: string, paymentId: string, status: string) {
@@ -67,30 +95,6 @@ export async function updateTransactionStatus(paymentProvider: string, paymentId
       await updateReservationStatus(transaction.booking_id, 'confirmed', 'completed');
     }
   }
-}
-
-export async function updateTransaction(id: number, updates: { paymentId?: string, status?: string }) {
-  const fields: string[] = [];
-  const values: any[] = [];
-  let paramIdx = 1;
-
-  if (updates.paymentId) {
-    fields.push(`payment_id = $${paramIdx++}`);
-    values.push(updates.paymentId);
-  }
-  if (updates.status) {
-    fields.push(`status = $${paramIdx++}`);
-    values.push(updates.status);
-  }
-
-  if (fields.length === 0) return;
-
-  values.push(id);
-
-  await query(
-    `UPDATE transactions SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${paramIdx}`,
-    values
-  );
 }
 
 export async function findTransactionByPaymentId(paymentProvider: string, paymentId: string) {

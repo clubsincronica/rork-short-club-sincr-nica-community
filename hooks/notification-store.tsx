@@ -9,7 +9,7 @@ export interface Notification {
     title: string;
     message: string;
     type: 'info' | 'success' | 'warning' | 'error';
-    is_read: boolean;
+    read: boolean;
     created_at: string;
 }
 
@@ -65,7 +65,7 @@ const useNotificationStore = () => {
     });
 
     const unreadCount = useMemo(() => {
-        return notifications.filter((n: Notification) => !n.is_read).length;
+        return notifications.filter((n: Notification) => !n.read).length;
     }, [notifications]);
 
     return {

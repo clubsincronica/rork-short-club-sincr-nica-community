@@ -1,3 +1,5 @@
+import { SupportedCurrency } from '@/constants/fees';
+
 export interface User {
   id: number;
   name: string;
@@ -400,6 +402,7 @@ export interface UserPreferences {
   language: 'es' | 'en' | 'pt';
   theme: 'light' | 'dark' | 'auto';
   autoBooking: boolean;
+  preferredCurrency?: SupportedCurrency; // ARS by default
   emailNotifications?: boolean;
   pushNotifications?: boolean;
   smsNotifications?: boolean;

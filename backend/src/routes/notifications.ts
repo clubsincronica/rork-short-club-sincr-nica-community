@@ -32,7 +32,7 @@ router.put('/:id/read', async (req: Request, res: Response) => {
 
     try {
         await query(
-            'UPDATE notifications SET is_read = TRUE WHERE id = $1',
+            'UPDATE notifications SET read = TRUE WHERE id = $1',
             [id]
         );
 
@@ -52,7 +52,7 @@ router.put('/read-all/:userId', async (req: Request, res: Response) => {
 
     try {
         await query(
-            'UPDATE notifications SET is_read = TRUE WHERE user_id = $1',
+            'UPDATE notifications SET read = TRUE WHERE user_id = $1',
             [userId]
         );
 

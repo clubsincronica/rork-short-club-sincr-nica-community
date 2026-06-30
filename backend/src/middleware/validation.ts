@@ -189,3 +189,16 @@ export const validateMessagePagination: ValidationChain[] = [
     .isInt({ min: 1, max: 100 })
     .withMessage('Limit must be between 1 and 100'),
 ];
+
+/**
+ * Create reservation validation
+ */
+export const validateCreateReservation: ValidationChain[] = [
+  body('eventId').optional({ nullable: true }).isInt({ min: 1 }),
+  body('serviceId').optional({ nullable: true }).isString(),
+  body('productId').optional({ nullable: true }).isInt({ min: 1 }),
+  body('providerId').isInt({ min: 1 }).withMessage('providerId is required'),
+  body('numberOfSpots').optional().isInt({ min: 1, max: 50 }),
+  body('paymentMethod').optional().isString().isLength({ max: 50 }),
+  body('notes').optional().isString().isLength({ max: 500 }),
+];

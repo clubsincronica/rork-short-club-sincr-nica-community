@@ -42,6 +42,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
 import * as ImagePicker from 'expo-image-picker';
+import { SUPPORTED_CURRENCIES, CURRENCY_LABELS, SupportedCurrency } from '@/constants/fees';
 
 interface Achievement {
   id: string;
@@ -72,13 +73,14 @@ interface PaymentMethod {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { currentUser, logout, updateUser, login } = useUser();
+  const { currentUser, logout, updateUser, login, preferences, updatePreferences } = useUser();
   const { settings } = useAppSettings();
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [isLoginModalVisible, setIsLoginModalVisible] = useState(false);
   const [isSignupModalVisible, setIsSignupModalVisible] = useState(false);
   const [isPaymentModalVisible, setIsPaymentModalVisible] = useState(false);
+  const [isCurrencyModalVisible, setIsCurrencyModalVisible] = useState(false);
   const [activeTab, setActiveTab] = useState<'activity' | 'achievements'>('activity');
   const [isMiCuentaExpanded, setIsMiCuentaExpanded] = useState(false);
 
@@ -272,6 +274,13 @@ export default function ProfileScreen() {
       subtitle: settings.language ? `${settings.language.nativeName} • ${settings.location?.city || 'Not set'}` : 'Set your preferences',
       onPress: () => router.push('/onboarding'),
       testId: 'localization',
+    },
+    {
+      icon: DollarSign,
+      title: 'Moneda Preferida',
+      subtitle: preferences?.preferredCurrency || 'ARS',
+      onPress: () => setIsCurrencyModalVisible(true),
+      testId: 'currency',
     },
     {
       icon: CreditCard,
@@ -794,6 +803,53 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={isCurrencyModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsCurrencyModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setIsCurrencyModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { maxHeight: '60%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Moneda Preferida</Text>
+              <TouchableOpacity onPress={() => setIsCurrencyModalVisible(false)}>
+                <X size={24} color={Colors.textLight} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {SUPPORTED_CURRENCIES.map((currency) => (
+                <TouchableOpacity
+                  key={currency}
+                  style={[
+                    styles.menuItem,
+                    preferences?.preferredCurrency === currency && { backgroundColor: Colors.cream }
+                  ]}
+                  onPress={() => {
+                    updatePreferences({ preferredCurrency: currency });
+                    setIsCurrencyModalVisible(false);
+                  }}
+                >
+                  <Text style={[
+                    styles.menuTitle,
+                    preferences?.preferredCurrency === currency && { color: Colors.primary, fontWeight: '700' }
+                  ]}>
+                    {CURRENCY_LABELS[currency]}
+                  </Text>
+                  {preferences?.preferredCurrency === currency && (
+                    <CheckCircle size={20} color={Colors.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       <Modal

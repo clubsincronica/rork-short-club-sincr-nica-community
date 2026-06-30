@@ -10,6 +10,7 @@ import {
 } from '../models/bank-account';
 import { authLimiter, strictLimiter } from '../middleware/rateLimiter';
 import { parseIntSafe, parseFloatSafe, authenticateJWT } from '../middleware/security';
+import { requireAdmin } from '../middleware/roles';
 import {
   validateAuth,
   validateUserId,
@@ -21,8 +22,6 @@ import {
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-import { getDefaultLocation, isBlocked } from '../config/user-overrides';
-
 const router = express.Router();
 
 // Register/Login - Create or get user (with rate limiting and validation)
@@ -30,16 +29,22 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
   try {
     let { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
     console.log(`[AUTH DEBUG] Received login request for email: '${email}'`);
-    // Log the raw request body (Sanitized)
-    const sanitizedBody = { ...req.body };
-    if (sanitizedBody.password) sanitizedBody.password = '***REDACTED***';
-    console.log('[AUTH DEBUG] Request body:', sanitizedBody);
+    // Log the raw request body for debugging
+    console.log('[AUTH DEBUG] Raw request body:', req.body);
 
     // Default coordinates if not provided (so users are always discoverable)
-    if (latitude === undefined || latitude === null || longitude === undefined || longitude === null) {
-      const defaultLoc = getDefaultLocation(email);
-      latitude = latitude ?? defaultLoc.latitude;
-      longitude = longitude ?? defaultLoc.longitude;
+    if (latitude === undefined || latitude === null) {
+      // Example: assign by email for known users, else default to SF
+      if (email === 'matias.cazeaux@gmail.com') latitude = -38.02;
+      else if (email === 'eularra@gmail.com') latitude = 40.4168;
+      else if (email === 'tom_weasley@hotmail.com') latitude = 37.7749;
+      else latitude = 37.7749;
+    }
+    if (longitude === undefined || longitude === null) {
+      if (email === 'matias.cazeaux@gmail.com') longitude = -57.53;
+      else if (email === 'eularra@gmail.com') longitude = -3.7038;
+      else if (email === 'tom_weasley@hotmail.com') longitude = -122.4194;
+      else longitude = -122.4194;
     }
 
     if (!email) {
@@ -50,10 +55,10 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
     let user: any = await userQueries.getUserByEmail(email);
     let isNewUser = false;
 
-    // Check for blocked email
-    if (isBlocked(email)) {
+    // Block both creation and login for matiascazeaux@gmail.com (no-dot)
+    if (email === 'matiascazeaux@gmail.com') {
       console.warn(`[AUTH BLOCKED] Attempt to create or login blocked user: '${email}'. Returning error.`);
-      return res.status(403).json({ error: 'This user is blocked.' });
+      return res.status(403).json({ error: 'This user is blocked. Please use matias.cazeaux@gmail.com.' });
     }
     if (!user) {
       // Extra debug: If the login request is for matias.cazeaux@gmail.com, log if the no-dot user is being created
@@ -116,16 +121,6 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
       role: user.role || 'user'
     }, jwtSecret, { expiresIn: '30d' });
     console.log(`[AUTH DEBUG] Email returned in token: '${user.email}'`);
-
-    // Fetch and attach bank accounts for frontend persistence
-    try {
-      const bankAccounts = await getBankAccountsByUserId(user.id);
-      user.bankAccounts = bankAccounts;
-    } catch (err) {
-      console.warn(`[AUTH DEBUG] Failed to get bank accounts on login:`, err);
-      user.bankAccounts = [];
-    }
-
     res.json({ user, token, isNewUser });
   } catch (error) {
     console.error('Auth error:', error);
@@ -175,7 +170,7 @@ router.get('/users/:id', validateUserId, handleValidationErrors, async (req: Req
 });
 
 // Update user profile (with stricter rate limiting for security)
-router.put('/users/:id', strictLimiter, authenticateJWT, validateUserId, validateUpdateUser, handleValidationErrors, async (req: Request, res: Response) => {
+router.put('/users/:id', strictLimiter, validateUserId, validateUpdateUser, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.id, 'user ID');
     const { name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
@@ -311,8 +306,8 @@ router.delete('/users/me/bank-accounts/:id', authenticateJWT, async (req: Reques
   }
 });
 
-// Delete user by ID (admin or script use)
-router.delete('/users/:id', async (req: Request, res: Response) => {
+// Delete user by ID (admin only)
+router.delete('/users/:id', authenticateJWT, requireAdmin(), async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.id, 'user ID');
     await userQueries.deleteUser(userId);

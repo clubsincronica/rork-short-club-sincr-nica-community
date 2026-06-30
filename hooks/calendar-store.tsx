@@ -217,9 +217,9 @@ const useCalendarHook = () => {
 
 
   // Add event wrapper
-  const addEvent = async (event: Omit<CalendarEvent, 'id' | 'provider' | 'currentParticipants' | 'status'> & { provider?: any }) => {
+  const addEvent = useCallback(async (event: Omit<CalendarEvent, 'id' | 'provider' | 'currentParticipants' | 'status'> & { provider?: any }) => {
     return await addEventMutation.mutateAsync(event);
-  };
+  }, [addEventMutation]);
 
   // Update event wrapper
   const updateEvent = useCallback(async (eventId: string, updates: Partial<CalendarEvent>) => {
@@ -231,44 +231,46 @@ const useCalendarHook = () => {
   }, [updateEventMutation]);
 
   // Delete event wrapper
-  const deleteEvent = async (eventId: string) => {
+  const deleteEvent = useCallback(async (eventId: string) => {
     return await deleteEventMutation.mutateAsync(eventId);
-  };
+  }, [deleteEventMutation]);
 
   // Add to cart
   const addToCart = useCallback(async (eventId: string, numberOfSpots: number = 1, eventObject?: CalendarEvent) => {
-    console.log('🛒 addToCart called with eventId:', eventId);
-    console.log('🛒 Current events count:', events.length);
-    console.log('🛒 Event object provided:', !!eventObject);
+    if (__DEV__) {
+      console.log('🛒 addToCart called with eventId:', eventId);
+      console.log('🛒 Current events count:', events.length);
+      console.log('🛒 Event object provided:', !!eventObject);
+    }
 
     // Use provided event object if available, otherwise look it up
     let event: CalendarEvent | undefined = eventObject;
 
     if (!event) {
-      console.log('🛒 Looking for event in events array...');
+      if (__DEV__) console.log('🛒 Looking for event in events array...');
       event = events.find((e: CalendarEvent) => e.id === eventId);
     }
 
     if (!event) {
       console.error('❌ Event not found in events array:', eventId);
-      console.log('📋 Available event IDs:', events.map((e: CalendarEvent) => e.id).slice(0, 10));
+      if (__DEV__) console.log('📋 Available event IDs:', events.map((e: CalendarEvent) => e.id).slice(0, 10));
       return;
     }
 
-    console.log('✅ Event found:', event.title);
+    if (__DEV__) console.log('✅ Event found:', event.title);
 
     const existingItem = cart.find((item: CartItem) => item.eventId === eventId);
 
     let updatedCart: CartItem[];
     if (existingItem) {
-      console.log('📦 Updating existing cart item');
+      if (__DEV__) console.log('📦 Updating existing cart item');
       updatedCart = cart.map((item: CartItem) =>
         item.eventId === eventId
           ? { ...item, numberOfSpots: item.numberOfSpots + numberOfSpots }
           : item
       );
     } else {
-      console.log('📦 Adding new cart item');
+      if (__DEV__) console.log('📦 Adding new cart item');
       const newItem: CartItem = {
         eventId,
         event,
@@ -278,10 +280,10 @@ const useCalendarHook = () => {
       updatedCart = [...cart, newItem];
     }
 
-    console.log('💾 Saving cart to storage, new count:', updatedCart.length);
+    if (__DEV__) console.log('💾 Saving cart to storage, new count:', updatedCart.length);
     await AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(updatedCart));
     setCart(updatedCart);
-    console.log('✅ Cart updated successfully');
+    if (__DEV__) console.log('✅ Cart updated successfully');
   }, [cart, events]);
 
   // Remove from cart
@@ -319,10 +321,10 @@ const useCalendarHook = () => {
     }
 
     const reservationData = {
-      eventId: parseInt(event.id),
+      eventId: parseInt(event.id) || null,
       userId: currentUser.id,
-      providerId: parseInt(event.providerId),
-      status: 'confirmed',
+      providerId: parseInt(event.providerId) || null,
+      status: paymentMethod === 'free' ? 'confirmed' : 'pending',
       numberOfSpots,
       totalPrice: event.price * numberOfSpots,
       paymentStatus: paymentMethod === 'free' ? 'completed' : 'pending',
@@ -354,7 +356,7 @@ const useCalendarHook = () => {
         event,
         userId: currentUser.id.toString(),
         user: currentUser,
-        status: 'confirmed',
+        status: paymentMethod === 'free' ? 'confirmed' : 'pending',
         numberOfSpots,
         totalPrice: reservationData.totalPrice,
         paymentStatus: reservationData.paymentStatus as any,
@@ -560,6 +562,7 @@ const useCalendarHook = () => {
     providerReservations,
     upcomingEvents,
     cartTotal,
+    refetch,
     addEvent,
     updateEvent,
     deleteEvent,
@@ -582,6 +585,7 @@ const useCalendarHook = () => {
     userReservations,
     upcomingEvents,
     cartTotal,
+    refetch,
     addEvent,
     updateEvent,
     deleteEvent,
@@ -594,29 +598,6 @@ const useCalendarHook = () => {
     checkoutCart,
     updateAttendance,
   ]);
-
-  return {
-    events,
-    userEvents,
-    userReservations,
-    providerReservations,
-    cart,
-    cartTotal,
-    settings,
-    isLoading,
-    addEvent,
-    updateEvent,
-    deleteEvent,
-    addToCart,
-    removeFromCart,
-    clearCart,
-    createReservation,
-    cancelReservation,
-    updateSettings,
-    checkoutCart,
-    updateAttendance,
-    refetch,
-  };
 };
 
 // Helper hook to get events for a specific date

@@ -298,16 +298,18 @@ export const ServicesProvider: React.FC<{ children: ReactNode }> = ({ children }
     const userServices = getUserServices(userId).filter((service: Service) => service.isScheduled);
     const allEvents: any[] = [];
     
-    console.log('🔍 Services Store: Getting calendar events for userId:', userId);
-    console.log('🔍 Services Store: User scheduled services:', userServices.length, userServices.map(s => ({ id: s.id, title: s.title, isScheduled: s.isScheduled })));
+    if (__DEV__) {
+      console.log('🔍 Services Store: Getting calendar events for userId:', userId);
+      console.log('🔍 Services Store: User scheduled services:', userServices.length, userServices.map(s => ({ id: s.id, title: s.title, isScheduled: s.isScheduled })));
+    }
     
     userServices.forEach(service => {
       const serviceEvents = getServiceCalendarEvents(service.id);
-      console.log('🔍 Services Store: Generated', serviceEvents.length, 'events for service:', service.title);
+      if (__DEV__) console.log('🔍 Services Store: Generated', serviceEvents.length, 'events for service:', service.title);
       allEvents.push(...serviceEvents);
     });
     
-    console.log('📅 Generated total', allEvents.length, 'service calendar events for user:', userId);
+    if (__DEV__) console.log('📅 Generated total', allEvents.length, 'service calendar events for user:', userId);
     return allEvents;
   };
 

@@ -44,7 +44,7 @@ const { width: screenWidth } = Dimensions.get('window');
 export default function EventDetailScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const { events, createReservation } = useCalendar();
+  const { events, createReservation, cancelReservation, reservations } = useCalendar();
   const { currentUser } = useUser();
 
   const [event, setEvent] = useState<any>(null);
@@ -52,6 +52,7 @@ export default function EventDetailScreen() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [attendeeCount, setAttendeeCount] = useState(1);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [reservationId, setReservationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   console.log('Event Detail: Received params:', params);
@@ -67,8 +68,8 @@ export default function EventDetailScreen() {
 
       console.log('Event Detail: Loading event with ID:', eventId, 'Name:', eventName);
 
-      // Find the real event from calendar store
-      const realEvent = events.find((e: any) => e.id === eventId || e.title === eventName);
+      // Find the real event from calendar store — always match by ID first (string comparison)
+      const realEvent = events.find((e: any) => String(e.id) === String(eventId));
 
       if (realEvent) {
         console.log('Event Detail: ✅ Found real event:', realEvent.title, realEvent.id);
@@ -145,8 +146,11 @@ export default function EventDetailScreen() {
             text: 'Sí, cancelar',
             style: 'destructive',
             onPress: async () => {
-              // TODO: Implement cancelReservation in calendar-store
+              if (reservationId) {
+                await cancelReservation(reservationId);
+              }
               setIsRegistered(false);
+              setReservationId(null);
               Alert.alert('Cancelado', 'Tu inscripción ha sido cancelada.');
             }
           }
@@ -168,6 +172,7 @@ export default function EventDetailScreen() {
                 const reservation = await createReservation(event.id, attendeeCount, 'free');
                 if (reservation) {
                   setIsRegistered(true);
+                  setReservationId(reservation.id);
                   Alert.alert('¡Inscrito!', 'Te has inscrito exitosamente al evento.');
                   router.push('/calendar');
                 }
@@ -184,19 +189,31 @@ export default function EventDetailScreen() {
             { text: 'Cancelar', style: 'cancel' },
             {
               text: 'Continuar al Pago',
-              onPress: () => {
-                router.push({
-                  pathname: '/payment',
-                  params: {
-                    type: 'event',
-                    id: event.id,
-                    title: event.title,
-                    price: event.price.toString(),
-                    attendeeCount: attendeeCount.toString(),
-                    providerId: params.providerId || event.organizer?.id || '',
-                    image: event.images?.[0] || ''
+              onPress: async () => {
+                try {
+                  const reservation = await createReservation(event.id, attendeeCount, 'pending');
+                  if (!reservation) {
+                    Alert.alert('Error', 'No se pudo crear la reserva. Inténtalo de nuevo.');
+                    return;
                   }
-                });
+
+                  router.push({
+                    pathname: '/payment',
+                    params: {
+                      type: 'event',
+                      id: event.id,
+                      bookingId: reservation.id,
+                      title: event.title,
+                      price: event.price.toString(),
+                      attendeeCount: attendeeCount.toString(),
+                      providerId: params.providerId || event.organizer?.id || '',
+                      image: event.images?.[0] || ''
+                    }
+                  });
+                } catch (error) {
+                  console.error('Error creating pending reservation:', error);
+                  Alert.alert('Error', 'No se pudo iniciar el proceso de pago.');
+                }
               }
             }
           ]

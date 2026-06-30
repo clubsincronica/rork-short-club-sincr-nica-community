@@ -65,9 +65,18 @@ router.get('/provider/:userId', async (req, res) => {
 });
 
 // Update event
-router.put('/:id', authenticateJWT, async (req, res) => {
+router.put('/:id', authenticateJWT, async (req: any, res: express.Response) => {
     try {
         const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const allEvents = await eventQueries.getEvents();
+        const event = allEvents.find((e: any) => e.id === id);
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (event.provider_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this event' });
+        }
+
         await eventQueries.updateEvent(id, req.body);
         res.json({ message: 'Event updated successfully' });
     } catch (error: any) {
@@ -77,9 +86,18 @@ router.put('/:id', authenticateJWT, async (req, res) => {
 });
 
 // Delete event
-router.delete('/:id', authenticateJWT, async (req, res) => {
+router.delete('/:id', authenticateJWT, async (req: any, res: express.Response) => {
     try {
         const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const allEvents = await eventQueries.getEvents();
+        const event = allEvents.find((e: any) => e.id === id);
+        if (!event) return res.status(404).json({ error: 'Event not found' });
+        if (event.provider_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this event' });
+        }
+
         await eventQueries.deleteEvent(id);
         res.json({ message: 'Event deleted successfully' });
     } catch (error: any) {

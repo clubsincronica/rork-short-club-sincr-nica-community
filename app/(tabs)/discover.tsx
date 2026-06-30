@@ -20,7 +20,7 @@ import { ServiceCategory } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { router } from 'expo-router';
 
-type ViewMode = 'services' | 'lodging' | 'products';
+type ViewMode = 'services' | 'lodging' | 'products' | 'events';
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -69,6 +69,19 @@ export default function DiscoverScreen() {
     }
     return filtered;
   }, [debouncedSearchQuery, allLodgings]);
+
+  const filteredEvents = useMemo(() => {
+    let filtered = (events || []) as any[];
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter((event: any) =>
+        event.title?.toLowerCase().includes(query) ||
+        event.description?.toLowerCase().includes(query) ||
+        event.location?.toLowerCase().includes(query)
+      );
+    }
+    return filtered;
+  }, [debouncedSearchQuery, events]);
 
   const filteredProducts = useMemo(() => {
     let filtered = allProducts as any[];
@@ -138,6 +151,14 @@ export default function DiscoverScreen() {
                   Productos
                 </AccessibleText>
               </TouchableScale>
+              <TouchableScale
+                style={[styles.viewModeButton, viewMode === 'events' && styles.activeViewMode]}
+                onPress={() => setViewMode('events')}
+              >
+                <AccessibleText style={[styles.viewModeText, viewMode === 'events' && styles.activeViewModeText]}>
+                  Eventos
+                </AccessibleText>
+              </TouchableScale>
             </View>
           </View>
         </View>
@@ -145,7 +166,10 @@ export default function DiscoverScreen() {
         <View style={styles.content}>
           <OnTodayBoard
             events={upcomingEvents.length > 0 ? upcomingEvents : (events || [])}
-            onEventPress={() => { }}
+            onEventPress={(event) => router.push({
+              pathname: '/event-detail',
+              params: { eventId: event.id, eventName: event.title }
+            })}
           />
 
           {viewMode === 'services' && (
@@ -161,7 +185,10 @@ export default function DiscoverScreen() {
               </View>
               <View style={styles.servicesContainer}>
                 {filteredServices.map((service) => (
-                  <ServiceCard key={service.id} service={service} onPress={() => { }} />
+                  <ServiceCard key={service.id} service={service} onPress={() => router.push({
+                    pathname: '/service-detail',
+                    params: { serviceId: service.id, serviceName: service.title }
+                  })} />
                 ))}
               </View>
             </>
@@ -176,7 +203,10 @@ export default function DiscoverScreen() {
               </View>
               <View style={styles.lodgingContainer}>
                 {filteredLodging.map((lodging) => (
-                  <LodgingCard key={lodging.id} lodging={lodging} onPress={() => { }} />
+                  <LodgingCard key={lodging.id} lodging={lodging} onPress={() => router.push({
+                    pathname: '/lodging-detail',
+                    params: { lodgingId: lodging.id }
+                  })} />
                 ))}
               </View>
             </>
@@ -205,6 +235,36 @@ export default function DiscoverScreen() {
                     onPress={() => router.push({
                       pathname: '/product-detail',
                       params: { id: product.id }
+                    })}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
+          {viewMode === 'events' && (
+            <>
+              <View style={styles.resultsContainer}>
+                <AccessibleText style={styles.resultsText}>
+                  {filteredEvents.length} eventos encontrados
+                </AccessibleText>
+              </View>
+              <View style={styles.servicesContainer}>
+                {filteredEvents.map((event: any) => (
+                  <OfferingCard
+                    key={event.id}
+                    offering={{
+                      id: event.id,
+                      type: 'event',
+                      title: event.title,
+                      description: event.description || '',
+                      price: event.price || 0,
+                      image: event.images?.[0],
+                      location: event.location || ''
+                    }}
+                    onPress={() => router.push({
+                      pathname: '/event-detail',
+                      params: { eventId: event.id, eventName: event.title }
                     })}
                   />
                 ))}

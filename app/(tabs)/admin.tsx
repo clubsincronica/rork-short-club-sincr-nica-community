@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, Alert, TextInput } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { getApiBaseUrl } from '@/utils/api-config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Shield, Users, DollarSign, TrendingUp, MessageSquare, Settings, Save, Edit3, Plus, Trash2 } from '@/components/SmartIcons';
+import { Shield, Users, DollarSign, TrendingUp, MessageSquare } from '@/components/SmartIcons';
 import { Colors } from '@/constants/colors';
 
 export default function AdminScreen() {
@@ -12,20 +12,10 @@ export default function AdminScreen() {
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState<any>(null);
     const [users, setUsers] = useState<any[]>([]);
-    const [config, setConfig] = useState<any[]>([]);
-    const [profitDestinations, setProfitDestinations] = useState({
-        stripe_id: '',
-        cvu: '',
-        alias: '',
-        cbu: ''
-    });
-    // For generic config editing
-    const [editingConfig, setEditingConfig] = useState<any>(null);
-    const [newConfigKey, setNewConfigKey] = useState('');
-    const [newConfigValue, setNewConfigValue] = useState('');
-    const [showAddConfig, setShowAddConfig] = useState(false);
-
     const [error, setError] = useState('');
+    const [commissionRate, setCommissionRate] = useState<string>('');
+    const [commissionInput, setCommissionInput] = useState<string>('');
+    const [savingCommission, setSavingCommission] = useState(false);
 
     const loadAdminData = async () => {
         try {
@@ -69,19 +59,13 @@ export default function AdminScreen() {
                 setUsers(usersWithBlocked);
             }
 
-            // Load Config
-            const configResponse = await fetch(`${getApiBaseUrl()}/api/admin/config`, { headers });
-            if (configResponse.ok) {
-                const configData = await configResponse.json();
-                setConfig(configData);
-
-                // Parse profit destinations
-                setProfitDestinations({
-                    stripe_id: configData.find((c: any) => c.key === 'profit_dest_stripe_id')?.value || '',
-                    cvu: configData.find((c: any) => c.key === 'profit_dest_cvu')?.value || '',
-                    alias: configData.find((c: any) => c.key === 'profit_dest_alias')?.value || '',
-                    cbu: configData.find((c: any) => c.key === 'profit_dest_cbu')?.value || ''
-                });
+            // Load platform settings
+            const settingsResponse = await fetch(`${getApiBaseUrl()}/api/admin/settings`, { headers });
+            if (settingsResponse.ok) {
+                const settingsData = await settingsResponse.json();
+                const rate = settingsData.commission_rate || '0.05';
+                setCommissionRate(rate);
+                setCommissionInput((parseFloat(rate) * 100).toFixed(2));
             }
 
         } catch (err: any) {
@@ -96,69 +80,32 @@ export default function AdminScreen() {
         loadAdminData();
     }, []);
 
-    const saveConfigValue = async (key: string, value: string, description?: string) => {
-        try {
-            setLoading(true);
-            const token = await AsyncStorage.getItem('authToken');
-            const response = await fetch(`${getApiBaseUrl()}/api/admin/config`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ key, value, description })
-            });
-
-            if (response.ok) {
-                // Update local state
-                const newConfig = [...config];
-                const index = newConfig.findIndex(c => c.key === key);
-                if (index >= 0) {
-                    newConfig[index] = { ...newConfig[index], value, description: description || newConfig[index].description };
-                } else {
-                    newConfig.push({ key, value, description });
-                }
-                setConfig(newConfig);
-                Alert.alert('Éxito', 'Configuración guardada correctamente');
-                setEditingConfig(null);
-                setShowAddConfig(false);
-                setNewConfigKey('');
-                setNewConfigValue('');
-            } else {
-                Alert.alert('Error', 'No se pudo guardar la configuración');
-            }
-        } catch (err) {
-            console.error(err);
-            Alert.alert('Error', 'Error de conexión');
-        } finally {
-            setLoading(false);
+    const handleSaveCommissionRate = async () => {
+        const pct = parseFloat(commissionInput);
+        if (isNaN(pct) || pct < 0 || pct > 100) {
+            Alert.alert('Error', 'Ingresa un porcentaje válido entre 0 y 100.');
+            return;
         }
-    };
-
-    const saveProfitDestinations = async () => {
+        setSavingCommission(true);
         try {
-            setLoading(true);
             const token = await AsyncStorage.getItem('authToken');
-            const headers = {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            };
-
-            // Save all 4 fields independently
-            await Promise.all([
-                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_stripe_id', value: profitDestinations.stripe_id, description: 'Stripe Account ID for Profit Split' }) }),
-                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_cvu', value: profitDestinations.cvu, description: 'MercadoPago CVU for Profit Split' }) }),
-                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_alias', value: profitDestinations.alias, description: 'MercadoPago Alias for Profit Split' }) }),
-                fetch(`${getApiBaseUrl()}/api/admin/config`, { method: 'PUT', headers, body: JSON.stringify({ key: 'profit_dest_cbu', value: profitDestinations.cbu, description: 'Bank CBU for Profit Split' }) })
-            ]);
-
-            Alert.alert('Éxito', 'Cuentas de destino actualizadas');
-            // Reload to be sure
-            loadAdminData();
-        } catch (err) {
-            Alert.alert('Error', 'Error al guardar destinos');
+            const response = await fetch(`${getApiBaseUrl()}/api/admin/settings`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ commission_rate: pct / 100 }),
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setCommissionRate(data.commission_rate.toString());
+                Alert.alert('✅ Guardado', `Comisión actualizada a ${pct.toFixed(2)}%`);
+            } else {
+                const err = await response.json();
+                Alert.alert('Error', err.error || 'No se pudo guardar');
+            }
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Error de red');
         } finally {
-            setLoading(false);
+            setSavingCommission(false);
         }
     };
 
@@ -229,124 +176,35 @@ export default function AdminScreen() {
                         </View>
                     </View>
 
-                    {/* Configuration Section */}
+                    {/* Platform Settings — Commission Rate */}
                     <View style={styles.section}>
-                        <View style={styles.sectionHeaderRow}>
-                            <Settings size={20} color={Colors.text} />
-                            <Text style={styles.sectionTitleWithIcon}>Configuración del Sistema</Text>
-                        </View>
-
-                        {/* Profit Destinations */}
-                        <Text style={styles.subsectionTitle}>Destinos de Ganancias (Split Payment)</Text>
-                        <View style={styles.configGroup}>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>Stripe Account ID</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={profitDestinations.stripe_id}
-                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, stripe_id: text })}
-                                    placeholder="acct_..."
-                                />
-                            </View>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>MercadoPago CVU</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={profitDestinations.cvu}
-                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, cvu: text })}
-                                    placeholder="00000031000..."
-                                    keyboardType="numeric"
-                                />
-                            </View>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>MercadoPago Alias</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={profitDestinations.alias}
-                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, alias: text })}
-                                    placeholder="mi.alias.mp"
-                                    autoCapitalize="none"
-                                />
-                            </View>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>CBU Bancario</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    value={profitDestinations.cbu}
-                                    onChangeText={(text: string) => setProfitDestinations({ ...profitDestinations, cbu: text })}
-                                    placeholder="01700..."
-                                    keyboardType="numeric"
-                                />
-                            </View>
-                            <TouchableOpacity style={styles.saveButton} onPress={saveProfitDestinations}>
-                                <Save size={18} color="white" />
-                                <Text style={styles.saveButtonText}>Guardar Destinos</Text>
+                        <Text style={styles.sectionTitle}>⚙️ Configuración de Plataforma</Text>
+                        <Text style={styles.settingLabel}>
+                            Comisión de plataforma (%)
+                        </Text>
+                        <Text style={styles.settingHint}>
+                            Valor actual: {(parseFloat(commissionRate || '0.05') * 100).toFixed(2)}% — se aplica a todos los pagos de Stripe y MercadoPago.
+                        </Text>
+                        <View style={styles.settingRow}>
+                            <TextInput
+                                style={styles.settingInput}
+                                value={commissionInput}
+                                onChangeText={setCommissionInput}
+                                keyboardType="decimal-pad"
+                                placeholder="5.00"
+                                maxLength={5}
+                            />
+                            <Text style={styles.settingPercent}>%</Text>
+                            <TouchableOpacity
+                                style={[styles.saveSettingButton, savingCommission && { opacity: 0.6 }]}
+                                onPress={handleSaveCommissionRate}
+                                disabled={savingCommission}
+                            >
+                                <Text style={styles.saveSettingText}>
+                                    {savingCommission ? 'Guardando...' : 'Guardar'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
-
-                        {/* Generic Config */}
-                        <View style={styles.subsectionHeaderRow}>
-                            <Text style={styles.subsectionTitle}>Configuración Avanzada</Text>
-                            <TouchableOpacity onPress={() => setShowAddConfig(!showAddConfig)} style={styles.iconButton}>
-                                <Plus size={20} color={Colors.primary} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {showAddConfig && (
-                            <View style={styles.addConfigForm}>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Clave (Key)"
-                                    value={newConfigKey}
-                                    onChangeText={setNewConfigKey}
-                                />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Valor"
-                                    value={newConfigValue}
-                                    onChangeText={setNewConfigValue}
-                                />
-                                <TouchableOpacity
-                                    style={styles.saveButton}
-                                    onPress={() => saveConfigValue(newConfigKey, newConfigValue)}
-                                >
-                                    <Text style={styles.saveButtonText}>Añadir Configuración</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {config.filter(c => !c.key.startsWith('profit_dest_')).map((item) => (
-                            <View key={item.key} style={styles.configItem}>
-                                <View style={styles.configInfo}>
-                                    <Text style={styles.configKey}>{item.key}</Text>
-                                    {editingConfig === item.key ? (
-                                        <TextInput
-                                            style={styles.inputSmall}
-                                            value={newConfigValue || item.value}
-                                            onChangeText={setNewConfigValue}
-                                            autoFocus
-                                        />
-                                    ) : (
-                                        <Text style={styles.configValue}>{item.value}</Text>
-                                    )}
-                                    {item.description && <Text style={styles.configDesc}>{item.description}</Text>}
-                                </View>
-                                <View style={styles.configActions}>
-                                    {editingConfig === item.key ? (
-                                        <TouchableOpacity onPress={() => saveConfigValue(item.key, newConfigValue)}>
-                                            <Save size={18} color={Colors.primary} />
-                                        </TouchableOpacity>
-                                    ) : (
-                                        <TouchableOpacity onPress={() => {
-                                            setEditingConfig(item.key);
-                                            setNewConfigValue(item.value);
-                                        }}>
-                                            <Edit3 size={18} color={Colors.textLight} />
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            </View>
-                        ))}
                     </View>
 
                     {/* Recent Users */}
@@ -374,43 +232,32 @@ export default function AdminScreen() {
                                     {user.blocked ? (
                                         <TouchableOpacity
                                             style={styles.unblockButton}
-                                            onPress={() => {
-                                                Alert.alert(
-                                                    'Confirmar',
-                                                    '¿Seguro que quieres desbloquear este usuario?',
-                                                    [
-                                                        { text: 'Cancelar', style: 'cancel' },
-                                                        {
-                                                            text: 'Desbloquear',
-                                                            onPress: async () => {
-                                                                try {
-                                                                    setLoading(true);
-                                                                    setError('');
-                                                                    const token = await AsyncStorage.getItem('authToken');
-                                                                    const headers = {
-                                                                        'Authorization': `Bearer ${token}`,
-                                                                        'Content-Type': 'application/json'
-                                                                    };
-                                                                    const response = await fetch(`${getApiBaseUrl()}/api/admin/unblock-user`, {
-                                                                        method: 'POST',
-                                                                        headers,
-                                                                        body: JSON.stringify({ email: user.email })
-                                                                    });
-                                                                    if (response.ok) {
-                                                                        setUsers(users.map(u => u.email === user.email ? { ...u, blocked: false } : u));
-                                                                    } else {
-                                                                        const errorData = await response.json();
-                                                                        setError(errorData.error || 'Error al desbloquear usuario');
-                                                                    }
-                                                                } catch (err: any) {
-                                                                    setError(err.message || 'Error al desbloquear usuario');
-                                                                } finally {
-                                                                    setLoading(false);
-                                                                }
-                                                            }
-                                                        }
-                                                    ]
-                                                );
+                                            onPress={async () => {
+                                                if (!confirm('¿Seguro que quieres desbloquear este usuario?')) return;
+                                                try {
+                                                    setLoading(true);
+                                                    setError('');
+                                                    const token = await AsyncStorage.getItem('authToken');
+                                                    const headers = {
+                                                        'Authorization': `Bearer ${token}`,
+                                                        'Content-Type': 'application/json'
+                                                    };
+                                                    const response = await fetch(`${getApiBaseUrl()}/api/admin/unblock-user`, {
+                                                        method: 'POST',
+                                                        headers,
+                                                        body: JSON.stringify({ email: user.email })
+                                                    });
+                                                    if (response.ok) {
+                                                        setUsers(users.map(u => u.email === user.email ? { ...u, blocked: false } : u));
+                                                    } else {
+                                                        const errorData = await response.json();
+                                                        setError(errorData.error || 'Error al desbloquear usuario');
+                                                    }
+                                                } catch (err: any) {
+                                                    setError(err.message || 'Error al desbloquear usuario');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
                                             }}
                                         >
                                             <Text style={styles.unblockButtonText}>Desbloquear</Text>
@@ -418,44 +265,32 @@ export default function AdminScreen() {
                                     ) : (
                                         <TouchableOpacity
                                             style={styles.removeButton}
-                                            onPress={() => {
-                                                Alert.alert(
-                                                    'Confirmar',
-                                                    '¿Seguro que quieres eliminar este usuario?',
-                                                    [
-                                                        { text: 'Cancelar', style: 'cancel' },
-                                                        {
-                                                            text: 'Eliminar',
-                                                            style: 'destructive',
-                                                            onPress: async () => {
-                                                                try {
-                                                                    setLoading(true);
-                                                                    setError('');
-                                                                    const token = await AsyncStorage.getItem('authToken');
-                                                                    const headers = {
-                                                                        'Authorization': `Bearer ${token}`,
-                                                                        'Content-Type': 'application/json'
-                                                                    };
-                                                                    const response = await fetch(`${getApiBaseUrl()}/api/admin/remove-user`, {
-                                                                        method: 'POST',
-                                                                        headers,
-                                                                        body: JSON.stringify({ email: user.email })
-                                                                    });
-                                                                    if (response.ok) {
-                                                                        setUsers(users.map(u => u.email === user.email ? { ...u, blocked: true } : u));
-                                                                    } else {
-                                                                        const errorData = await response.json();
-                                                                        setError(errorData.error || 'Error al eliminar usuario');
-                                                                    }
-                                                                } catch (err: any) {
-                                                                    setError(err.message || 'Error al eliminar usuario');
-                                                                } finally {
-                                                                    setLoading(false);
-                                                                }
-                                                            }
-                                                        }
-                                                    ]
-                                                );
+                                            onPress={async () => {
+                                                if (!confirm('¿Seguro que quieres eliminar este usuario?')) return;
+                                                try {
+                                                    setLoading(true);
+                                                    setError('');
+                                                    const token = await AsyncStorage.getItem('authToken');
+                                                    const headers = {
+                                                        'Authorization': `Bearer ${token}`,
+                                                        'Content-Type': 'application/json'
+                                                    };
+                                                    const response = await fetch(`${getApiBaseUrl()}/api/admin/remove-user`, {
+                                                        method: 'POST',
+                                                        headers,
+                                                        body: JSON.stringify({ email: user.email })
+                                                    });
+                                                    if (response.ok) {
+                                                        setUsers(users.map(u => u.email === user.email ? { ...u, blocked: true } : u));
+                                                    } else {
+                                                        const errorData = await response.json();
+                                                        setError(errorData.error || 'Error al eliminar usuario');
+                                                    }
+                                                } catch (err: any) {
+                                                    setError(err.message || 'Error al eliminar usuario');
+                                                } finally {
+                                                    setLoading(false);
+                                                }
                                             }}
                                         >
                                             <Text style={styles.removeButtonText}>Eliminar</Text>
@@ -475,49 +310,6 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
-    },
-    filterBar: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginVertical: 10,
-    },
-    filterButton: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 6,
-        backgroundColor: Colors.surface,
-        marginHorizontal: 4,
-    },
-    filterActive: {
-        backgroundColor: Colors.primary,
-    },
-    filterText: {
-        color: Colors.text,
-        fontWeight: '600',
-    },
-    unblockButton: {
-        marginTop: 8,
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
-    unblockButtonText: {
-        color: 'white',
-        fontWeight: '600',
-        fontSize: 12,
-    },
-    removeButton: {
-        marginTop: 8,
-        backgroundColor: Colors.error,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 6,
-    },
-    removeButtonText: {
-        color: 'white',
-        fontWeight: '600',
-        fontSize: 12,
     },
     header: {
         flexDirection: 'row',
@@ -614,6 +406,50 @@ const styles = StyleSheet.create({
     superuserRole: {
         color: Colors.error,
     },
+    settingLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.text,
+        marginBottom: 4,
+    },
+    settingHint: {
+        fontSize: 12,
+        color: Colors.textLight,
+        marginBottom: 12,
+    },
+    settingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    settingInput: {
+        width: 80,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        fontSize: 16,
+        color: Colors.text,
+        backgroundColor: Colors.background,
+        textAlign: 'center',
+    },
+    settingPercent: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: Colors.text,
+    },
+    saveSettingButton: {
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+    },
+    saveSettingText: {
+        color: 'white',
+        fontWeight: '600',
+        fontSize: 14,
+    },
     userId: {
         fontSize: 10,
         color: Colors.textSecondary,
@@ -656,112 +492,47 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: '600',
     },
-    sectionHeaderRow: {
+    filterBar: {
         flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 15,
-    },
-    sectionTitleWithIcon: {
-        fontSize: 18,
-        fontWeight: '700',
-        color: Colors.text,
-        marginLeft: 10,
-    },
-    subsectionTitle: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: Colors.textSecondary,
-        marginTop: 10,
-        marginBottom: 10,
-        textTransform: 'uppercase',
-    },
-    configGroup: {
-        marginBottom: 20,
-    },
-    inputContainer: {
-        marginBottom: 12,
-    },
-    label: {
-        fontSize: 12,
-        color: Colors.textLight,
-        marginBottom: 4,
-    },
-    input: {
-        backgroundColor: Colors.background,
-        borderWidth: 1,
-        borderColor: Colors.border,
-        borderRadius: 8,
-        padding: 10,
-        fontSize: 14,
-        color: Colors.text,
-    },
-    saveButton: {
-        backgroundColor: Colors.primary,
-        flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'center',
-        padding: 12,
-        borderRadius: 8,
-        marginTop: 10,
+        marginVertical: 10,
     },
-    saveButtonText: {
+    filterButton: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 6,
+        backgroundColor: Colors.surface,
+        marginHorizontal: 4,
+    },
+    filterActive: {
+        backgroundColor: Colors.primary,
+    },
+    filterText: {
+        color: Colors.text,
+        fontWeight: '600',
+    },
+    unblockButton: {
+        marginTop: 8,
+        backgroundColor: Colors.primary,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
+    },
+    unblockButtonText: {
         color: 'white',
         fontWeight: '600',
-        marginLeft: 8,
+        fontSize: 12,
     },
-    subsectionHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
+    removeButton: {
+        marginTop: 8,
+        backgroundColor: Colors.error,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 6,
     },
-    iconButton: {
-        padding: 4,
-    },
-    addConfigForm: {
-        backgroundColor: Colors.background,
-        padding: 10,
-        borderRadius: 8,
-        marginBottom: 10,
-        gap: 8,
-    },
-    configItem: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-    },
-    configInfo: {
-        flex: 1,
-    },
-    configKey: {
-        fontSize: 14,
+    removeButtonText: {
+        color: 'white',
         fontWeight: '600',
-        color: Colors.text,
-    },
-    configValue: {
-        fontSize: 14,
-        color: Colors.textLight,
-        marginTop: 2,
-    },
-    configDesc: {
-        fontSize: 10,
-        color: Colors.textSecondary,
-        marginTop: 2,
-        fontStyle: 'italic',
-    },
-    inputSmall: {
-        backgroundColor: Colors.white,
-        borderWidth: 1,
-        borderColor: Colors.primary,
-        borderRadius: 4,
-        padding: 4,
-        fontSize: 14,
-        color: Colors.text,
-    },
-    configActions: {
-        marginLeft: 10,
+        fontSize: 12,
     },
 });

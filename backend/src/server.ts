@@ -7,13 +7,14 @@ import jwt from 'jsonwebtoken';
 import userRoutes from './routes/users';
 import messageRoutes from './routes/messages';
 import eventRoutes from './routes/events';
+import servicesRoutes from './routes/services';
+import productsRoutes from './routes/products';
+import reservationsRoutes from './routes/reservations';
+import lodgingRoutes from './routes/lodging';
+import notificationsRoutes from './routes/notifications';
 import paymentsRoutes from './routes/payments';
 import webhooksRoutes from './routes/webhooks';
-import productRoutes from './routes/products';
-import serviceRoutes from './routes/services';
-import lodgingRoutes from './routes/lodging';
-import reservationRoutes from './routes/reservations';
-import notificationRoutes from './routes/notifications';
+import oauthMpRoutes from './routes/oauth-mp';
 import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
@@ -52,14 +53,9 @@ function getCorsOptions() {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      // Normalize origin for comparison (remove trailing slashes)
-      const normalizedOrigin = origin.replace(/\/$/, '');
-      const isAllowed = allowedOrigins.some(ao => ao.replace(/\/$/, '') === normalizedOrigin);
-
-      if (isAllowed) {
+      if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        console.warn(`🚨 Blocked CORS origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -102,12 +98,13 @@ if (isProduction()) {
 app.use('/api', userRoutes);
 app.use('/api', messageRoutes);
 app.use('/api/events', eventRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/services', serviceRoutes);
+app.use('/api/services', servicesRoutes);
+app.use('/api/products', productsRoutes);
+app.use('/api/reservations', reservationsRoutes);
 app.use('/api/lodging', lodgingRoutes);
-app.use('/api/reservations', reservationRoutes);
-app.use('/api/notifications', notificationRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/oauth/mp', oauthMpRoutes);
 app.use('/api/admin', require('./routes/admin').default);
 
 // Health check
@@ -350,7 +347,7 @@ io.on('connection', (socket) => {
           // OR the conversation ID is for a different pair of users.
           console.warn(`⚠️ User ${senderId} tried to send to conversation ${conversationId} with ${receiverId} but no direct conversation found.`);
           // We will treat this as a new conversation or error checks
-        } else if (conversation.id !== conversationId) {
+        } else if (Number(conversation.id) !== Number(conversationId)) {
           console.warn(`⚠️ User ${senderId} tried to send to conversation ${conversationId} but their conversation with ${receiverId} is ${conversation.id}`);
           // Force use of the correct conversation ID
           finalConversationId = conversation.id;

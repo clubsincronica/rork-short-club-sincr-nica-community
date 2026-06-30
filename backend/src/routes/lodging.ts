@@ -53,7 +53,16 @@ router.post('/', authenticateJWT, async (req: any, res) => {
 // Update lodging
 router.put('/:id', authenticateJWT, async (req: any, res) => {
     try {
-        await lodgingQueries.updateLodging(parseInt(req.params.id), req.body);
+        const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const lodging = await lodgingQueries.getLodgingById(id);
+        if (!lodging) return res.status(404).json({ error: 'Lodging not found' });
+        if (lodging.host_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this listing' });
+        }
+
+        await lodgingQueries.updateLodging(id, req.body);
         res.json({ message: 'Lodging updated successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -63,7 +72,16 @@ router.put('/:id', authenticateJWT, async (req: any, res) => {
 // Delete lodging
 router.delete('/:id', authenticateJWT, async (req: any, res) => {
     try {
-        await lodgingQueries.deleteLodging(parseInt(req.params.id));
+        const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const lodging = await lodgingQueries.getLodgingById(id);
+        if (!lodging) return res.status(404).json({ error: 'Lodging not found' });
+        if (lodging.host_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this listing' });
+        }
+
+        await lodgingQueries.deleteLodging(id);
         res.json({ message: 'Lodging deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

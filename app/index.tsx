@@ -13,18 +13,19 @@ export default function Index() {
   const { currentUser, isLoading: userLoading, logout } = useUser();
   const { settings, isLoading: settingsLoading } = useAppSettings();
 
-  // 🔧 TESTING MODE: Set to true to force logout and show login screen
-  // Change to false after testing login flow
-  const FORCE_LOGOUT_FOR_TESTING = true;
+  // Set to true only when testing the login flow; must be false in production
+  const FORCE_LOGOUT_FOR_TESTING = false;
 
   useEffect(() => {
     if (!userLoading && !settingsLoading) {
       console.log('Index - currentUser:', currentUser?.email, 'hasCompletedOnboarding:', settings.hasCompletedOnboarding);
 
-      // DEBUG: Print raw currentUser from AsyncStorage
-      AsyncStorage.getItem('currentUser').then(user => {
-        console.log('DEBUG: Raw currentUser from AsyncStorage:', user);
-      });
+      if (__DEV__) {
+        // DEBUG: Print raw currentUser from AsyncStorage
+        AsyncStorage.getItem('currentUser').then(user => {
+          console.log('DEBUG: Raw currentUser from AsyncStorage:', user);
+        });
+      }
       
       // Force logout during testing if flag is enabled
       if (FORCE_LOGOUT_FOR_TESTING && currentUser) {

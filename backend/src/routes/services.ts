@@ -53,7 +53,16 @@ router.post('/', authenticateJWT, async (req: any, res) => {
 // Update service
 router.put('/:id', authenticateJWT, async (req: any, res) => {
     try {
-        await serviceQueries.updateService(parseInt(req.params.id), req.body);
+        const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const service = await serviceQueries.getServiceById(id);
+        if (!service) return res.status(404).json({ error: 'Service not found' });
+        if (service.provider_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this service' });
+        }
+
+        await serviceQueries.updateService(id, req.body);
         res.json({ message: 'Service updated successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -63,7 +72,16 @@ router.put('/:id', authenticateJWT, async (req: any, res) => {
 // Delete service
 router.delete('/:id', authenticateJWT, async (req: any, res) => {
     try {
-        await serviceQueries.deleteService(parseInt(req.params.id));
+        const id = parseInt(req.params.id);
+
+        // IDOR Check
+        const service = await serviceQueries.getServiceById(id);
+        if (!service) return res.status(404).json({ error: 'Service not found' });
+        if (service.provider_id !== req.user.userId && req.user.role !== 'admin') {
+            return res.status(403).json({ error: 'Forbidden: You do not own this service' });
+        }
+
+        await serviceQueries.deleteService(id);
         res.json({ message: 'Service deleted successfully' });
     } catch (error: any) {
         res.status(500).json({ error: error.message });

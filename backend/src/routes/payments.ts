@@ -1,203 +1,171 @@
 import express, { Request, Response } from 'express';
 import Stripe from 'stripe';
-import mercadopago from 'mercadopago';
-import { createTransaction, updateTransaction } from '../models/transaction';
-import { authenticateJWT } from '../middleware/security';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 
 const router = express.Router();
 
-// Validated: Only authenticated users can initiate payments
-router.use(authenticateJWT);
+import { createTransaction, getCommissionRate } from '../models/transaction';
+import { getReservationById } from '../models/reservation';
+import { authenticateJWT } from '../middleware/security';
+import * as db from '../db/postgres-client';
 
 // Stripe setup
-// Initialize conditionally to prevent startup crash if key is missing
-const stripeKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeKey ? new Stripe(stripeKey, {
-  apiVersion: '2025-12-15.clover' as any
-}) : null;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-12-15.clover' });
 
-// MercadoPago setup (v2 SDK)
-import { MercadoPagoConfig, Preference } from 'mercadopago';
-const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
-const preferenceClient = mpClient ? new Preference(mpClient) : null;
+// ==========================================
+// SINGLE SOURCE OF TRUTH FOR PLATFORM FEE
+// ==========================================
+// The COMMISSION_RATE environment variable defines the platform fee percentage.
+// Default is 0.05 (5%). The frontend relies on this value (PLATFORM_FEE_RATE).
 
 // Create Stripe Payment Intent
-router.post('/stripe/create-intent', async (req: Request, res: Response) => {
+router.post('/stripe/create-intent', authenticateJWT, async (req: any, res: Response) => {
   try {
-    const { amount, currency, buyerId, providerId, bookingId, type } = req.body;
+    const { currency, providerId, bookingId } = req.body;
+    const buyerId = req.user.userId; // Securely get buyerId from JWT
 
-    if (!stripe) {
-      return res.status(503).json({ error: 'Stripe payments not configured' });
+    if (!bookingId) {
+      return res.status(400).json({ error: 'bookingId is required' });
     }
 
-    // Calculate Profit Sharing Fees (2.5% Customer + 2.5% Provider)
-    const baseAmount = amount; // Input is in cents
+    // Secure validation: fetch the reservation directly from the database
+    const reservation = await getReservationById(parseInt(bookingId));
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation not found' });
+    }
 
-    // Validates keys exist or falls back to defaults
-    const { getConfigValue } = require('../models/system-config');
-    const custFeeStr = await getConfigValue('customer_fee_percent', '2.5');
-    const provFeeStr = await getConfigValue('provider_fee_percent', '2.5');
+    if (reservation.user_id !== buyerId) {
+      return res.status(403).json({ error: 'You are not authorized to pay for this reservation' });
+    }
 
-    const customerFeePct = parseFloat(custFeeStr) / 100;
-    const providerFeePct = parseFloat(provFeeStr) / 100;
+    // IMPORTANT: Ignore the 'amount' from the client and use the database value!
+    // Convert to cents for Stripe
+    const amountCents = Math.round(Number(reservation.total_price) * 100);
+    const amountDecimal = amountCents / 100;
+    const commissionRate = await getCommissionRate();
+    const appFeeAmount = Math.round(amountDecimal * commissionRate * 100) / 100;
+    const providerAmount = Math.round((amountDecimal - appFeeAmount) * 100) / 100;
 
-    const customerFee = Math.round(baseAmount * customerFeePct);
-    const providerFee = Math.round(baseAmount * providerFeePct);
-    const totalCharge = baseAmount + customerFee; // Total to charge the customer's card
-    const applicationFee = customerFee + providerFee; // Total to keep in Platform account
-    const providerPayout = totalCharge - applicationFee; // Amount for provider (Base - ProviderFee)
+    // Create Stripe Intent
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountCents,
+      currency,
+      metadata: { buyerId, providerId, bookingId: bookingId.toString() }
+    });
 
-    // Transaction Safety: Record PENDING transaction first
-    const tempPaymentId = `temp_stripe_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-    const pendingTx: any = await createTransaction({
+    // Record pending transaction in DB (appFeeAmount goes to platform MP account)
+    await createTransaction({
       paymentProvider: 'stripe',
-      paymentId: tempPaymentId,
-      status: 'pending_payment', // Initial status before Stripe confirms intent creation
-      amount: totalCharge / 100, // Convert to standard units for DB
+      paymentId: paymentIntent.id,
+      status: 'pending',
+      amount: amountDecimal,
       currency,
       buyerId,
       providerId,
       bookingId,
-      appFeeAmount: applicationFee / 100,
-      providerAmount: providerPayout / 100,
-      metadata: {
-        base_amount_cents: baseAmount,
-        customer_fee_cents: customerFee,
-        provider_fee_cents: providerFee
-      }
+      appFeeAmount,
+      providerAmount
     });
 
-    try {
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: totalCharge,
-        currency,
-        metadata: {
-          buyerId,
-          providerId,
-          bookingId,
-          type,
-          base_amount: baseAmount,
-          customer_fee: customerFee,
-          provider_fee: providerFee,
-          transaction_db_id: pendingTx?.id
-        }
-      });
-
-      // Update with real Payment ID
-      if (pendingTx?.id) {
-        await updateTransaction(pendingTx.id, {
-          paymentId: paymentIntent.id,
-          status: 'pending' // Ready for client confirmation
-        });
-      }
-
-      res.json({ clientSecret: paymentIntent.client_secret });
-    } catch (error) {
-      console.error('Stripe Intent Creation Failed:', error);
-      // Mark as failed
-      if (pendingTx?.id) {
-        await updateTransaction(pendingTx.id, { status: 'failed_init' });
-      }
-      throw error; // Let outer catch block handle response
-    }
+    res.json({ clientSecret: paymentIntent.client_secret });
   } catch (error) {
     console.error('Stripe error:', error);
-    res.status(500).json({ error: 'Stripe error', details: error });
+    res.status(500).json({ error: 'Payment processing error. Please try again.' });
   }
 });
 
-// MercadoPago Preference
-router.post('/mercadopago/create-preference', async (req: Request, res: Response) => {
+// MercadoPago Preference — SDK v2
+router.post('/mercadopago/create-preference', authenticateJWT, async (req: any, res: Response) => {
   try {
-    const { items, payer, back_urls, buyerId, providerId, bookingId, type } = req.body;
+    const { items, payer, back_urls, providerId, bookingId } = req.body;
+    const buyerId = req.user.userId;
 
-    if (!preferenceClient) {
-      return res.status(503).json({ error: 'MercadoPago payments not configured' });
+    if (!bookingId) {
+      return res.status(400).json({ error: 'bookingId is required' });
     }
 
-    // Calculate Profit Sharing Fees (2.5% Customer + 2.5% Provider)
-    // Base amount is sum of item prices
-    const baseAmount = items.reduce((sum: number, item: any) => sum + (item.unit_price * (item.quantity || 1)), 0);
+    // Secure validation: fetch the reservation directly from the database
+    const reservation = await getReservationById(parseInt(bookingId));
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation not found' });
+    }
 
-    // Validates keys exist or falls back to defaults
-    const { getConfigValue } = require('../models/system-config');
-    const custFeeStr = await getConfigValue('customer_fee_percent', '2.5');
-    const provFeeStr = await getConfigValue('provider_fee_percent', '2.5');
+    if (reservation.user_id !== buyerId) {
+      return res.status(403).json({ error: 'You are not authorized to pay for this reservation' });
+    }
 
-    const customerFeePct = parseFloat(custFeeStr) / 100;
-    const providerFeePct = parseFloat(provFeeStr) / 100;
+    // Look up the vendor's MP access token (marketplace OAuth)
+    const vendorRows: any = await db.query(
+      `SELECT mp_access_token, mp_token_expires_at FROM users WHERE id = $1`,
+      [providerId]
+    );
+    const vendor = vendorRows[0];
+    if (!vendor || !vendor.mp_access_token) {
+      return res.status(402).json({
+        error: 'vendor_not_connected',
+        message: 'El vendedor aún no ha vinculado su cuenta de MercadoPago. Por favor contacta al proveedor.',
+      });
+    }
+    if (vendor.mp_token_expires_at && new Date(vendor.mp_token_expires_at) < new Date()) {
+      return res.status(402).json({
+        error: 'vendor_token_expired',
+        message: 'El token de MercadoPago del vendedor ha expirado. Por favor pídele que reconecte su cuenta.',
+      });
+    }
 
-    // Fees
-    const customerFee = Math.round(baseAmount * customerFeePct);
-    const providerFee = Math.round(baseAmount * providerFeePct);
+    // IMPORTANT: Ignore the client-provided prices and use the DB value
+    const totalAmount = Number(reservation.total_price);
+    const commissionRate = await getCommissionRate();
+    const appFeeAmount = Math.round(totalAmount * commissionRate * 100) / 100;
+    const providerAmount = Math.round((totalAmount - appFeeAmount) * 100) / 100;
 
-    // Totals
-    const applicationFee = customerFee + providerFee;
-    const totalCharge = baseAmount + customerFee;
-    const providerPayout = totalCharge - applicationFee;
+    // Create a secured items array using the correct price from DB
+    const currency_id = items && items[0] ? items[0].currency_id : 'ARS';
+    const securedItems = [{
+      id: bookingId.toString(),
+      title: items && items[0] ? items[0].title : `Reserva #${bookingId}`,
+      quantity: 1,
+      currency_id,
+      unit_price: totalAmount,
+    }];
 
-    // Add Service Fee item to preference (Charge the customer extra)
-    const preferenceItems = [
-      ...items,
-      {
-        title: 'Costo de Servicio (2.5%)',
-        unit_price: customerFee,
-        quantity: 1,
-        currency_id: items[0]?.currency_id || 'ARS'
+    // Use the vendor's own MP token so the payment goes to their account
+    // marketplace_fee is automatically transferred to the platform's account
+    const vendorMpClient = new MercadoPagoConfig({ accessToken: vendor.mp_access_token });
+    const vendorMpPreference = new Preference(vendorMpClient);
+
+    const result = await vendorMpPreference.create({
+      body: {
+        items: securedItems,
+        payer,
+        marketplace_fee: appFeeAmount, // Platform commission — goes to the platform's MP account
+        back_urls: back_urls || {},
+        auto_return: 'approved' as const,
+        external_reference: bookingId?.toString()
       }
-    ];
-
-    // Transaction Safety: Record PENDING first
-    const currency = items[0]?.currency_id || 'ARS';
-    const tempPaymentId = `temp_mp_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-    const pendingTx: any = await createTransaction({
-      paymentProvider: 'mercadopago',
-      paymentId: tempPaymentId,
-      status: 'pending_payment',
-      amount: totalCharge,
-      currency,
-      buyerId: buyerId || (payer && payer.id ? payer.id.toString() : null),
-      providerId,
-      bookingId,
-      metadata: { items: preferenceItems, payer, type, base_amount: baseAmount },
-      appFeeAmount: applicationFee,
-      providerAmount: providerPayout
     });
 
-    try {
-      const preference = await preferenceClient.create({
-        body: {
-          items: preferenceItems,
-          payer,
-          back_urls: back_urls || {},
-          auto_return: 'approved',
-          external_reference: bookingId?.toString(),
-          metadata: { transaction_db_id: pendingTx?.id }
-        }
-      });
+    // Store transaction in DB
+    const currency = currency_id;
 
-      // Update with real ID
-      if (pendingTx?.id) {
-        await updateTransaction(pendingTx.id, {
-          paymentId: (preference.id || '').toString(),
-          status: 'pending'
-        });
-      }
+    await createTransaction({
+      paymentProvider: 'mercadopago',
+      paymentId: result.id!.toString(),
+      status: 'pending',
+      amount: totalAmount,
+      currency,
+      buyerId: buyerId || (payer?.id ? payer.id.toString() : null),
+      providerId,
+      bookingId,
+      metadata: { items: securedItems, payer },
+      appFeeAmount,
+      providerAmount
+    });
 
-      res.json({ init_point: preference.init_point });
-    } catch (error) {
-      console.error('MercadoPago Preference Creation Failed:', error);
-      if (pendingTx?.id) {
-        await updateTransaction(pendingTx.id, { status: 'failed_init' });
-      }
-      throw error;
-    }
+    res.json({ init_point: result.init_point, sandbox_init_point: result.sandbox_init_point });
   } catch (error) {
     console.error('MercadoPago error:', error);
-    res.status(500).json({ error: 'MercadoPago error', details: error });
+    res.status(500).json({ error: 'Payment processing error. Please try again.' });
   }
 });
 

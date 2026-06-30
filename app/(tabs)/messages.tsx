@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator, RefreshControl } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
@@ -224,6 +225,7 @@ export default function MessagesScreen() {
       if (activeConversation && message.conversation_id === activeConversation.conversationId) {
         setMessages(prev => {
           const messageId = message.id?.toString();
+          // Check for exact duplicate by real ID
           if (messageId && prev.some(m => m.id === messageId)) {
             console.log('⏭️ [DEBUG] Duplicate message ID, ignoring:', messageId);
             return prev;
@@ -232,18 +234,21 @@ export default function MessagesScreen() {
             id: message.id?.toString() || Date.now().toString(),
             text: message.text,
             senderId: message.sender_id?.toString(),
-            sender: message.sender_id === currentUser.id ? ('me' as 'me' | 'other') : ('other' as 'me' | 'other'),
+            sender: Number(message.sender_id) === Number(currentUser.id) ? ('me' as 'me' | 'other') : ('other' as 'me' | 'other'),
             timestamp: new Date(message.created_at),
           };
           console.log('💬 [DEBUG] Adding message to local state:', newMsg);
-          console.log('💬 [DEBUG] Previous messages state:', prev);
-          return [newMsg, ...prev];
+          // Remove any matching temp (optimistic) message for this same text+sender to avoid duplicates
+          const withoutTemp = Number(message.sender_id) === Number(currentUser.id)
+            ? prev.filter(m => !(m.id.startsWith('temp-') && m.text === message.text && m.sender === 'me'))
+            : prev;
+          return [newMsg, ...withoutTemp];
         });
       }
 
       // Show notification modal if not actively viewing this conversation
-      const isReceivedByMe = message.receiver_id === currentUser.id;
-      const isSentByMe = message.sender_id === currentUser.id;
+      const isReceivedByMe = Number(message.receiver_id) === Number(currentUser.id);
+      const isSentByMe = Number(message.sender_id) === Number(currentUser.id);
       const activeUserId = activeConversation ? parseInt(activeConversation.userId) : null;
       const activeConvoId = activeConversation ? activeConversation.conversationId : null;
       let shouldStopPropagation = false;
@@ -306,7 +311,7 @@ export default function MessagesScreen() {
           id: msg.id.toString(),
           text: msg.text,
           senderId: msg.sender_id.toString(),
-          sender: msg.sender_id === currentUser?.id ? 'me' : 'other',
+          sender: Number(msg.sender_id) === Number(currentUser?.id) ? 'me' : 'other',
           timestamp: new Date(msg.created_at),
         }));
 
@@ -338,9 +343,13 @@ export default function MessagesScreen() {
       const url = `${getApiBaseUrl()}/api/conversations`;
       console.log('💬 POST URL:', url);
 
+      const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({ user1Id: userId1, user2Id: userId2 }),
       });
 
@@ -480,6 +489,20 @@ export default function MessagesScreen() {
       return;
     }
 
+    // Optimistically add message to local state immediately (don't wait for socket echo)
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      text: messageText,
+      senderId: currentUser.id.toString(),
+      sender: 'me' as 'me' | 'other',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [optimisticMsg, ...prev]);
+
+    // Clear input immediately for better UX
+    setMessageText('');
+
     // Emit to server (backend expects 'message:send')
     console.log('✅ Emitting message:send to backend...');
     socket.emit('message:send', {
@@ -488,9 +511,6 @@ export default function MessagesScreen() {
       receiverId: parseInt(activeConversation.userId),
       text: messageText,
     });
-
-    // Clear input immediately for better UX
-    setMessageText('');
   };
 
   const handleCloseConversation = () => {
@@ -621,54 +641,44 @@ export default function MessagesScreen() {
       }, 100);
     }
   }, [messages]);
+// ...existing code...
 
-  // Render individual conversation item
-  const renderConversationItem = (conversation: Conversation) => {
-    const formatTimestamp = (timestamp?: string) => {
-      if (!timestamp) return '';
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) return 'Ahora';
-      if (diffMins < 60) return `${diffMins}m`;
-      if (diffHours < 24) return `${diffHours}h`;
-      if (diffDays < 7) return `${diffDays}d`;
-      return date.toLocaleDateString('es', { day: 'numeric', month: 'short' });
-    };
-
-    return (
-      <TouchableOpacity
-        style={styles.conversationItem}
-        onPress={() => handleOpenConversation(conversation)}
-      >
-        <Image
-          source={{ uri: conversation.avatar || 'https://via.placeholder.com/50' }}
-          style={styles.avatar}
-        />
-        <View style={styles.conversationInfo}>
-          <View style={styles.conversationItemHeader}>
-            <Text style={styles.conversationName}>{conversation.name}</Text>
-            <Text style={styles.timestamp}>{formatTimestamp(conversation.last_message_time)}</Text>
-          </View>
-          <View style={styles.lastMessageRow}>
-            <Text style={styles.lastMessage} numberOfLines={1}>
-              {conversation.last_message || 'Sin mensajes aún'}
-            </Text>
-            {conversation.unread_count > 0 && (
-              <View style={styles.unreadBadge}>
-                <Text style={styles.unreadCount}>{conversation.unread_count}</Text>
-              </View>
-            )}
-          </View>
+  const renderConversationItem = (item: Conversation) => (
+    <TouchableOpacity
+      style={styles.conversationItem}
+      onPress={() => handleOpenConversation(item)}
+    >
+      {item.avatar ? (
+        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, { backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ color: Colors.white, fontWeight: '700', fontSize: 18 }}>
+            {item.name?.charAt(0)?.toUpperCase() || '?'}
+          </Text>
         </View>
-      </TouchableOpacity>
-    );
-  };
-  // ...existing code...
+      )}
+      <View style={styles.conversationInfo}>
+        <View style={styles.conversationItemHeader}>
+          <Text style={styles.conversationName} numberOfLines={1}>{item.name}</Text>
+          {item.last_message_time && (
+            <Text style={styles.timestamp}>
+              {new Date(item.last_message_time).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          )}
+        </View>
+        <View style={styles.lastMessageRow}>
+          <Text style={styles.lastMessage} numberOfLines={1}>
+            {item.last_message || 'Sin mensajes'}
+          </Text>
+          {item.unread_count > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadCount}>{item.unread_count}</Text>
+            </View>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -1132,11 +1142,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
-  },
-  conversationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
   },
   timestamp: {
     fontSize: 12,

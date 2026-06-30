@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { StripeProvider, useStripe, Mode } from '@stripe/stripe-react-native';
+import React, { useState, useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PLATFORM_FEE_RATE, DEFAULT_CURRENCY } from '@/constants/fees';
+import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 import { WebView } from 'react-native-webview';
 import {
   View,
@@ -65,7 +67,7 @@ function PaymentScreenInner() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { currentUser } = useUser();
+  const { currentUser, preferences } = useUser();
   const params = useLocalSearchParams();
 
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([
@@ -98,55 +100,24 @@ function PaymentScreenInner() {
     },
   ]);
 
-  const [bookingItems, setBookingItems] = useState<BookingItem[]>([]);
-
-  useEffect(() => {
-    // Populate booking items from params if available
-    if (params.type === 'event') {
-      const attendeeCount = parseInt(params.attendeeCount as string) || 1;
-      const price = parseFloat(params.price as string) || 0;
-
-      setBookingItems([{
-        id: params.id as string || 'default',
-        title: `${params.title}${attendeeCount > 1 ? ` (${attendeeCount} personas)` : ''}`,
-        provider: (params.providerId as string) || 'Organizador',
-        date: '', // Not strictly needed for payment summary logic but good for UI if passed
-        time: '',
-        duration: '',
-        location: '',
-        price: price * attendeeCount,
-        image: (params.image as string) || '', // No fallback image
-      }]);
-    } else if (params.type === 'product') {
-      // Future: handle product params
-      setBookingItems([{
-        id: params.id as string || 'default',
-        title: params.title as string || 'Producto',
-        provider: (params.providerId as string) || 'Vendedor',
-        date: '',
-        time: '',
-        duration: '',
-        location: '',
+  // Build booking items from route params when available (event/service detail → payment)
+  const bookingItems = useMemo<BookingItem[]>(() => {
+    if (params.title && params.price) {
+      return [{
+        id: (params.id as string) || '1',
+        title: params.title as string,
+        provider: (params.providerName as string) || '',
+        date: (params.date as string) || '',
+        time: (params.time as string) || '',
+        duration: (params.duration as string) || '',
+        location: (params.location as string) || '',
         price: parseFloat(params.price as string) || 0,
-        image: (params.image as string) || '', // No fallback image
-      }]);
-    } else {
-      // Fallback/Mock
-      setBookingItems([
-        {
-          id: '1',
-          title: 'Sesión de Reiki Sanador',
-          provider: 'María González',
-          date: '15 de Marzo',
-          time: '10:00',
-          duration: '60 min',
-          location: 'Centro Holístico Luz',
-          price: 65,
-          image: '', // No fallback image for mock data
-        }
-      ]);
+        image: (params.image as string) || '',
+      }];
     }
-  }, [params.id, params.type]);
+    // Fallback: empty list — will be visible as "no items"
+    return [];
+  }, [params]);
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('1');
   const [savePaymentInfo, setSavePaymentInfo] = useState<boolean>(true);
@@ -163,24 +134,27 @@ function PaymentScreenInner() {
   const [stripeClientSecret, setStripeClientSecret] = useState<string | null>(null);
 
   const subtotal = bookingItems.reduce((sum, item) => sum + item.price, 0);
-  const serviceFee = Math.round(subtotal * 0.05);
+  const serviceFee = Math.round(subtotal * PLATFORM_FEE_RATE);
   const total = subtotal + serviceFee;
 
   // Stripe payment flow
   const handleStripePayment = async () => {
     setLoading(true);
     try {
+      const token = await AsyncStorage.getItem('authToken');
+      const currency = preferences?.preferredCurrency || DEFAULT_CURRENCY;
       // Stripe expects amount in cents
       const res = await fetch(`${BACKEND_URL}/api/payments/stripe/create-intent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           amount: total * 100,
-          currency: 'eur',
-          buyerId: currentUser?.id,
-          providerId: params.providerId || bookingItems[0]?.provider,
-          bookingId: params.id || bookingItems[0]?.id,
-          type: params.type || 'service'
+          currency: currency.toLowerCase(),
+          providerId: (params.providerId as string) || bookingItems[0]?.id,
+          bookingId: (params.bookingId as string) || (params.id as string) || bookingItems[0]?.id
         }),
       });
       const data = await res.json();
@@ -189,8 +163,8 @@ function PaymentScreenInner() {
         // Initialize PaymentSheet
         const initResult = await initPaymentSheet({
           paymentIntentClientSecret: data.clientSecret,
-          // intentConfiguration: { mode: 'payment' }, // Removed specific config to rely on secret
           merchantDisplayName: 'Club Sincrónica',
+          paymentMethodOrder: ['bizum', 'card'], // Bizum shown first for ES users
         });
         if (initResult.error) {
           Alert.alert('Stripe', `Error inicializando PaymentSheet: ${initResult.error.message}`);
@@ -219,15 +193,15 @@ function PaymentScreenInner() {
   const handleMercadoPagoPayment = async () => {
     setLoading(true);
     try {
-      // Example items and payer
+      const token = await AsyncStorage.getItem('authToken');
+      const currency = preferences?.preferredCurrency || DEFAULT_CURRENCY;
       const items = bookingItems.map(item => ({
         title: item.title,
         quantity: 1,
-        currency_id: 'ARS',
+        currency_id: currency,
         unit_price: item.price,
       }));
-      const payer = { email: 'usuario@email.com' };
-      // Define back_urls for MercadoPago redirection
+      const payer = { email: currentUser?.email || '' };
       const back_urls = {
         success: 'https://clubsincronica.app/payment-success',
         failure: 'https://clubsincronica.app/payment-failure',
@@ -235,20 +209,23 @@ function PaymentScreenInner() {
       };
       const res = await fetch(`${BACKEND_URL}/api/payments/mercadopago/create-preference`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           items,
           payer,
           back_urls,
-          buyerId: currentUser?.id,
-          providerId: params.providerId || bookingItems[0]?.provider,
-          bookingId: params.id || bookingItems[0]?.id,
-          type: params.type || 'service'
+          providerId: params.providerId as string,
+          bookingId: (params.bookingId as string) || (params.id as string),
         }),
       });
       const data = await res.json();
-      if (data.init_point) {
-        setWebViewUrl(data.init_point);
+      // Use sandbox_init_point in development, init_point in production
+      const url = __DEV__ ? (data.sandbox_init_point || data.init_point) : data.init_point;
+      if (url) {
+        setWebViewUrl(url);
       } else {
         Alert.alert('Error', 'No init_point received from backend.');
       }
@@ -579,54 +556,66 @@ function PaymentScreenInner() {
       </View>
       {/* MercadoPago WebView overlay */}
       {webViewUrl ? (
-        <WebView
-          source={{ uri: webViewUrl }}
-          onNavigationStateChange={navState => {
-            if (navState.url.includes('success')) {
-              setWebViewUrl(null);
-              Alert.alert('Pago Exitoso', '¡El pago fue realizado con éxito!');
-              router.back();
-            }
-            if (navState.url.includes('failure') || navState.url.includes('pending')) {
-              setWebViewUrl(null);
-              Alert.alert('Pago no completado', 'El pago no fue realizado.');
-            }
-          }}
-          startInLoadingState
-          style={{ flex: 1, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}
-        />
+        <View style={{ flex: 1, position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, backgroundColor: Colors.background }}>
+          <View style={{ height: insets.top, backgroundColor: Colors.white }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white, padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+            <TouchableOpacity onPress={() => setWebViewUrl(null)} style={{ padding: 8 }}>
+              <Text style={{ fontSize: 16, color: Colors.primary, fontWeight: '600' }}>✕ Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+          <WebView
+            source={{ uri: webViewUrl }}
+            onNavigationStateChange={navState => {
+              if (navState.url.includes('success')) {
+                setWebViewUrl(null);
+                Alert.alert('Pago Exitoso', '¡El pago fue realizado con éxito!');
+                router.back();
+              }
+              if (navState.url.includes('failure') || navState.url.includes('pending')) {
+                setWebViewUrl(null);
+                Alert.alert('Pago no completado', 'El pago no fue realizado.');
+              }
+            }}
+            startInLoadingState
+            style={{ flex: 1 }}
+          />
+        </View>
       ) : null}
     </>
   );
 }
 
-// MockStripeProvider removed
+// Stripe publishable key — set EXPO_PUBLIC_STRIPE_KEY in your environment
+// (or add stripePublishableKey to app.json > extra) before building.
+// Using a placeholder here will cause Stripe to fail at runtime — intentional.
+const getStripePublishableKey = (): string => {
+  try {
+    // expo-constants injects app.json's `extra` at build time
+    const Constants = require('expo-constants').default;
+    const key =
+      Constants?.expoConfig?.extra?.stripePublishableKey ||
+      Constants?.manifest?.extra?.stripePublishableKey;
+    if (key) return key;
+  } catch (_) { /* expo-constants unavailable */ }
+  // Fallback: process.env (works for bare workflow / local dev with .env)
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_STRIPE_KEY) {
+    return process.env.EXPO_PUBLIC_STRIPE_KEY;
+  }
+  if (__DEV__) {
+    console.warn('⚠️ STRIPE: No publishable key configured. Set EXPO_PUBLIC_STRIPE_KEY or stripePublishableKey in app.json extra.');
+  }
+  return ''; // empty key → Stripe will reject gracefully
+};
 
-export default function PaymentScreen() {
-  // Replace with your Stripe publishable key
-  const STRIPE_PUBLISHABLE_KEY = 'pk_test_51SxrLMEVe3DO9qZi6Vi4NzdjBTOyOFBsqJzGk6OGgutb8VG4LK88A1wIxxw8DFVOZJqSuRzL5jNs6rXcPMgA9fTl00ikUFBQXG';
+const STRIPE_PUBLISHABLE_KEY = getStripePublishableKey();
 
-  // Verify if we can render the real provider or need a fallback
-  // For this debugging session, we will use the Inner screen directly 
-  // if you strictly need Stripe, you must rebuild the client.
-  // But to unblock Messaging tests, we use this:
+const PaymentScreen = () => (
+  <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+    <PaymentScreenInner />
+  </StripeProvider>
+);
 
-  // NOTE: Uncomment the real provider when running on a valid client
-
-  return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-      <PaymentScreenInner />
-    </StripeProvider>
-  );
-
-  /*
-  return (
-    <MockStripeProvider>
-      <PaymentScreenInner />
-    </MockStripeProvider>
-  );
-  */
-}
+export default PaymentScreen;
 
 const styles = StyleSheet.create({
   container: {

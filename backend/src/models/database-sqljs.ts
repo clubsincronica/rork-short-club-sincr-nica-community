@@ -62,6 +62,9 @@ export async function initializeDatabase() {
           services TEXT,
           is_host INTEGER DEFAULT 0,
           role TEXT DEFAULT 'user',
+          mp_access_token TEXT,
+          mp_refresh_token TEXT,
+          mp_token_expires_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW()
         )
@@ -73,6 +76,15 @@ export async function initializeDatabase() {
       } catch (e) {
         // Ignore error if column exists
         console.log('Role column check passed');
+      }
+
+      // Migration: Add MercadoPago OAuth token columns
+      try {
+        await pgClient.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS mp_access_token TEXT`);
+        await pgClient.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS mp_refresh_token TEXT`);
+        await pgClient.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS mp_token_expires_at TIMESTAMP`);
+      } catch (e) {
+        console.log('MP token columns check passed');
       }
 
       await pgClient.query(`
@@ -174,49 +186,6 @@ export async function initializeDatabase() {
       `);
 
       await pgClient.query(`
-        CREATE TABLE IF NOT EXISTS services (
-          id SERIAL PRIMARY KEY,
-          provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          title TEXT NOT NULL,
-          description TEXT,
-          category TEXT,
-          price DECIMAL(10,2) DEFAULT 0,
-          duration INTEGER DEFAULT 60,
-          is_online BOOLEAN DEFAULT false,
-          location TEXT,
-          images TEXT,
-          tags TEXT,
-          start_date TEXT,
-          end_date TEXT,
-          is_scheduled BOOLEAN DEFAULT false,
-          schedule TEXT,
-          is_active BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-
-      await pgClient.query(`
-        CREATE TABLE IF NOT EXISTS lodging (
-          id SERIAL PRIMARY KEY,
-          host_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-          title TEXT NOT NULL,
-          description TEXT,
-          type TEXT,
-          price_per_night DECIMAL(10,2) NOT NULL,
-          images TEXT,
-          location TEXT NOT NULL,
-          amenities TEXT,
-          max_guests INTEGER DEFAULT 1,
-          rating DECIMAL(3,2) DEFAULT 0,
-          review_count INTEGER DEFAULT 0,
-          available_dates TEXT,
-          created_at TIMESTAMP DEFAULT NOW(),
-          updated_at TIMESTAMP DEFAULT NOW()
-        )
-      `);
-
-      await pgClient.query(`
         CREATE TABLE IF NOT EXISTS bank_accounts (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -291,8 +260,6 @@ export async function initializeDatabase() {
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_reservations_provider ON reservations(provider_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_events_provider ON events(provider_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_products_provider ON products(provider_id)`);
-      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_services_provider ON services(provider_id)`);
-      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_lodging_host ON lodging(host_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read)`);
 
       await pgClient.query(`
@@ -305,24 +272,21 @@ export async function initializeDatabase() {
       `);
 
       await pgClient.query(`
-        CREATE TABLE IF NOT EXISTS system_config (
+        CREATE TABLE IF NOT EXISTS platform_settings (
           key TEXT PRIMARY KEY,
           value TEXT NOT NULL,
-          description TEXT,
           updated_at TIMESTAMP DEFAULT NOW()
         )
       `);
 
-      // Initialize default config if empty
+      // Seed default commission rate if not present
       await pgClient.query(`
-        INSERT INTO system_config (key, value, description)
-        VALUES 
-          ('customer_fee_percent', '2.5', 'Percentage fee charged to customers'),
-          ('provider_fee_percent', '2.5', 'Percentage fee deducted from providers')
+        INSERT INTO platform_settings (key, value)
+        VALUES ('commission_rate', '0.05')
         ON CONFLICT (key) DO NOTHING
       `);
 
-      console.log('Postgres events, bank_accounts, transactions, reservations, notifications, blocked_emails, and system_config tables initialized');
+      console.log('Postgres events, bank_accounts, transactions, reservations, notifications, blocked_emails, and platform_settings tables initialized');
     } else {
       // Use sql.js
       console.log('Using SQL.js database');
@@ -352,25 +316,12 @@ export async function initializeDatabase() {
             interests TEXT,
             services TEXT,
             is_host INTEGER DEFAULT 0,
+            mp_access_token TEXT,
+            mp_refresh_token TEXT,
+            mp_token_expires_at TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
-        `);
-
-        db.run(`
-          CREATE TABLE IF NOT EXISTS system_config (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            description TEXT,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-
-        db.run(`
-          INSERT OR IGNORE INTO system_config (key, value, description)
-          VALUES 
-            ('customer_fee_percent', '2.5', 'Percentage fee charged to customers'),
-            ('provider_fee_percent', '2.5', 'Percentage fee deducted from providers')
         `);
 
         db.run(`
@@ -501,10 +452,10 @@ export const userQueries = usePostgres ? {
     return rows[0] ?? null;
   },
 
-  updateUser: async (id: number, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number, role?: string) => {
+  updateUser: async (id: number, name: string, avatar?: string, bio?: string, location?: string, latitude?: number, longitude?: number, phone?: string, website?: string, interests?: string, services?: string, isHost?: number) => {
     await pgClient.query(
-      `UPDATE users SET name = $1, avatar = $2, bio = $3, location = $4, latitude = $5, longitude = $6, phone = $7, website = $8, interests = $9, services = $10, is_host = $11, role = COALESCE($12, role), updated_at = NOW() WHERE id = $13`,
-      [name, avatar || null, bio || null, location || null, latitude || null, longitude || null, phone || null, website || null, interests || null, services || null, isHost || 0, role || null, id]
+      `UPDATE users SET name = $1, avatar = $2, bio = $3, location = $4, latitude = $5, longitude = $6, phone = $7, website = $8, interests = $9, services = $10, is_host = $11, updated_at = NOW() WHERE id = $12`,
+      [name, avatar || null, bio || null, location || null, latitude || null, longitude || null, phone || null, website || null, interests || null, services || null, isHost || 0, id]
     );
   },
 
@@ -910,142 +861,13 @@ export const eventQueries = usePostgres ? {
     ]);
   }
 } : {
-  createEvent: (event: any) => {
-    db.run(
-      `INSERT INTO events (
-        provider_id, title, description, category, start_time, end_time, date, 
-        location, is_online, max_participants, current_participants, price, image, tags, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        event.providerId, event.title, event.description, event.category, event.startTime, event.endTime, event.date,
-        event.location, event.isOnline ? 1 : 0, event.maxParticipants, event.currentParticipants || 0, event.price, event.image,
-        event.tags ? JSON.stringify(event.tags) : null, event.status || 'upcoming'
-      ]
-    );
-    saveDatabase();
-    return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
-  },
-
-  getEvents: () => {
-    const result = db.exec(`
-      SELECT e.*, u.name as provider_name, u.avatar as provider_avatar, u.email as provider_email
-      FROM events e
-      LEFT JOIN users u ON u.id = e.provider_id
-      ORDER BY date ASC, start_time ASC
-    `);
-
-    if (!result[0]) return [];
-
-    return result[0].values.map((row: any) => {
-      const obj = rowToObject(result[0].columns, row);
-      return {
-        ...obj,
-        providerId: obj.provider_id,
-        startTime: obj.start_time,
-        endTime: obj.end_time,
-        isOnline: obj.is_online === 1 || obj.is_online === 'true' || obj.is_online === true,
-        maxParticipants: obj.max_participants,
-        currentParticipants: obj.current_participants,
-        tags: obj.tags ? JSON.parse(obj.tags) : [],
-        provider: {
-          id: obj.provider_id,
-          name: obj.provider_name,
-          avatar: obj.provider_avatar,
-          email: obj.provider_email,
-          isServiceProvider: true,
-          rating: 0,
-          reviewCount: 0,
-          specialties: [],
-          joinedDate: '',
-          verified: false
-        }
-      };
-    });
-  },
-
-  getEventsByProvider: (id: number) => {
-    const result = db.exec(`SELECT * FROM events WHERE provider_id = ? ORDER BY date ASC, start_time ASC`, [id]);
-    if (!result[0]) return [];
-
-    return result[0].values.map((row: any) => {
-      const obj = rowToObject(result[0].columns, row);
-      return {
-        ...obj,
-        providerId: obj.provider_id,
-        startTime: obj.start_time,
-        endTime: obj.end_time,
-        isOnline: obj.is_online === 1 || obj.is_online === 'true' || obj.is_online === true,
-        maxParticipants: obj.max_participants,
-        currentParticipants: obj.current_participants,
-        tags: obj.tags ? JSON.parse(obj.tags) : []
-      };
-    });
-  },
-
-  getEventById: (id: number) => {
-    const result = db.exec(`
-      SELECT e.*, u.name as provider_name, u.avatar as provider_avatar
-      FROM events e
-      LEFT JOIN users u ON u.id = e.provider_id
-      WHERE e.id = ?
-    `, [id]);
-
-    if (!result[0] || !result[0].values[0]) return null;
-
-    const obj = rowToObject(result[0].columns, result[0].values[0]);
-    return {
-      ...obj,
-      providerId: obj.provider_id,
-      startTime: obj.start_time,
-      endTime: obj.end_time,
-      isOnline: obj.is_online === 1 || obj.is_online === 'true' || obj.is_online === true,
-      maxParticipants: obj.max_participants,
-      currentParticipants: obj.current_participants,
-      tags: obj.tags ? JSON.parse(obj.tags) : []
-    };
-  },
-
-  deleteEvent: (id: number) => {
-    db.run(`DELETE FROM events WHERE id = ?`, [id]);
-    saveDatabase();
-  },
-
-  updateEvent: (id: number, event: any) => {
-    db.run(`
-      UPDATE events SET 
-        title = COALESCE(?, title),
-        description = COALESCE(?, description),
-        category = COALESCE(?, category),
-        start_time = COALESCE(?, start_time),
-        end_time = COALESCE(?, end_time),
-        date = COALESCE(?, date),
-        location = COALESCE(?, location),
-        is_online = COALESCE(?, is_online),
-        max_participants = COALESCE(?, max_participants),
-        price = COALESCE(?, price),
-        image = COALESCE(?, image),
-        tags = COALESCE(?, tags),
-        status = COALESCE(?, status),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [
-      event.title !== undefined ? event.title : null, 
-      event.description !== undefined ? event.description : null, 
-      event.category !== undefined ? event.category : null, 
-      event.startTime !== undefined ? event.startTime : null, 
-      event.endTime !== undefined ? event.endTime : null, 
-      event.date !== undefined ? event.date : null,
-      event.location !== undefined ? event.location : null, 
-      event.isOnline !== undefined ? (event.isOnline ? 1 : 0) : null, 
-      event.maxParticipants !== undefined ? event.maxParticipants : null, 
-      event.price !== undefined ? event.price : null, 
-      event.image !== undefined ? event.image : null,
-      event.tags ? JSON.stringify(event.tags) : null, 
-      event.status !== undefined ? event.status : null, 
-      id
-    ]);
-    saveDatabase();
-  }
+  // SQLite fallback (minimal implementation for compilation, but we are using Postgres)
+  createEvent: (event: any) => { return { lastID: 0 }; },
+  getEvents: () => [],
+  getEventsByProvider: (id: number) => [],
+  getEventById: (id: number) => null,
+  deleteEvent: (id: number) => { },
+  updateEvent: (id: number, event: any) => { }
 };
 
 // Product queries
@@ -1150,124 +972,12 @@ export const productQueries = usePostgres ? {
     await pgClient.query(`DELETE FROM products WHERE id = $1`, [id]);
   }
 } : {
-  createProduct: (product: any) => {
-    db.run(
-      `INSERT INTO products (
-        provider_id, title, description, category, price, images, tags, 
-        specifications, features, in_stock, stock_count, shipping_info
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        product.providerId, product.title, product.description, product.category, product.price,
-        JSON.stringify(product.images || []), JSON.stringify(product.tags || []),
-        product.specifications, product.features, product.inStock !== false ? 1 : 0,
-        product.stockCount || 0, product.shippingInfo
-      ]
-    );
-    saveDatabase();
-    return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
-  },
-
-  getProducts: () => {
-    const result = db.exec(`
-      SELECT p.*, u.name as provider_name, u.avatar as provider_avatar
-      FROM products p
-      LEFT JOIN users u ON u.id = p.provider_id
-      ORDER BY p.created_at DESC
-    `);
-    
-    if (!result[0]) return [];
-    
-    return result[0].values.map((row: any) => {
-      const obj = rowToObject(result[0].columns, row);
-      return {
-        ...obj,
-        providerId: obj.provider_id,
-        inStock: obj.in_stock === 1,
-        stockCount: obj.stock_count,
-        shippingInfo: obj.shipping_info,
-        images: obj.images ? JSON.parse(obj.images) : [],
-        tags: obj.tags ? JSON.parse(obj.tags) : []
-      };
-    });
-  },
-
-  getProductById: (id: number) => {
-    const result = db.exec(`
-      SELECT p.*, u.name as provider_name, u.avatar as provider_avatar
-      FROM products p
-      LEFT JOIN users u ON u.id = p.provider_id
-      WHERE p.id = ?
-    `, [id]);
-    
-    if (!result[0] || !result[0].values[0]) return null;
-    
-    const obj = rowToObject(result[0].columns, result[0].values[0]);
-    return {
-      ...obj,
-      providerId: obj.provider_id,
-      inStock: obj.in_stock === 1,
-      stockCount: obj.stock_count,
-      shippingInfo: obj.shipping_info,
-      images: obj.images ? JSON.parse(obj.images) : [],
-      tags: obj.tags ? JSON.parse(obj.tags) : []
-    };
-  },
-
-  getProductsByProvider: (id: number) => {
-    const result = db.exec(`SELECT * FROM products WHERE provider_id = ? ORDER BY created_at DESC`, [id]);
-    if (!result[0]) return [];
-    
-    return result[0].values.map((row: any) => {
-      const obj = rowToObject(result[0].columns, row);
-      return {
-        ...obj,
-        providerId: obj.provider_id,
-        inStock: obj.in_stock === 1,
-        stockCount: obj.stock_count,
-        shippingInfo: obj.shipping_info,
-        images: obj.images ? JSON.parse(obj.images) : [],
-        tags: obj.tags ? JSON.parse(obj.tags) : []
-      };
-    });
-  },
-
-  updateProduct: (id: number, product: any) => {
-    db.run(`
-      UPDATE products SET
-        title = COALESCE(?, title),
-        description = COALESCE(?, description),
-        category = COALESCE(?, category),
-        price = COALESCE(?, price),
-        images = COALESCE(?, images),
-        tags = COALESCE(?, tags),
-        specifications = COALESCE(?, specifications),
-        features = COALESCE(?, features),
-        in_stock = COALESCE(?, in_stock),
-        stock_count = COALESCE(?, stock_count),
-        shipping_info = COALESCE(?, shipping_info),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `, [
-      product.title !== undefined ? product.title : null, 
-      product.description !== undefined ? product.description : null, 
-      product.category !== undefined ? product.category : null, 
-      product.price !== undefined ? product.price : null,
-      product.images ? JSON.stringify(product.images) : null,
-      product.tags ? JSON.stringify(product.tags) : null,
-      product.specifications !== undefined ? product.specifications : null, 
-      product.features !== undefined ? product.features : null, 
-      product.inStock !== undefined ? (product.inStock ? 1 : 0) : null,
-      product.stockCount !== undefined ? product.stockCount : null, 
-      product.shippingInfo !== undefined ? product.shippingInfo : null, 
-      id
-    ]);
-    saveDatabase();
-  },
-
-  deleteProduct: (id: number) => {
-    db.run(`DELETE FROM products WHERE id = ?`, [id]);
-    saveDatabase();
-  }
+  createProduct: (product: any) => ({ lastID: 0 }),
+  getProducts: () => [],
+  getProductById: (id: number) => null,
+  getProductsByProvider: (id: number) => [],
+  updateProduct: (id: number, product: any) => { },
+  deleteProduct: (id: number) => { }
 };
 
 // Notification queries
@@ -1309,267 +1019,9 @@ export const notificationQueries = usePostgres ? {
     return res[0]?.count ?? 0;
   }
 } : {
-  createNotification: (notif: any) => {
-    db.run(
-      `INSERT INTO notifications (user_id, type, title, message, data)
-       VALUES (?, ?, ?, ?, ?)`,
-      [notif.userId, notif.type, notif.title, notif.message, notif.data ? JSON.stringify(notif.data) : null]
-    );
-    saveDatabase();
-    return { lastID: (db.exec('SELECT last_insert_rowid() as id')[0]?.values[0]?.[0] as number) || 0 };
-  },
-
-  getUserNotifications: (userId: number) => {
-    const result = db.exec(`SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`, [userId]);
-    if (!result[0]) return [];
-    
-    return result[0].values.map((row: any) => {
-      const obj = rowToObject(result[0].columns, row);
-      return {
-        ...obj,
-        userId: obj.user_id,
-        data: obj.data ? JSON.parse(obj.data) : null
-      };
-    });
-  },
-
-  markAsRead: (id: number) => {
-    db.run(`UPDATE notifications SET read = 1 WHERE id = ?`, [id]);
-    saveDatabase();
-  },
-
-  markAllAsRead: (userId: number) => {
-    db.run(`UPDATE notifications SET read = 1 WHERE user_id = ?`, [userId]);
-    saveDatabase();
-  },
-
-  getUnreadCount: (userId: number) => {
-    const result = db.exec(`SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0`, [userId]);
-    return (result[0]?.values[0]?.[0] as number) || 0;
-  }
-};
-
-// Service queries
-export const serviceQueries = usePostgres ? {
-  createService: async (service: any) => {
-    const res = await pgClient.query(
-      `INSERT INTO services (
-        provider_id, title, description, category, price, duration, is_online, 
-        location, images, tags, start_date, end_date, is_scheduled, schedule, is_active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) 
-      RETURNING id`,
-      [
-        service.providerId, service.title, service.description, service.category, service.price,
-        service.duration, service.isOnline, service.location, 
-        JSON.stringify(service.images || []), JSON.stringify(service.tags || []),
-        service.startDate, service.endDate, service.isScheduled, 
-        JSON.stringify(service.schedule || []), service.isActive ?? true
-      ]
-    );
-    return { lastID: res[0]?.id ?? null };
-  },
-
-  getAllServices: async () => {
-    const rows = await pgClient.query(`
-      SELECT s.*, u.name as provider_name, u.avatar as provider_avatar
-      FROM services s
-      LEFT JOIN users u ON u.id = s.provider_id
-      WHERE s.is_active = true
-      ORDER BY s.created_at DESC
-    `);
-    return rows.map((row: any) => ({
-      ...row,
-      providerId: row.provider_id,
-      isOnline: row.is_online,
-      isScheduled: row.is_scheduled,
-      isActive: row.is_active,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      images: row.images ? JSON.parse(row.images) : [],
-      tags: row.tags ? JSON.parse(row.tags) : [],
-      schedule: row.schedule ? JSON.parse(row.schedule) : []
-    }));
-  },
-
-  getServicesByProvider: async (providerId: number) => {
-    const rows = await pgClient.query(`
-      SELECT * FROM services WHERE provider_id = $1 ORDER BY created_at DESC
-    `, [providerId]);
-    return rows.map((row: any) => ({
-      ...row,
-      providerId: row.provider_id,
-      isOnline: row.is_online,
-      isScheduled: row.is_scheduled,
-      isActive: row.is_active,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      images: row.images ? JSON.parse(row.images) : [],
-      tags: row.tags ? JSON.parse(row.tags) : [],
-      schedule: row.schedule ? JSON.parse(row.schedule) : []
-    }));
-  },
-
-  getServiceById: async (id: number) => {
-    const rows = await pgClient.query(`SELECT * FROM services WHERE id = $1`, [id]);
-    if (!rows[0]) return null;
-    const row = rows[0];
-    return {
-      ...row,
-      providerId: row.provider_id,
-      isOnline: row.is_online,
-      isScheduled: row.is_scheduled,
-      isActive: row.is_active,
-      startDate: row.start_date,
-      endDate: row.end_date,
-      images: row.images ? JSON.parse(row.images) : [],
-      tags: row.tags ? JSON.parse(row.tags) : [],
-      schedule: row.schedule ? JSON.parse(row.schedule) : []
-    };
-  },
-
-  updateService: async (id: number, service: any) => {
-    await pgClient.query(`
-      UPDATE services SET
-        title = COALESCE($1, title),
-        description = COALESCE($2, description),
-        category = COALESCE($3, category),
-        price = COALESCE($4, price),
-        duration = COALESCE($5, duration),
-        is_online = COALESCE($6, is_online),
-        location = COALESCE($7, location),
-        images = COALESCE($8, images),
-        tags = COALESCE($9, tags),
-        start_date = COALESCE($10, start_date),
-        end_date = COALESCE($11, end_date),
-        is_scheduled = COALESCE($12, is_scheduled),
-        schedule = COALESCE($13, schedule),
-        is_active = COALESCE($14, is_active),
-        updated_at = NOW()
-      WHERE id = $15
-    `, [
-      service.title, service.description, service.category, service.price, service.duration,
-      service.isOnline, service.location, 
-      service.images ? JSON.stringify(service.images) : null,
-      service.tags ? JSON.stringify(service.tags) : null,
-      service.startDate, service.endDate, service.isScheduled,
-      service.schedule ? JSON.stringify(service.schedule) : null,
-      service.isActive, id
-    ]);
-  },
-
-  deleteService: async (id: number) => {
-    await pgClient.query(`DELETE FROM services WHERE id = $1`, [id]);
-  }
-} : {
-  // SQLite Fallbacks (Minimal implementation)
-  createService: async (service: any) => { return { lastID: 0 }; },
-  getAllServices: async () => { return []; },
-  getServicesByProvider: async (providerId: number) => { return []; },
-  getServiceById: async (id: number) => { return null; },
-  updateService: async (id: number, service: any) => {},
-  deleteService: async (id: number) => {}
-};
-
-// Lodging queries
-export const lodgingQueries = usePostgres ? {
-  createLodging: async (lodging: any) => {
-    const res = await pgClient.query(
-      `INSERT INTO lodging (
-        host_id, title, description, type, price_per_night, images, 
-        location, amenities, max_guests, available_dates
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-      RETURNING id`,
-      [
-        lodging.hostId, lodging.title, lodging.description, lodging.type, lodging.pricePerNight,
-        JSON.stringify(lodging.images || []), lodging.location, 
-        JSON.stringify(lodging.amenities || []), lodging.maxGuests || 1,
-        JSON.stringify(lodging.availableDates || [])
-      ]
-    );
-    return { lastID: res[0]?.id ?? null };
-  },
-
-  getAllLodging: async () => {
-    const rows = await pgClient.query(`
-      SELECT l.*, u.name as host_name, u.avatar as host_avatar
-      FROM lodging l
-      LEFT JOIN users u ON u.id = l.host_id
-      ORDER BY l.created_at DESC
-    `);
-    return rows.map((row: any) => ({
-      ...row,
-      hostId: row.host_id,
-      pricePerNight: row.price_per_night,
-      maxGuests: row.max_guests,
-      images: row.images ? JSON.parse(row.images) : [],
-      amenities: row.amenities ? JSON.parse(row.amenities) : [],
-      availableDates: row.available_dates ? JSON.parse(row.available_dates) : []
-    }));
-  },
-
-  getLodgingByHost: async (hostId: number) => {
-    const rows = await pgClient.query(`
-      SELECT * FROM lodging WHERE host_id = $1 ORDER BY created_at DESC
-    `, [hostId]);
-    return rows.map((row: any) => ({
-      ...row,
-      hostId: row.host_id,
-      pricePerNight: row.price_per_night,
-      maxGuests: row.max_guests,
-      images: row.images ? JSON.parse(row.images) : [],
-      amenities: row.amenities ? JSON.parse(row.amenities) : [],
-      availableDates: row.available_dates ? JSON.parse(row.available_dates) : []
-    }));
-  },
-
-  getLodgingById: async (id: number) => {
-    const rows = await pgClient.query(`SELECT * FROM lodging WHERE id = $1`, [id]);
-    if (!rows[0]) return null;
-    const row = rows[0];
-    return {
-      ...row,
-      hostId: row.host_id,
-      pricePerNight: row.price_per_night,
-      maxGuests: row.max_guests,
-      images: row.images ? JSON.parse(row.images) : [],
-      amenities: row.amenities ? JSON.parse(row.amenities) : [],
-      availableDates: row.available_dates ? JSON.parse(row.available_dates) : []
-    };
-  },
-
-  updateLodging: async (id: number, lodging: any) => {
-    await pgClient.query(`
-      UPDATE lodging SET
-        title = COALESCE($1, title),
-        description = COALESCE($2, description),
-        type = COALESCE($3, type),
-        price_per_night = COALESCE($4, price_per_night),
-        images = COALESCE($5, images),
-        location = COALESCE($6, location),
-        amenities = COALESCE($7, amenities),
-        max_guests = COALESCE($8, max_guests),
-        available_dates = COALESCE($9, available_dates),
-        updated_at = NOW()
-      WHERE id = $10
-    `, [
-      lodging.title, lodging.description, lodging.type, lodging.pricePerNight,
-      lodging.images ? JSON.stringify(lodging.images) : null,
-      lodging.location, 
-      lodging.amenities ? JSON.stringify(lodging.amenities) : null,
-      lodging.maxGuests,
-      lodging.availableDates ? JSON.stringify(lodging.availableDates) : null,
-      id
-    ]);
-  },
-
-  deleteLodging: async (id: number) => {
-    await pgClient.query(`DELETE FROM lodging WHERE id = $1`, [id]);
-  }
-} : {
-  createLodging: async (lodging: any) => { return { lastID: 0 }; },
-  getAllLodging: async () => { return []; },
-  getLodgingByHost: async (hostId: number) => { return []; },
-  getLodgingById: async (id: number) => { return null; },
-  updateLodging: async (id: number, lodging: any) => {},
-  deleteLodging: async (id: number) => {}
+  createNotification: (notif: any) => ({ lastID: 0 }),
+  getUserNotifications: (userId: number) => [],
+  markAsRead: (id: number) => { },
+  markAllAsRead: (userId: number) => { },
+  getUnreadCount: (userId: number) => 0
 };

@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Modal } from 'react-native';
+import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Edit2, Trash2, Eye, DollarSign, Package, TrendingUp, Clock, Star } from '../components/SmartIcons';
@@ -7,6 +9,9 @@ import { Colors, Gradients } from '@/constants/colors';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
 import { useVendorStore } from '@/hooks/vendor-store';
+import { getApiBaseUrl } from '@/utils/api-config';
+
+const BACKEND_URL = getApiBaseUrl();
 
 export default function VendorDashboard() {
   const insets = useSafeAreaInsets();
@@ -14,12 +19,98 @@ export default function VendorDashboard() {
   const { vendorData, stats, activeOrders } = useVendorStore();
   const [selectedTab, setSelectedTab] = useState<'overview' | 'menu' | 'orders' | 'analytics'>('overview');
 
-  const handleBack = () => {
-    router.back();
+  // MercadoPago OAuth state
+  const [mpConnected, setMpConnected] = useState<boolean | null>(null); // null = loading
+  const [mpOAuthUrl, setMpOAuthUrl] = useState<string | null>(null);
+
+  const checkMpStatus = useCallback(async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const res = await fetch(`${BACKEND_URL}/api/oauth/mp/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      setMpConnected(data.connected === true);
+    } catch {
+      setMpConnected(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkMpStatus();
+  }, [checkMpStatus]);
+
+  const handleConnectMp = async () => {
+    try {
+      const token = await AsyncStorage.getItem('authToken');
+      const res = await fetch(`${BACKEND_URL}/api/oauth/mp/connect`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.url) {
+        setMpOAuthUrl(data.url);
+      } else {
+        Alert.alert('Error', data.error || 'No se pudo obtener el enlace de autorización.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Error conectando con MercadoPago');
+    }
+  };
+
+  const handleDisconnectMp = () => {
+    Alert.alert(
+      'Desconectar MercadoPago',
+      '¿Seguro que quieres desconectar tu cuenta de MercadoPago? Los compradores no podrán pagarte con MP hasta que vuelvas a conectarla.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Desconectar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('authToken');
+              await fetch(`${BACKEND_URL}/api/oauth/mp/disconnect`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              setMpConnected(false);
+            } catch (err: any) {
+              Alert.alert('Error', err.message);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderOverview = () => (
     <View style={styles.overviewContainer}>
+      {/* MercadoPago connection card */}
+      <View style={[styles.mpCard, mpConnected ? styles.mpCardConnected : styles.mpCardDisconnected]}>
+        <View style={styles.mpCardHeader}>
+          <Text style={styles.mpCardTitle}>MercadoPago</Text>
+          <View style={[styles.mpBadge, { backgroundColor: mpConnected ? Colors.success : Colors.warning }]}>
+            <Text style={styles.mpBadgeText}>
+              {mpConnected === null ? '…' : mpConnected ? 'Conectado' : 'Sin conectar'}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.mpCardDesc}>
+          {mpConnected
+            ? 'Tu cuenta de MercadoPago está vinculada. Los pagos se acreditan directo en tu cuenta y la plataforma descuenta su comisión automáticamente.'
+            : 'Vincula tu cuenta de MercadoPago para recibir pagos directos de los compradores.'}
+        </Text>
+        {mpConnected ? (
+          <TouchableOpacity style={styles.mpDisconnectBtn} onPress={handleDisconnectMp}>
+            <Text style={styles.mpDisconnectText}>Desconectar cuenta</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.mpConnectBtn} onPress={handleConnectMp}>
+            <Text style={styles.mpConnectText}>Conectar MercadoPago</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
           <DollarSign size={24} color={Colors.gold} />
@@ -232,12 +323,38 @@ export default function VendorDashboard() {
             headerTransparent: true,
             headerTitle: 'Panel de Vendedor',
             headerLeft: () => (
-              <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
                 <ArrowLeft size={24} color={Colors.text} />
               </TouchableOpacity>
             ),
           }}
         />
+
+        {/* MercadoPago OAuth WebView modal */}
+        <Modal visible={!!mpOAuthUrl} animationType="slide" onRequestClose={() => setMpOAuthUrl(null)}>
+          <View style={{ flex: 1 }}>
+            <View style={[styles.webviewHeader, { paddingTop: insets.top }]}>
+              <TouchableOpacity onPress={() => setMpOAuthUrl(null)} style={styles.webviewClose}>
+                <ArrowLeft size={24} color={Colors.text} />
+              </TouchableOpacity>
+              <Text style={styles.webviewTitle}>Conectar MercadoPago</Text>
+            </View>
+            <WebView
+              source={{ uri: mpOAuthUrl! }}
+              onNavigationStateChange={(state) => {
+                if (
+                  state.url.includes('mp-connected') ||
+                  state.url.includes('payment-success')
+                ) {
+                  setMpOAuthUrl(null);
+                  setMpConnected(true);
+                  checkMpStatus();
+                  Alert.alert('¡Listo!', 'Tu cuenta de MercadoPago fue vinculada correctamente.');
+                }
+              }}
+            />
+          </View>
+        </Modal>
         
         <LinearGradient colors={Gradients.darkToLight} style={styles.content}>
           <View style={styles.header}>
@@ -365,6 +482,88 @@ const styles = StyleSheet.create({
   },
   overviewContainer: {
     paddingBottom: 40,
+  },
+  mpCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+  },
+  mpCardConnected: {
+    backgroundColor: '#f0fdf4',
+    borderColor: Colors.success,
+  },
+  mpCardDisconnected: {
+    backgroundColor: '#fffbeb',
+    borderColor: Colors.warning,
+  },
+  mpCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mpCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+  },
+  mpBadge: {
+    borderRadius: 99,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  mpBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.white,
+  },
+  mpCardDesc: {
+    fontSize: 13,
+    color: Colors.textLight,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  mpConnectBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  mpConnectText: {
+    color: Colors.white,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  mpDisconnectBtn: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  mpDisconnectText: {
+    color: Colors.error,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  webviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border || '#e5e7eb',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  webviewClose: {
+    padding: 8,
+    marginRight: 8,
+  },
+  webviewTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: Colors.text,
   },
   statsGrid: {
     flexDirection: 'row',
