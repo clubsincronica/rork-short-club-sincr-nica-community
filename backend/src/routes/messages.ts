@@ -58,6 +58,16 @@ router.get('/messages/unread/:userId', validateUserId, handleValidationErrors, a
 });
 
 // Get conversation messages (with pagination)
+router.get('/debug-convs/:userId', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const conversations = await conversationQueries.getUserConversations(userId);
+    res.json({ success: true, conversations });
+  } catch (error: any) {
+    res.json({ success: false, error: error.message, stack: error.stack });
+  }
+});
+
 router.get('/conversations/:conversationId/messages', validateConversationId, validateMessagePagination, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
