@@ -650,6 +650,11 @@ export const conversationQueries = usePostgres ? {
     return rows[0] ?? null;
   },
 
+  getConversationById: async (conversationId: number) => {
+    const rows = await pgClient.query(`SELECT * FROM conversations WHERE id = $1 LIMIT 1`, [conversationId]);
+    return rows[0] ?? null;
+  },
+
   getUserConversations: async (userId: number) => {
     const rows = await pgClient.query(
       `SELECT c.id, c.participant1_id, c.participant2_id, c.created_at, c.updated_at,
@@ -681,6 +686,11 @@ export const conversationQueries = usePostgres ? {
       `UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [conversationId]
     );
+  },
+
+  deleteConversation: async (conversationId: number) => {
+    await pgClient.query(`DELETE FROM messages WHERE conversation_id = $1`, [conversationId]);
+    await pgClient.query(`DELETE FROM conversations WHERE id = $1`, [conversationId]);
   }
 } : {
   createConversation: (participant1Id: number, participant2Id: number) => {
@@ -697,6 +707,14 @@ export const conversationQueries = usePostgres ? {
       `SELECT * FROM conversations
        WHERE (participant1_id = ? AND participant2_id = ?) OR (participant1_id = ? AND participant2_id = ?)`,
       [user1Id, user2Id, user2Id, user1Id]
+    );
+    return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
+  },
+
+  getConversationById: (conversationId: number) => {
+    const result = db.exec(
+      `SELECT * FROM conversations WHERE id = ? LIMIT 1`,
+      [conversationId]
     );
     return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : null;
   },
@@ -729,6 +747,12 @@ export const conversationQueries = usePostgres ? {
       `UPDATE conversations SET updated_at = datetime('now') WHERE id = ?`,
       [conversationId]
     );
+    saveDatabase();
+  },
+
+  deleteConversation: (conversationId: number) => {
+    db.run(`DELETE FROM messages WHERE conversation_id = ?`, [conversationId]);
+    db.run(`DELETE FROM conversations WHERE id = ?`, [conversationId]);
     saveDatabase();
   }
 };

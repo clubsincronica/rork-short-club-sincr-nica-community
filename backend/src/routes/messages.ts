@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import { conversationQueries, messageQueries } from '../models/database-sqljs';
 import { parseIntSafe, authenticateJWT } from '../middleware/security';
 import {
@@ -13,29 +13,10 @@ import {
 const router = express.Router();
 
 // Get user's conversations
-router.get('/conversations/user/:id', (req: Request, res: Response, next: NextFunction) => {
-  console.log('🪪 [DEBUG] req.params.id:', req.params.id, 'type:', typeof req.params.id);
-  // Extra debug: print raw params and check for edge cases
-  try {
-    const idVal = req.params.id;
-    console.log('🪪 [DEBUG] req.params:', req.params);
-    console.log('🪪 [DEBUG] idVal:', idVal, 'Number(idVal):', Number(idVal), 'idVal type:', typeof idVal);
-    console.log('🪪 [DEBUG] isNaN(Number(idVal)):', isNaN(Number(idVal)));
-  } catch (e) {
-    console.error('🪪 [DEBUG] Error inspecting req.params.id:', e);
-  }
-  next();
-}, validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
+router.get('/conversations/user/:id', validateUserId, handleValidationErrors, async (req: Request, res: Response) => {
   try {
     const userId = parseIntSafe(req.params.id, 'user ID');
-    console.log('📬 Fetching conversations for user:', userId);
     const conversations: any[] = await conversationQueries.getUserConversations(userId);
-
-    console.log('📬 Found', conversations.length, 'conversations');
-    conversations.forEach((conv, index) => {
-      // ... existing debug logs ...
-    });
-
     res.json(conversations);
   } catch (error) {
     console.error('Get conversations error:', error);
@@ -54,17 +35,6 @@ router.get('/messages/unread/:userId', validateUserId, handleValidationErrors, a
   } catch (error) {
     console.error('Get unread count error:', error);
     res.status(500).json({ error: 'Failed to get unread count' });
-  }
-});
-
-// Get conversation messages (with pagination)
-router.get('/debug-convs/:userId', async (req: Request, res: Response) => {
-  try {
-    const userId = parseInt(req.params.userId, 10);
-    const conversations = await conversationQueries.getUserConversations(userId);
-    res.json({ success: true, conversations });
-  } catch (error: any) {
-    res.json({ success: false, error: error.message, stack: error.stack });
   }
 });
 
@@ -91,6 +61,38 @@ router.get('/conversations/:conversationId/messages', validateConversationId, va
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ error: 'Failed to get messages' });
+  }
+});
+
+// Delete conversation and its messages
+router.delete('/conversations/:conversationId', authenticateJWT, validateConversationId, handleValidationErrors, async (req: Request, res: Response) => {
+  try {
+    const conversationId = parseIntSafe(req.params.conversationId, 'conversation ID');
+    const requesterId = req.user?.userId;
+
+    if (!requesterId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const conversation: any = await conversationQueries.getConversationById(conversationId);
+    if (!conversation) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    const canDelete =
+      req.user?.role === 'admin' ||
+      Number(conversation.participant1_id) === Number(requesterId) ||
+      Number(conversation.participant2_id) === Number(requesterId);
+
+    if (!canDelete) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await conversationQueries.deleteConversation(conversationId);
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Delete conversation error:', error);
+    return res.status(500).json({ error: 'Failed to delete conversation' });
   }
 });
 

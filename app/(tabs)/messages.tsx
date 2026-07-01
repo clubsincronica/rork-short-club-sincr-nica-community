@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { Search, MessageCircle, Send, ArrowLeft, X } from '../../components/SmartIcons';
+import { Search, MessageCircle, Send, ArrowLeft, X, Trash2 } from '../../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useUser } from '@/hooks/user-store';
 import { initSocket, getSocket } from '@/utils/socket';
@@ -65,16 +65,12 @@ export default function MessagesScreen() {
 
   // Load conversations from backend
   const loadConversations = async () => {
-
-    console.log('🔎 [DEBUG] loadConversations called. currentUser:', currentUser, 'currentUser.id:', currentUser?.id);
     if (
       !currentUser ||
       currentUser.id === undefined ||
       currentUser.id === null ||
-      currentUser.id === undefined || currentUser.id === null || isNaN(Number(currentUser.id)) ||
       isNaN(Number(currentUser.id))
     ) {
-      console.warn('⚠️ [loadConversations] Skipping API call: currentUser or currentUser.id is invalid:', currentUser);
       return;
     }
 
@@ -83,19 +79,6 @@ export default function MessagesScreen() {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
       if (response.ok) {
         const data = await response.json();
-        console.log('🔎 [DEBUG] Conversations API response:', data);
-        if (__DEV__) {
-          logger.debug('📬 Loaded conversations for user', currentUser.id, ':', data);
-          logger.debug('📬 Current user name:', currentUser.name, 'ID:', currentUser.id);
-          // Debug each conversation
-          data.forEach((conv: any) => {
-            logger.debug(`  📬 Conversation ${conv.id}:`);
-            logger.debug(`     - name: "${conv.name}" (should be OTHER user's name)`);
-            logger.debug(`     - other_user_id: ${conv.other_user_id}`);
-            logger.debug(`     - avatar: ${conv.avatar}`);
-            logger.debug(`     - ⚠️  ISSUE CHECK: Is name "${conv.name}" same as current user "${currentUser.name}"? ${conv.name === currentUser.name ? 'YES - BUG!' : 'No - OK'}`);
-          });
-        }
         if (Array.isArray(data)) {
           // Filter out any invalid items (null, undefined, or missing ID)
           const validConversations = data
@@ -104,15 +87,13 @@ export default function MessagesScreen() {
               ...item,
               unread_count: Number(item.unread_count) || 0,
             }));
-          console.log('🔎 [DEBUG] Filtered valid conversations:', validConversations);
           setConversations(validConversations);
         } else {
-          console.error('❌ Expected array of conversations but got:', typeof data, data);
+          logger.error('Expected array of conversations but got:', typeof data, data);
           setConversations([]);
         }
       } else {
-        const errorText = await response.text();
-        console.error('❌ Conversations API error:', response.status, errorText);
+        logger.error('Conversations API error:', response.status);
       }
     } catch (error) {
       logger.error('Failed to load conversations:', error);
@@ -139,19 +120,15 @@ export default function MessagesScreen() {
       const socket = getSocket();
 
       if (!socket) {
-        console.warn('⚠️ Global socket not initialized, creating fallback socket');
         // Retrieve token for fallback connection
         import('@react-native-async-storage/async-storage').then(module => {
           module.default.getItem('authToken').then(token => {
             if (token) {
               socketRef.current = initSocket({ userId: currentUser.id, token });
-            } else {
-              console.warn('❌ No token found for fallback socket connection');
             }
           });
         });
       } else {
-        console.log('✅ Using global socket connection for Messages screen');
         socketRef.current = socket;
       }
 
@@ -159,31 +136,20 @@ export default function MessagesScreen() {
         // Update connection status immediately
         const currentConnectionState = socket.connected;
         setIsSocketConnected(currentConnectionState);
-        if (__DEV__) {
-          console.log('📡 Messages screen: Socket connection state:', currentConnectionState);
-        }
 
         // If already connected, join immediately
         if (currentConnectionState) {
-          console.log('Socket already connected, joining room for user:', currentUser.id);
           socket.emit('user:join', currentUser.id);
-          console.log('[SOCKET] user:join emitted (already connected) for user:', currentUser.id);
         }
 
         // Set up connection event handlers
         const handleConnect = () => {
-          console.log('Socket connected for messaging, user:', currentUser.id);
           setIsSocketConnected(true);
-          // Join user room
-          console.log('Emitting user:join for user:', currentUser.id);
           socket.emit('user:join', currentUser.id);
-          console.log('[SOCKET] user:join emitted (on connect) for user:', currentUser.id);
         };
 
         const handleDisconnect = () => {
-          console.log('Socket disconnected for user:', currentUser.id);
           setIsSocketConnected(false);
-          console.log('[SOCKET] Disconnected event for user:', currentUser.id);
         };
 
         // Always remove previous listeners before adding new ones
@@ -211,16 +177,9 @@ export default function MessagesScreen() {
   useEffect(() => {
     if (!currentUser) return;
 
-    console.log('📬 [Messages Screen] Subscribing to message event bus');
-
     const unsubscribe = messageEventBus.onNewMessage((message) => {
-      console.log('📬 [Messages Screen] [DEBUG] Event bus fired:', JSON.stringify(message));
-      console.log('📬 [Messages Screen] [DEBUG] Current user:', currentUser?.id, currentUser?.name);
-      console.log('📬 [Messages Screen] [DEBUG] Message sender_id:', message.sender_id, 'receiver_id:', message.receiver_id);
-
       // Safety check
       if (!message || !message.text) {
-        console.warn('❌ [DEBUG] Invalid message from event bus:', message);
         return false; // Let other handlers try
       }
 
@@ -232,7 +191,6 @@ export default function MessagesScreen() {
           const messageId = message.id?.toString();
           // Check for exact duplicate by real ID
           if (messageId && prev.some(m => m.id === messageId)) {
-            console.log('⏭️ [DEBUG] Duplicate message ID, ignoring:', messageId);
             return prev;
           }
           const newMsg = {
@@ -242,7 +200,6 @@ export default function MessagesScreen() {
             sender: Number(message.sender_id) === Number(currentUser.id) ? ('me' as 'me' | 'other') : ('other' as 'me' | 'other'),
             timestamp: new Date(message.created_at),
           };
-          console.log('💬 [DEBUG] Adding message to local state:', newMsg);
           // Remove any matching temp (optimistic) message for this same text+sender to avoid duplicates
           const withoutTemp = Number(message.sender_id) === Number(currentUser.id)
             ? prev.filter(m => !(m.id.startsWith('temp-') && m.text === message.text && m.sender === 'me'))
@@ -279,10 +236,8 @@ export default function MessagesScreen() {
         shouldStopPropagation = true;
       }
       if (shouldStopPropagation) {
-        console.log('🚫 [DEBUG] Stopping propagation - Messages screen handled this message');
         return true;
       }
-      console.log('⏩ [DEBUG] Continuing propagation - Messages screen did not handle this message');
       return false;
     });
 
@@ -303,11 +258,9 @@ export default function MessagesScreen() {
       const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversationId}/messages?page=${pageNum}&limit=20`);
       if (response.ok) {
         const data = await response.json();
-        console.log('🔎 [DEBUG] Messages API response:', data);
         // Backend returns { messages: [], page, limit, total }
 
         let messagesList = data.messages || [];
-        console.log('💬 Loaded messages:', messagesList.length, 'page:', pageNum);
 
         // Reverse so newest messages are first (to match real-time prepend logic)
         if (messagesList.length > 1) messagesList = messagesList.slice().reverse();
@@ -319,8 +272,6 @@ export default function MessagesScreen() {
           sender: Number(msg.sender_id) === Number(currentUser?.id) ? 'me' : 'other',
           timestamp: new Date(msg.created_at),
         }));
-
-        console.log('🔎 [DEBUG] Parsed newMessages (reversed):', newMessages);
         setMessages(prev => {
           if (pageNum === 1) return newMessages;
           // Append older messages to the end of the newest-to-oldest list
@@ -344,9 +295,7 @@ export default function MessagesScreen() {
   // Create or get conversation ID
   const getOrCreateConversation = async (userId1: number, userId2: number): Promise<number | null> => {
     try {
-      console.log('💬 Creating conversation between:', userId1, 'and', userId2);
       const url = `${getApiBaseUrl()}/api/conversations`;
-      console.log('💬 POST URL:', url);
 
       const token = await AsyncStorage.getItem('authToken');
       const response = await fetch(url, {
@@ -358,13 +307,9 @@ export default function MessagesScreen() {
         body: JSON.stringify({ user1Id: userId1, user2Id: userId2 }),
       });
 
-      console.log('💬 Response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('💬 Conversation created/found:', data);
         if (!data || !data.id) {
-          console.error('❌ Server returned success but no conversation ID:', data);
           Alert.alert('Error', 'El servidor no devolvió un ID de conversación válido.');
           return null;
         }
@@ -387,11 +332,6 @@ export default function MessagesScreen() {
       const initConversation = async () => {
         const otherUserId = parseInt(params.startConversationWith as string);
         const myUserId = currentUser.id;
-
-        console.log('🔍 Starting conversation:');
-        console.log('   My ID:', myUserId, '(type:', typeof currentUser.id, ')');
-        console.log('   Other user ID:', otherUserId, '(type:', typeof params.startConversationWith, ')');
-        console.log('   Other user name:', params.userName);
 
         // Validate IDs before making API call
         if (isNaN(myUserId) || myUserId > 2147483647) {
@@ -435,7 +375,6 @@ export default function MessagesScreen() {
       // Clear any pending notification for this conversation
       if (newMessageNotification &&
         newMessageNotification.conversationId === activeConversation.conversationId) {
-        console.log('🧹 Clearing notification - conversation now open');
         setNewMessageNotification(null);
       }
     }
@@ -465,7 +404,6 @@ export default function MessagesScreen() {
     // Ensure we have a conversation ID
     let conversationId = activeConversation.conversationId;
     if (!conversationId) {
-      console.log('Creating conversation...');
       conversationId = await getOrCreateConversation(
         currentUser.id,
         parseInt(activeConversation.userId)
@@ -480,17 +418,8 @@ export default function MessagesScreen() {
       setActiveConversation(prev => prev ? { ...prev, conversationId } : null);
     }
 
-    console.log('Sending message via socket:', {
-      conversationId,
-      senderId: currentUser.id,
-      receiverId: activeConversation.userId,
-      text: messageText,
-      socketConnected: socket?.connected
-    });
-
     if (!socket || !socket.connected) {
       Alert.alert('Error', 'Socket not connected. Cannot send message.');
-      console.error('❌ Socket not connected!');
       return;
     }
 
@@ -509,13 +438,50 @@ export default function MessagesScreen() {
     setMessageText('');
 
     // Emit to server (backend expects 'message:send')
-    console.log('✅ Emitting message:send to backend...');
     socket.emit('message:send', {
       conversationId,
       senderId: currentUser.id,
       receiverId: parseInt(activeConversation.userId),
       text: messageText,
     });
+  };
+
+  const handleDeleteConversation = async (conversation: Conversation) => {
+    Alert.alert(
+      'Eliminar conversación',
+      `Esta acción eliminará la conversación con ${conversation.name} para ambos participantes.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('authToken');
+              const response = await fetch(`${getApiBaseUrl()}/api/conversations/${conversation.id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                },
+              });
+
+              if (!response.ok) {
+                Alert.alert('Error', 'No se pudo eliminar la conversación.');
+                return;
+              }
+
+              setConversations(prev => prev.filter(c => c.id !== conversation.id));
+              if (activeConversation?.conversationId === conversation.id) {
+                handleCloseConversation();
+              }
+            } catch (error) {
+              logger.error('Failed to delete conversation:', error);
+              Alert.alert('Error', 'No se pudo eliminar la conversación.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCloseConversation = () => {
@@ -649,40 +615,50 @@ export default function MessagesScreen() {
 // ...existing code...
 
   const renderConversationItem = (item: Conversation) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => handleOpenConversation(item)}
-    >
-      {item.avatar ? (
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-      ) : (
-        <View style={[styles.avatar, { backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{ color: Colors.white, fontWeight: '700', fontSize: 18 }}>
-            {item.name?.charAt(0)?.toUpperCase() || '?'}
-          </Text>
-        </View>
-      )}
-      <View style={styles.conversationInfo}>
-        <View style={styles.conversationItemHeader}>
-          <Text style={styles.conversationName} numberOfLines={1}>{item.name}</Text>
-          {item.last_message_time && (
-            <Text style={styles.timestamp}>
-              {new Date(item.last_message_time).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+    <View style={styles.conversationItem}>
+      <TouchableOpacity
+        style={styles.conversationMainTapArea}
+        onPress={() => handleOpenConversation(item)}
+      >
+        {item.avatar ? (
+          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: Colors.primary, justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ color: Colors.white, fontWeight: '700', fontSize: 18 }}>
+              {item.name?.charAt(0)?.toUpperCase() || '?'}
             </Text>
-          )}
+          </View>
+        )}
+        <View style={styles.conversationInfo}>
+          <View style={styles.conversationItemHeader}>
+            <Text style={styles.conversationName} numberOfLines={1}>{item.name}</Text>
+            {item.last_message_time && (
+              <Text style={styles.timestamp}>
+                {new Date(item.last_message_time).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}
+              </Text>
+            )}
+          </View>
+          <View style={styles.lastMessageRow}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {item.last_message || 'Sin mensajes'}
+            </Text>
+            {item.unread_count > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>{item.unread_count}</Text>
+              </View>
+            )}
+          </View>
         </View>
-        <View style={styles.lastMessageRow}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.last_message || 'Sin mensajes'}
-          </Text>
-          {item.unread_count > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{item.unread_count}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.deleteConversationButton}
+        onPress={() => handleDeleteConversation(item)}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Trash2 size={18} color={Colors.textLight} />
+      </TouchableOpacity>
+    </View>
   );
 
   const renderEmptyState = () => (
@@ -708,12 +684,6 @@ export default function MessagesScreen() {
           newMessageNotification.senderId === parseInt(activeConversation.userId);
 
         if (isForActiveConvo) {
-          console.log('⚠️ Suppressing modal - already viewing this conversation', {
-            notificationConvoId: newMessageNotification.conversationId,
-            activeConvoId: activeConversation.conversationId,
-            notificationSenderId: newMessageNotification.senderId,
-            activeUserId: parseInt(activeConversation.userId)
-          });
           // Clear the notification without showing modal
           setNewMessageNotification(null);
           return null;
@@ -722,7 +692,6 @@ export default function MessagesScreen() {
 
       // Don't show modal if tab is not focused (user on another screen)
       if (!isFocused) {
-        console.log('⚠️ Suppressing modal - Messages tab not focused');
         // Don't clear - just don't render
         return null;
       }
@@ -740,7 +709,6 @@ export default function MessagesScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Nuevo Mensaje</Text>
               <TouchableOpacity onPress={() => {
-                console.log('❌ Modal X button pressed');
                 setNewMessageNotification(null);
               }}>
                 <X size={24} color={Colors.text} />
@@ -1131,6 +1099,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    alignItems: 'center',
+  },
+  conversationMainTapArea: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   avatar: {
     width: 50,
@@ -1176,6 +1150,15 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 12,
     fontWeight: '600',
+  },
+  deleteConversationButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    backgroundColor: Colors.background,
   },
   // Modal styles
   modalOverlay: {
