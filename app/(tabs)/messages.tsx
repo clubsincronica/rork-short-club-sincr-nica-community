@@ -98,7 +98,12 @@ export default function MessagesScreen() {
         }
         if (Array.isArray(data)) {
           // Filter out any invalid items (null, undefined, or missing ID)
-          const validConversations = data.filter((item: any) => item && typeof item === 'object' && item.id);
+          const validConversations = data
+            .filter((item: any) => item && typeof item === 'object' && item.id)
+            .map((item: any) => ({
+              ...item,
+              unread_count: Number(item.unread_count) || 0,
+            }));
           console.log('🔎 [DEBUG] Filtered valid conversations:', validConversations);
           setConversations(validConversations);
         } else {
