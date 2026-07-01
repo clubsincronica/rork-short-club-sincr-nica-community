@@ -8,7 +8,8 @@ import { updateTransactionStatus } from '../models/transaction';
 const router = express.Router();
 
 // MercadoPago client — SDK v2
-const mpClient = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN! });
+const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
+const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessToken }) : null;
 
 // Stripe webhook endpoint
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
@@ -103,9 +104,13 @@ router.post('/mercadopago', express.json(), async (req: Request, res: Response) 
       const paymentId = data.id.toString();
       let status = req.body.action || 'unknown';
       try {
-        const mpPayment = new MPPayment(mpClient);
-        const payment = await mpPayment.get({ id: paymentId });
-        status = payment.status || status;
+        if (mpClient) {
+          const mpPayment = new MPPayment(mpClient);
+          const payment = await mpPayment.get({ id: paymentId });
+          status = payment.status || status;
+        } else {
+          console.warn('MERCADOPAGO_ACCESS_TOKEN not set — skipping MercadoPago API fetch in webhook');
+        }
       } catch (err) {
         console.warn('MercadoPago API fetch failed:', err);
       }

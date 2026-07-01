@@ -7,8 +7,6 @@ dotenv.config();
 const requiredEnvVars = [
   'JWT_SECRET',
   'PORT',
-  'MERCADOPAGO_ACCESS_TOKEN',
-  'STRIPE_SECRET_KEY',
 ] as const;
 
 // Optional but recommended for production
@@ -16,6 +14,8 @@ const recommendedEnvVars = [
   'DATABASE_URL',
   'NODE_ENV',
   'COMMISSION_RATE',            // Platform fee rate (default: 0.05 = 5%)
+  'STRIPE_SECRET_KEY',
+  'MERCADOPAGO_ACCESS_TOKEN',
   'STRIPE_WEBHOOK_SECRET',      // Required to verify Stripe webhook signatures
   'MERCADOPAGO_WEBHOOK_SECRET', // Required to verify MercadoPago webhook signatures
 ] as const;

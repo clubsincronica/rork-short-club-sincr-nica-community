@@ -10,7 +10,10 @@ import { authenticateJWT } from '../middleware/security';
 import * as db from '../db/postgres-client';
 
 // Stripe setup
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-12-15.clover' });
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeSecretKey
+  ? new Stripe(stripeSecretKey, { apiVersion: '2025-12-15.clover' })
+  : null;
 
 // ==========================================
 // SINGLE SOURCE OF TRUTH FOR PLATFORM FEE
@@ -21,6 +24,10 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-12
 // Create Stripe Payment Intent
 router.post('/stripe/create-intent', authenticateJWT, async (req: any, res: Response) => {
   try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured on this server' });
+    }
+
     const { currency, providerId, bookingId } = req.body;
     const buyerId = req.user.userId; // Securely get buyerId from JWT
 
