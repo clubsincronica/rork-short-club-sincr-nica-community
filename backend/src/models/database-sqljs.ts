@@ -657,7 +657,7 @@ export const conversationQueries = usePostgres ? {
               u.name, u.avatar, u.email,
               (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
               (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_time,
-              (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND receiver_id = $1 AND read = 0) as unread_count
+              (SELECT COUNT(*)::int FROM messages WHERE conversation_id = c.id AND receiver_id = $1 AND read = 0) as unread_count
        FROM conversations c
        LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
        WHERE c.participant1_id = $1 OR c.participant2_id = $1
@@ -670,7 +670,10 @@ export const conversationQueries = usePostgres ? {
       const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : new Date(b.created_at).getTime();
       return timeB - timeA;
     });
-    return sortedRows;
+    return sortedRows.map((row: any) => ({
+      ...row,
+      unread_count: Number(row.unread_count) || 0,
+    }));
   },
 
   updateConversation: async (conversationId: number) => {
@@ -712,7 +715,13 @@ export const conversationQueries = usePostgres ? {
        ORDER BY last_message_time DESC`,
       [userId, userId, userId, userId, userId]
     );
-    return result[0]?.values.map((row: any) => rowToObject(result[0].columns, row)) || [];
+    return result[0]?.values.map((row: any) => {
+      const conversation = rowToObject(result[0].columns, row);
+      return {
+        ...conversation,
+        unread_count: Number(conversation.unread_count) || 0,
+      };
+    }) || [];
   },
 
   updateConversation: (conversationId: number) => {
