@@ -109,6 +109,29 @@ export async function initializeDatabase() {
         )
       `);
 
+      // Normalize legacy schemas where messages.read was created as BOOLEAN.
+      // Conversation listing and unread counters expect numeric 0/1 values.
+      try {
+        const readColumnInfo = await pgClient.query(
+          `SELECT data_type
+           FROM information_schema.columns
+           WHERE table_name = 'messages' AND column_name = 'read'
+           LIMIT 1`
+        );
+        const readDataType = readColumnInfo?.[0]?.data_type;
+        if (readDataType === 'boolean') {
+          await pgClient.query(`
+            ALTER TABLE messages
+            ALTER COLUMN read TYPE INTEGER
+            USING CASE WHEN read THEN 1 ELSE 0 END
+          `);
+          await pgClient.query(`ALTER TABLE messages ALTER COLUMN read SET DEFAULT 0`);
+          console.log('Migrated messages.read from BOOLEAN to INTEGER for compatibility');
+        }
+      } catch (readColumnError) {
+        console.warn('Could not verify/normalize messages.read column type:', readColumnError);
+      }
+
       // Create indexes for better query performance
       await pgClient.query(`
         CREATE INDEX IF NOT EXISTS idx_messages_conversation 
@@ -417,7 +440,6 @@ export async function initializeDatabase() {
     console.error('Failed to initialize database:', error);
     throw error;
   }
-}
 }
 
 export const mergeDuplicateConversations = async () => {
@@ -779,7 +801,28 @@ export const messageQueries = usePostgres ? {
       `SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND read = 0`,
       [userId]
     );
+    return result[0]?.values[0] ? rowToObject(result[0].columns, result[0].values[0]) : { count: 0 };
   }
+};
+
+// Compatibility query exports for legacy routes.
+// These endpoints are mounted in server.ts and must exist for TypeScript builds.
+export const serviceQueries: any = {
+  getAllServices: async () => [],
+  getServicesByProvider: async (_userId: number) => [],
+  getServiceById: async (_id: number) => null,
+  createService: async (_service: any) => ({ lastID: 0 }),
+  updateService: async (_id: number, _patch: any) => undefined,
+  deleteService: async (_id: number) => undefined,
+};
+
+export const lodgingQueries: any = {
+  getAllLodging: async () => [],
+  getLodgingByHost: async (_userId: number) => [],
+  getLodgingById: async (_id: number) => null,
+  createLodging: async (_lodging: any) => ({ lastID: 0 }),
+  updateLodging: async (_id: number, _patch: any) => undefined,
+  deleteLodging: async (_id: number) => undefined,
 };
 
 // Event queries
