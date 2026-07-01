@@ -418,6 +418,42 @@ export async function initializeDatabase() {
     throw error;
   }
 }
+}
+
+export const mergeDuplicateConversations = async () => {
+  if (!usePostgres) return; // Only needed for production Postgres
+  try {
+    console.log('🔧 Checking for duplicate conversations...');
+    const allConvs = await pgClient.query('SELECT * FROM conversations ORDER BY id ASC');
+    const seen = new Map();
+    let mergedCount = 0;
+    
+    for (const conv of allConvs) {
+      const p1 = Math.min(conv.participant1_id, conv.participant2_id);
+      const p2 = Math.max(conv.participant1_id, conv.participant2_id);
+      const pairKey = `${p1}-${p2}`;
+      
+      if (seen.has(pairKey)) {
+        const keepId = seen.get(pairKey);
+        // Move messages to the kept conversation
+        await pgClient.query('UPDATE messages SET conversation_id = $1 WHERE conversation_id = $2', [keepId, conv.id]);
+        // Delete the duplicate conversation
+        await pgClient.query('DELETE FROM conversations WHERE id = $1', [conv.id]);
+        mergedCount++;
+        console.log(`✅ Merged duplicate conversation ${conv.id} into ${keepId}`);
+      } else {
+        seen.set(pairKey, conv.id);
+      }
+    }
+    if (mergedCount > 0) {
+      console.log(`Successfully merged ${mergedCount} duplicate conversations.`);
+    } else {
+      console.log('No duplicate conversations found.');
+    }
+  } catch (err) {
+    console.error('Error cleaning up duplicate conversations:', err);
+  }
+};
 
 export function getDb() {
   if (!db) {
@@ -594,7 +630,8 @@ export const conversationQueries = usePostgres ? {
 
   getUserConversations: async (userId: number) => {
     const rows = await pgClient.query(
-      `SELECT c.id, c.participant1_id, c.participant2_id, c.created_at, c.updated_at,
+      `SELECT DISTINCT ON (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
+              c.id, c.participant1_id, c.participant2_id, c.created_at, c.updated_at,
               CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END as other_user_id,
               u.name, u.avatar, u.email,
               (SELECT text FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
@@ -603,10 +640,16 @@ export const conversationQueries = usePostgres ? {
        FROM conversations c
        LEFT JOIN users u ON u.id = (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END)
        WHERE c.participant1_id = $1 OR c.participant2_id = $1
-       ORDER BY last_message_time DESC`,
+       ORDER BY (CASE WHEN c.participant1_id = $1 THEN c.participant2_id ELSE c.participant1_id END), last_message_time DESC`,
       [userId]
     );
-    return rows || [];
+    // Since we used DISTINCT ON which forces a specific ORDER BY, we need to re-sort the results in JS by last_message_time
+    const sortedRows = (rows || []).sort((a: any, b: any) => {
+      const timeA = a.last_message_time ? new Date(a.last_message_time).getTime() : new Date(a.created_at).getTime();
+      const timeB = b.last_message_time ? new Date(b.last_message_time).getTime() : new Date(b.created_at).getTime();
+      return timeB - timeA;
+    });
+    return sortedRows;
   },
 
   updateConversation: async (conversationId: number) => {

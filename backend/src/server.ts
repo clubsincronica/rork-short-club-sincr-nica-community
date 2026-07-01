@@ -15,7 +15,7 @@ import notificationsRoutes from './routes/notifications';
 import paymentsRoutes from './routes/payments';
 import webhooksRoutes from './routes/webhooks';
 import oauthMpRoutes from './routes/oauth-mp';
-import { initializeDatabase, messageQueries, conversationQueries, getDb } from './models/database-sqljs';
+import { initializeDatabase, messageQueries, conversationQueries, getDb, mergeDuplicateConversations } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
 
@@ -486,8 +486,11 @@ const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0'; // Always listen on all interfaces for Railway
 
 // Initialize database then start server
-initializeDatabase().then(() => {
+initializeDatabase().then(async () => {
   console.log('✅ Database ready for connections');
+  if (mergeDuplicateConversations) {
+    await mergeDuplicateConversations();
+  }
 
   httpServer.listen({
     port: PORT,
