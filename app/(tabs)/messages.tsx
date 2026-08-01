@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, KeyboardAvoidingView, Platform, Alert, Modal, ActivityIndicator, RefreshControl } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Search, MessageCircle, Send, ArrowLeft, X, Trash2 } from '../../components/SmartIcons';
 import { Colors } from '@/constants/colors';
 import { useUser } from '@/hooks/user-store';
@@ -30,88 +29,96 @@ interface Message {
   timestamp: Date;
 }
 
+interface ActiveConversation {
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  conversationId?: number;
+}
+
+interface NewMessageNotification {
+  senderName: string;
+  senderAvatar?: string;
+  messageText: string;
+  senderId: number;
+  conversationId: number;
+}
+
 export default function MessagesScreen() {
+  const { currentUser } = useUser();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const router = useRouter();
-  const { currentUser } = useUser();
-  const isFocused = useIsFocused();
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [activeConversation, setActiveConversation] = useState<{
-    userId: string;
-    userName: string;
-    userAvatar?: string;
-    conversationId?: number;
-  } | null>(null);
+  const [activeConversation, setActiveConversation] = useState<ActiveConversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState('');
-  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoadingConversations, setIsLoadingConversations] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
-  const flatListRef = useRef<FlatList>(null);
-  const [newMessageNotification, setNewMessageNotification] = useState<{
-    senderName: string;
-    senderAvatar?: string;
-    messageText: string;
-    senderId: number;
-    conversationId: number;
-  } | null>(null);
-
-  const socketRef = useRef<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(1);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [newMessageNotification, setNewMessageNotification] = useState<NewMessageNotification | null>(null);
+  const [isFocused, setIsFocused] = useState(true);
+  const socketRef = useRef<any>(null);
+  const flatListRef = useRef<FlatList<any> | null>(null);
 
-  // Load conversations from backend
   const loadConversations = async () => {
-    if (
-      !currentUser ||
-      currentUser.id === undefined ||
-      currentUser.id === null ||
-      isNaN(Number(currentUser.id))
-    ) {
+    if (!currentUser?.id) {
+      setConversations([]);
       return;
     }
 
     setIsLoadingConversations(true);
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data)) {
-          // Filter out any invalid items (null, undefined, or missing ID)
-          const validConversations = data
-            .filter((item: any) => item && typeof item === 'object' && item.id)
-            .map((item: any) => ({
-              ...item,
-              unread_count: Number(item.unread_count) || 0,
-            }));
-          setConversations(validConversations);
-        } else {
-          logger.error('Expected array of conversations but got:', typeof data, data);
-          setConversations([]);
-        }
-      } else {
-        logger.error('Conversations API error:', response.status);
+      const token = await AsyncStorage.getItem('authToken');
+      const response = await fetch(`${getApiBaseUrl()}/api/conversations/user/${currentUser.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load conversations: ${response.status}`);
       }
+
+      const data = await response.json();
+      const list = Array.isArray(data) ? data : (data.conversations || []);
+      const normalized = list.map((conversation: any) => ({
+        id: Number(conversation.id),
+        other_user_id: Number(conversation.other_user_id ?? conversation.otherUserId ?? conversation.user_id ?? conversation.participant_id ?? 0),
+        name: conversation.name || conversation.other_user_name || 'Conversación',
+        avatar: conversation.avatar || conversation.other_user_avatar,
+        last_message: conversation.last_message || conversation.lastMessage || '',
+        last_message_time: conversation.last_message_time || conversation.lastMessageTime || conversation.updated_at || '',
+        unread_count: Number(conversation.unread_count || conversation.unreadCount || 0),
+      }));
+
+      setConversations(normalized);
     } catch (error) {
-      logger.error('Failed to load conversations:', error);
+      console.error('Failed to load conversations:', error);
+      setConversations([]);
     } finally {
       setIsLoadingConversations(false);
     }
   };
 
-  const onRefresh = React.useCallback(() => {
-    loadConversations();
-  }, [currentUser]);
+  const onRefresh = async () => {
+    await loadConversations();
+  };
 
   // Load conversations on mount and when user changes or tab becomes focused
-  useEffect(() => {
-    if (isFocused && currentUser) {
-      loadConversations();
-    }
-  }, [currentUser?.id, isFocused]);
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsFocused(true);
+      if (currentUser?.id) {
+        loadConversations();
+      }
+      return () => setIsFocused(false);
+    }, [currentUser?.id])
+  );
 
   // Initialize socket connection - use existing global socket
   useEffect(() => {
