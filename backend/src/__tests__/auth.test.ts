@@ -140,7 +140,7 @@ describe('Authentication', () => {
       }).toThrow();
     });
 
-    it('should reject expired token', (done) => {
+    it('should reject expired token', (done: jest.DoneCallback) => {
       const token = jwt.sign({ userId: 1 }, 'test-secret', { expiresIn: '1ms' });
 
       // Wait for token to expire

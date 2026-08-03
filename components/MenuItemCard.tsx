@@ -27,9 +27,6 @@ export function MenuItemCard({ menuItem, onPress }: MenuItemCardProps) {
     <FloatingCard
       style={styles.floatingContainer}
       intensity="subtle"
-      enableRotation={false}
-      enableShadowAnimation={true}
-      delay={Math.random() * 100}
     >
       <TouchableOpacity style={styles.card} onPress={onPress} testID="menu-item-card">
       <View style={styles.content}>

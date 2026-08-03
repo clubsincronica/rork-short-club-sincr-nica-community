@@ -25,7 +25,7 @@ describe('Socket.IO Real-time Messaging', () => {
   let user2Id: number;
   let conversationId: number;
 
-  beforeEach((done) => {
+  beforeEach((done: jest.DoneCallback) => {
     // Create test database
     createTestDatabase().then((database) => {
       db = database;
@@ -94,7 +94,7 @@ describe('Socket.IO Real-time Messaging', () => {
     });
   });
 
-  afterEach((done) => {
+  afterEach((done: jest.DoneCallback) => {
     // Cleanup
     if (clientSocket1 && clientSocket1.connected) {
       clientSocket1.disconnect();
@@ -115,7 +115,7 @@ describe('Socket.IO Real-time Messaging', () => {
   });
 
   describe('Connection', () => {
-    it('should connect client to server', (done) => {
+    it('should connect client to server', (done: jest.DoneCallback) => {
       clientSocket1 = ioClient(`http://localhost:${serverPort}`, {
         transports: ['websocket'],
       });
@@ -126,7 +126,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should handle multiple client connections', (done) => {
+    it('should handle multiple client connections', (done: jest.DoneCallback) => {
       let connectedCount = 0;
       const checkBothConnected = () => {
         connectedCount++;
@@ -149,7 +149,7 @@ describe('Socket.IO Real-time Messaging', () => {
       clientSocket2.on('connect', checkBothConnected);
     });
 
-    it('should disconnect client', (done) => {
+    it('should disconnect client', (done: jest.DoneCallback) => {
       clientSocket1 = ioClient(`http://localhost:${serverPort}`, {
         transports: ['websocket'],
       });
@@ -166,7 +166,7 @@ describe('Socket.IO Real-time Messaging', () => {
   });
 
   describe('User Join', () => {
-    it('should allow user to join with their ID', (done) => {
+    it('should allow user to join with their ID', (done: jest.DoneCallback) => {
       clientSocket1 = ioClient(`http://localhost:${serverPort}`, {
         transports: ['websocket'],
       });
@@ -182,7 +182,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should allow multiple users to join', (done) => {
+    it('should allow multiple users to join', (done: jest.DoneCallback) => {
       let joinedCount = 0;
       const checkBothJoined = () => {
         joinedCount++;
@@ -212,7 +212,7 @@ describe('Socket.IO Real-time Messaging', () => {
   });
 
   describe('Message Sending', () => {
-    beforeEach((done) => {
+    beforeEach((done: jest.DoneCallback) => {
       let connectedCount = 0;
       const checkBothReady = () => {
         connectedCount++;
@@ -240,7 +240,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should send message from user1 to user2', (done) => {
+    it('should send message from user1 to user2', (done: jest.DoneCallback) => {
       const messageText = 'Hello from user1!';
 
       clientSocket2.on('message:new', (message: any) => {
@@ -258,7 +258,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should deliver message to both sender and receiver', (done) => {
+    it('should deliver message to both sender and receiver', (done: jest.DoneCallback) => {
       const messageText = 'Test message';
       let receivedCount = 0;
 
@@ -281,7 +281,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should handle multiple messages in sequence', (done) => {
+    it('should handle multiple messages in sequence', (done: jest.DoneCallback) => {
       const messages: string[] = [];
       const expectedMessages = ['Message 1', 'Message 2', 'Message 3'];
 
@@ -306,7 +306,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should include conversation ID in message', (done) => {
+    it('should include conversation ID in message', (done: jest.DoneCallback) => {
       clientSocket2.on('message:new', (message: any) => {
         expect(message.conversation_id).toBe(conversationId);
         done();
@@ -320,7 +320,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should handle empty message text', (done) => {
+    it('should handle empty message text', (done: jest.DoneCallback) => {
       clientSocket2.on('message:new', (message: any) => {
         expect(message.text).toBe('');
         done();
@@ -334,7 +334,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should handle special characters in message', (done) => {
+    it('should handle special characters in message', (done: jest.DoneCallback) => {
       const specialText = 'Test 🎉 @#$% <script>alert("xss")</script>';
 
       clientSocket2.on('message:new', (message: any) => {
@@ -352,7 +352,7 @@ describe('Socket.IO Real-time Messaging', () => {
   });
 
   describe('Typing Indicators', () => {
-    beforeEach((done) => {
+    beforeEach((done: jest.DoneCallback) => {
       let connectedCount = 0;
       const checkBothReady = () => {
         connectedCount++;
@@ -380,7 +380,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should emit typing start indicator', (done) => {
+    it('should emit typing start indicator', (done: jest.DoneCallback) => {
       clientSocket2.on('typing:start', (data: any) => {
         expect(data.userId).toBe(user1Id);
         expect(data.conversationId).toBe(conversationId);
@@ -394,7 +394,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should emit typing stop indicator', (done) => {
+    it('should emit typing stop indicator', (done: jest.DoneCallback) => {
       clientSocket2.on('typing:stop', (data: any) => {
         expect(data.userId).toBe(user1Id);
         expect(data.conversationId).toBe(conversationId);
@@ -408,7 +408,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should handle typing start and stop sequence', (done) => {
+    it('should handle typing start and stop sequence', (done: jest.DoneCallback) => {
       const events: string[] = [];
 
       clientSocket2.on('typing:start', () => {
@@ -438,7 +438,7 @@ describe('Socket.IO Real-time Messaging', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle disconnection gracefully', (done) => {
+    it('should handle disconnection gracefully', (done: jest.DoneCallback) => {
       clientSocket1 = ioClient(`http://localhost:${serverPort}`, {
         transports: ['websocket'],
       });
@@ -454,7 +454,7 @@ describe('Socket.IO Real-time Messaging', () => {
       });
     });
 
-    it('should handle reconnection', (done) => {
+    it('should handle reconnection', (done: jest.DoneCallback) => {
       clientSocket1 = ioClient(`http://localhost:${serverPort}`, {
         transports: ['websocket'],
         reconnection: true,

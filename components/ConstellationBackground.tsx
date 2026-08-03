@@ -96,7 +96,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
       {/* Deep space gradient background */}
       <LinearGradient
         colors={Gradients.constellation || ['rgba(44, 109, 133, 0.8)', 'rgba(79, 132, 151, 0.4)', 'rgba(106, 170, 202, 0.2)']}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         locations={[0, 0.6, 1]}
       />
       
@@ -104,7 +104,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
       <Svg
         width={width}
         height={height}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
       >
         <Defs>
           <RadialGradient id="starGlow" cx="50%" cy="50%" r="50%">
@@ -174,7 +174,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
       {/* Twinkling overlay */}
       <Animated.View
         style={[
-          StyleSheet.absoluteFillObject,
+          StyleSheet.absoluteFill,
           {
             opacity: twinkleOpacity,
             backgroundColor: 'rgba(156, 175, 136, 0.08)',

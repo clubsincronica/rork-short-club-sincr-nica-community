@@ -19,7 +19,7 @@ interface ServiceReservationModalProps {
     provider?: {
       name: string;
       avatar?: string;
-      id?: string;
+      id?: string | number;
     };
     rating?: number;
     reviewCount?: number;

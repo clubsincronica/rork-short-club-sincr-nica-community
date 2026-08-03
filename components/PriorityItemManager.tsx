@@ -75,7 +75,7 @@ export function PriorityItemManager({ visible, item, onClose, onSave }: Priority
           title: item.title,
           description: item.description,
           image: item.image || '',
-          price: item.price || 0,
+          price: Number(item.price || 0),
           currency: item.currency || 'EUR',
           category: item.category || '',
           tags: [...(item.tags || [])],
@@ -253,12 +253,12 @@ export function PriorityItemManager({ visible, item, onClose, onSave }: Priority
       return;
     }
 
-    const itemData = {
+    const itemData: Omit<ProfilePriorityItem, 'id' | 'createdAt' | 'updatedAt'> = {
       type: formState.type,
       title: formState.title.trim(),
       description: formState.description.trim(),
       image: formState.image || undefined,
-      price: formState.showPrice ? formState.price : undefined,
+      price: formState.showPrice ? Number(formState.price) : 0,
       currency: formState.showPrice ? formState.currency : undefined,
       category: formState.category.trim() || undefined,
       tags: formState.tags || [],
@@ -267,17 +267,17 @@ export function PriorityItemManager({ visible, item, onClose, onSave }: Priority
       validUntil: formState.validUntil || undefined,
       actionButton: formState.actionButton,
       availability: formState.showAvailability ? formState.availability : undefined,
-      // Add type-specific fields
-      eventDate: formState.eventDate || undefined,
-      eventTime: formState.eventTime || undefined,
-      location: formState.location || undefined,
-      duration: formState.duration || undefined,
-      maxParticipants: formState.maxParticipants || undefined,
-      // Add service scheduling fields
-      isScheduled: formState.isScheduled,
-      startDate: formState.startDate || undefined,
-      endDate: formState.endDate || undefined,
-      schedule: formState.schedule || [],
+      metadata: {
+        date: formState.eventDate || undefined,
+        startTime: formState.eventTime || undefined,
+        location: formState.location || undefined,
+        duration: formState.duration || undefined,
+        maxParticipants: formState.maxParticipants || undefined,
+        isScheduled: formState.isScheduled,
+        startDate: formState.startDate || undefined,
+        endDate: formState.endDate || undefined,
+        schedule: formState.schedule || [],
+      },
     };
 
     onSave(itemData);

@@ -120,7 +120,6 @@ export const UserX = createIcon('person-remove');
 export const ImageIcon = createIcon('image');
 export const Type = createIcon('text');
 
-// Social Media Icons
 export const Instagram = createIcon('logo-instagram');
 export const Facebook = createIcon('logo-facebook');
 export const Tiktok = createIcon('logo-tiktok');
@@ -128,3 +127,31 @@ export const Twitter = createIcon('logo-twitter');
 export const Linkedin = createIcon('logo-linkedin');
 export const Youtube = createIcon('logo-youtube');
 export const Share2 = createIcon('share-social');
+
+// Co-Work Modality Icons
+export const Building = createIcon('business');
+export const Layers = createIcon('layers');
+export const LayoutGrid = createIcon('grid');
+export const DoorOpen = createIcon('enter');
+export const Mic = createIcon('mic');
+export const Radio = createIcon('radio');
+export const Tv = createIcon('tv');
+export const Car = createIcon('car');
+export const Coffee = createIcon('cafe');
+export const Bath = createIcon('water');
+export const Bed = createIcon('bed');
+export const Wind = createIcon('cloudy');
+export const Key = createIcon('key');
+export const PlusCircle = createIcon('add-circle');
+export const MinusCircle = createIcon('remove-circle');
+export const Eye2 = createIcon('eye');
+export const EyeOff2 = createIcon('eye-off');
+export const ToggleLeft = createIcon('toggle');
+export const Repeat = createIcon('repeat');
+export const Maximize = createIcon('expand');
+export const List = createIcon('list');
+export const Map = createIcon('map');
+export const ArrowRight = createIcon('arrow-forward');
+export const Sliders = createIcon('options');
+export const Percent = createIcon('pricetag');
+

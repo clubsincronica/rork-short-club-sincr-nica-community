@@ -12,7 +12,10 @@ import {
   Calendar,
   DollarSign,
   Users,
-  Clock
+  Clock,
+  Building,
+  Layers,
+  ChevronRight
 } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
@@ -498,6 +501,23 @@ export default function MiTableroScreen() {
           </View>
         </TouchableScale>
 
+        {/* Mis Espacios Co-Work Banner */}
+        <TouchableScale
+          style={styles.coworkBanner}
+          onPress={() => router.push('/mis-espacios')}
+        >
+          <View style={styles.coworkBannerLeft}>
+            <View style={styles.coworkIconBox}>
+              <Building size={22} color='#fff' />
+            </View>
+            <View style={styles.coworkTextBox}>
+              <Text style={styles.coworkBannerTitle}>Mis Espacios · Co-Work</Text>
+              <Text style={styles.coworkBannerSub}>Arrienda partes de tu espacio por hora, día o mes</Text>
+            </View>
+          </View>
+          <ChevronRight size={20} color='rgba(255,255,255,0.8)' />
+        </TouchableScale>
+
         {/* Interactive Priority Board */}
         <View style={styles.boardSection}>
           <View style={styles.boardHeader}>
@@ -717,6 +737,50 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '600',
     marginTop: 4,
+  },
+  // Co-Work Modality Banner
+  coworkBanner: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderRadius: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    backgroundColor: '#2c6d85',
+    shadowColor: '#2c6d85',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  coworkBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  coworkIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  coworkTextBox: {
+    flex: 1,
+  },
+  coworkBannerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  coworkBannerSub: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
   },
   addNewButton: {
     marginHorizontal: 20,

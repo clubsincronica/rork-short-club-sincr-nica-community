@@ -119,7 +119,7 @@ export default function BankAccountsManagement() {
     }
 
     if (globalState.editingAccount) {
-      updateBankAccount({ accountId: globalState.editingAccount.id, updates: { ...globalState.formData, accountType: 'checking' as const, currency: 'EUR', country: 'ES', isVerified: false, isActive: true } });
+      updateBankAccount({ id: globalState.editingAccount.id, updates: { ...globalState.formData, accountType: 'checking' as const, currency: 'EUR', country: 'ES', isVerified: false, isActive: true } });
     } else {
       addBankAccount({ ...globalState.formData, accountType: 'checking' as const, currency: 'EUR', country: 'ES', isVerified: false, isActive: true });
     }
@@ -128,7 +128,7 @@ export default function BankAccountsManagement() {
     resetForm();
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = (id: number) => {
     Alert.alert(
       'Eliminar Cuenta',
       '¿Estás seguro de que deseas eliminar esta cuenta bancaria?',

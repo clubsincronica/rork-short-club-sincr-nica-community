@@ -47,6 +47,11 @@ backend/reset-and-create-users.js
 backend/src/scripts/check-data.ts
 backend/src/scripts/check-user.ts
 
+# logs / scratch output (never commit)
+*.log
+install.log
+out.txt
+
 # typescript
 *.tsbuildinfo
 .vercel

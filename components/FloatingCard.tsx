@@ -8,6 +8,9 @@ interface FloatingCardProps {
   style?: ViewStyle;
   intensity?: 'subtle' | 'medium' | 'strong';
   glowColor?: string;
+  enableRotation?: boolean;
+  enableShadowAnimation?: boolean;
+  delay?: number;
 }
 
 export function FloatingCard({ 

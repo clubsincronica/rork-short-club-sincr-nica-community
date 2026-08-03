@@ -215,7 +215,7 @@ export const [FoodCartProvider, useFoodCart] = createContextHook(() => {
       id: `order-${Date.now()}`,
       userId: 'current-user', // This would come from auth context
       user: {
-        id: 'current-user',
+        id: -1,
         name: 'Usuario Actual',
         email: 'user@example.com',
         isServiceProvider: false,

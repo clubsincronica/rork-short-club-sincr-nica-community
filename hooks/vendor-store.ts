@@ -68,7 +68,7 @@ export const [VendorProvider, useVendorStore] = createContextHook(() => {
             businessName: 'Cocina Consciente',
             category: 'organic',
             provider: {
-              id: 'provider-1',
+              id: 1,
               name: 'María González',
               email: 'maria@cocinaconciente.com',
               isServiceProvider: true,

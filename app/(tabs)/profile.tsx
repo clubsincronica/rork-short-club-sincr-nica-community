@@ -33,7 +33,8 @@ import {
   Globe,
   DollarSign,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Building
 } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { Colors, Gradients } from '@/constants/colors';
@@ -256,6 +257,14 @@ export default function ProfileScreen() {
       subtitle: 'Gestiona tus servicios y eventos',
       onPress: () => router.push('/mi-tablero'),
       testId: 'mi-tablero',
+      highlight: true,
+    },
+    {
+      icon: Building,
+      title: 'Mis Espacios Co-Work',
+      subtitle: 'Arrienda partes de tu espacio',
+      onPress: () => router.push('/mis-espacios'),
+      testId: 'mis-espacios',
       highlight: true,
     },
   ];

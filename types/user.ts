@@ -28,7 +28,7 @@ export interface User {
 
 export interface ProfilePriorityItem {
   id: string;
-  type: 'service' | 'event' | 'product' | 'other';
+  type: 'service' | 'event' | 'product' | 'announcement' | 'special-offer' | 'other';
   title: string;
   description: string;
   price: number | string;
@@ -37,6 +37,18 @@ export interface ProfilePriorityItem {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  currency?: string;
+  category?: string;
+  validUntil?: string;
+  actionButton?: {
+    label: string;
+    action: 'contact' | 'book' | 'buy' | 'external-link';
+    url?: string;
+  };
+  availability?: {
+    available: number;
+    total: number;
+  };
   tags?: string[];
   metadata?: any;
 }
@@ -410,11 +422,25 @@ export interface UserPreferences {
 
 export interface EventTicket {
   id: string;
-  reservation: Reservation;
-  qrData: string;
-  validationStatus: 'valid' | 'used' | 'expired' | 'invalid';
-  generatedAt: string;
+  reservation?: Reservation;
+  reservationId?: string;
+  eventId?: string;
+  eventTitle?: string;
+  eventDate?: string;
+  eventTime?: string;
+  eventLocation?: string;
+  attendeeName?: string;
+  attendeeEmail?: string;
+  ticketType?: string;
+  price?: number;
+  qrData?: string;
+  qrCodeData?: string;
+  validationStatus?: 'valid' | 'used' | 'expired' | 'invalid';
+  generatedAt?: string;
   usedAt?: string;
+  isScanned?: boolean;
+  scanTime?: string;
+  scanLocation?: string;
 }
 
 export interface BankAccount {
@@ -429,3 +455,75 @@ export interface BankAccount {
   isVerified: boolean;
   createdAt: string;
 }
+
+// ─── Co-Work Modality Types ───────────────────────────────────────────────────
+
+export type BillingUnit = 'hour' | 'day' | 'week' | 'month';
+
+export type SubSpaceType =
+  | 'office'
+  | 'studio'
+  | 'meeting-room'
+  | 'event-space'
+  | 'streaming-set'
+  | 'recording-booth'
+  | 'coworking-desk'
+  | 'other';
+
+export type CalendarMode = 'unified' | 'separate';
+
+export interface SubSpace {
+  id: string;
+  spaceId: string;
+  title: string;
+  description: string;
+  type: SubSpaceType;
+  capacity: number;
+  features: string[]; // e.g., ['Sound Absorption', 'Natural Light', 'AC', 'WiFi']
+  images: string[];
+  pricePerHour?: number;
+  pricePerDay?: number;
+  pricePerWeek?: number;
+  pricePerMonth?: number;
+  billingUnits: BillingUnit[]; // which billing options are enabled
+  isActive: boolean;
+  floorLabel?: string; // e.g., 'Subsuelo', 'Planta Baja', 'Mezzanine'
+  calendarMode: CalendarMode; // 'unified' shares parent space calendar, 'separate' has its own
+  color?: string; // optional color tag for calendar display
+}
+
+export interface CoWorkSpace {
+  id: string;
+  ownerId: string;
+  title: string;
+  description: string;
+  location: string;
+  images: string[];
+  amenities: string[];
+  subSpaces: SubSpace[];
+  calendarMode: CalendarMode; // owner's preferred calendar style for this whole space
+  isPublished: boolean;
+  rating: number;
+  reviewCount: number;
+  createdAt: string;
+  updatedAt: string;
+  tags: string[]; // e.g., ['Art Gallery', 'Creative Space', 'Sound Studio']
+}
+
+export interface SpaceBooking {
+  id: string;
+  subSpaceId: string;
+  spaceId: string;
+  userId: string;
+  date: string; // ISO date string
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  billingUnit: BillingUnit;
+  quantity: number; // number of hours/days/weeks/months
+  totalPrice: number;
+  status: 'pending' | 'confirmed' | 'cancelled';
+  paymentStatus: PaymentStatus;
+  notes?: string;
+  createdAt: string;
+}
+

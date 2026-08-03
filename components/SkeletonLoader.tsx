@@ -3,10 +3,10 @@ import { View, StyleSheet, Animated, ViewStyle } from 'react-native';
 import { Colors } from '@/constants/colors';
 
 interface SkeletonLoaderProps {
-  width?: number | string;
+  width?: number | `${number}%` | 'auto';
   height?: number;
   borderRadius?: number;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
 }
 
 export function SkeletonLoader({ 
