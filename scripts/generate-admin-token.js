@@ -5,7 +5,11 @@
 
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('ERROR: JWT_SECRET must be set in the environment. Refusing to sign a token with a known fallback secret.');
+    process.exit(1);
+}
 const USER_ID = 2; // Matias Cazeaux
 const EMAIL = 'matias.cazeaux@gmail.com';
 const ROLE = 'superuser';

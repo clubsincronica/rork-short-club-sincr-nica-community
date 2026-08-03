@@ -29,8 +29,23 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
+# local env files (keep the example tracked)
+.env
+.env.*
+!.env.example
+
+# local databases / backups (contain PII) — keep out of version control
+*.db
+*.db-journal
+*.db.backup
+*.bak
+backend/clubsincronica.db*
+
+# ad-hoc scripts that may embed live credentials
+backend/test-query.js
+backend/reset-and-create-users.js
+backend/src/scripts/check-data.ts
+backend/src/scripts/check-user.ts
 
 # typescript
 *.tsbuildinfo

@@ -2,10 +2,14 @@ import { Pool } from 'pg';
 import jwt from 'jsonwebtoken';
 
 const connectionString = process.env.DATABASE_URL || '';
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!connectionString) {
     console.error('❌ DATABASE_URL not set');
+    process.exit(1);
+}
+if (!JWT_SECRET) {
+    console.error('❌ JWT_SECRET must be set. Refusing to sign a token with a known fallback secret.');
     process.exit(1);
 }
 
@@ -44,7 +48,7 @@ async function generateToken() {
                 email: user.email,
                 role: user.role
             },
-            JWT_SECRET,
+            JWT_SECRET as string,
             { expiresIn: '30d' }
         );
 
