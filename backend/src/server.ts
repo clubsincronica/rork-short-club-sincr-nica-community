@@ -275,6 +275,14 @@ if (!isProduction()) {
   console.log('✅ Debug endpoints disabled in production');
 }
 
+// Global error handler — catches errors thrown by route handlers / middleware.
+// Register after all routers so it is the final error-handling middleware.
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[Unhandled error]', err.message || err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: err.message || 'Internal Server Error' });
+});
+
 // Socket.IO - Real-time messaging with JWT authentication
 const userSockets = new Map<number, string>(); // userId -> socketId
 

@@ -12,7 +12,7 @@ import * as db from '../db/postgres-client';
 // Stripe setup
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey
-  ? new Stripe(stripeSecretKey, { apiVersion: '2025-12-15.clover' })
+  ? new Stripe(stripeSecretKey)
   : null;
 
 // ==========================================

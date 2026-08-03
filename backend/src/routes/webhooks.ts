@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import crypto from 'crypto';
 import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import { updateTransactionStatus } from '../models/transaction';
+import { isProduction } from '../config/env';
 
 const router = express.Router();
 
@@ -13,13 +14,19 @@ const mpClient = mpAccessToken ? new MercadoPagoConfig({ accessToken: mpAccessTo
 
 // Stripe webhook endpoint
 router.post('/stripe', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2025-12-15.clover' });
+  const secretKey = process.env.STRIPE_SECRET_KEY;
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secretKey || !endpointSecret) {
+    console.error('Stripe webhook aborted: STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET not configured.');
+    return res.status(503).send('Stripe webhook is not configured');
+  }
+
+  const stripe = new Stripe(secretKey);
   const sig = req.headers['stripe-signature'];
 
   let event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret!);
+    event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret);
   } catch (err: any) {
     console.error('Stripe webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -61,7 +68,13 @@ router.post('/stripe', express.raw({ type: 'application/json' }), async (req: Re
 router.post('/mercadopago', express.json(), async (req: Request, res: Response) => {
   // Validate MercadoPago HMAC-SHA256 signature
   const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET;
-  if (secret) {
+  // Signature verification is REQUIRED in production.
+  if (!secret) {
+    if (isProduction()) {
+      return res.status(500).send('MERCADOPAGO_WEBHOOK_SECRET not set in production — rejecting unverified webhook');
+    }
+    console.warn('MERCADOPAGO_WEBHOOK_SECRET not set — skipping signature verification (development only)');
+  } else {
     const xSignature = req.headers['x-signature'] as string | undefined;
     const xRequestId = req.headers['x-request-id'] as string | undefined;
     const dataId = req.body?.data?.id?.toString() ?? '';
@@ -90,8 +103,6 @@ router.post('/mercadopago', express.json(), async (req: Request, res: Response) 
       console.error('MercadoPago webhook: signature verification failed');
       return res.status(400).send('Invalid signature');
     }
-  } else {
-    console.warn('MERCADOPAGO_WEBHOOK_SECRET not set — skipping signature verification (not safe for production)');
   }
 
   // MercadoPago sends payment notifications here

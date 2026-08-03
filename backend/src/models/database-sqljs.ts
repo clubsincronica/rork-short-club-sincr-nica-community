@@ -209,6 +209,48 @@ export async function initializeDatabase() {
       `);
 
       await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS services (
+          id SERIAL PRIMARY KEY,
+          provider_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          category TEXT,
+          price DECIMAL(10,2) DEFAULT 0,
+          duration INTEGER DEFAULT 0,
+          location TEXT,
+          is_online BOOLEAN DEFAULT false,
+          rating DECIMAL(3,2) DEFAULT 0,
+          review_count INTEGER DEFAULT 0,
+          images TEXT,
+          tags TEXT,
+          status TEXT DEFAULT 'active',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS lodging (
+          id SERIAL PRIMARY KEY,
+          host_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          type TEXT,
+          price_per_night DECIMAL(10,2) DEFAULT 0,
+          location TEXT,
+          max_guests INTEGER DEFAULT 1,
+          rating DECIMAL(3,2) DEFAULT 0,
+          review_count INTEGER DEFAULT 0,
+          amenities TEXT,
+          images TEXT,
+          available_dates TEXT,
+          status TEXT DEFAULT 'active',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
         CREATE TABLE IF NOT EXISTS bank_accounts (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -283,6 +325,8 @@ export async function initializeDatabase() {
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_reservations_provider ON reservations(provider_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_events_provider ON events(provider_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_products_provider ON products(provider_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_services_provider ON services(provider_id)`);
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_lodging_host ON lodging(host_id)`);
       await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read)`);
 
       await pgClient.query(`
@@ -840,7 +884,98 @@ export const messageQueries = usePostgres ? {
 
 // Compatibility query exports for legacy routes.
 // These endpoints are mounted in server.ts and must exist for TypeScript builds.
-export const serviceQueries: any = {
+export const serviceQueries: any = usePostgres ? {
+  getAllServices: async () => {
+    const rows = await pgClient.query(`
+      SELECT s.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM services s
+      LEFT JOIN users u ON u.id = s.provider_id
+      WHERE s.status = 'active'
+      ORDER BY s.created_at DESC
+    `);
+    return rows.map((row: any) => ({
+      ...row,
+      providerId: row.provider_id,
+      isOnline: row.is_online,
+      reviewCount: row.review_count,
+      images: row.images ? JSON.parse(row.images) : [],
+      tags: row.tags ? JSON.parse(row.tags) : []
+    }));
+  },
+  getServicesByProvider: async (userId: number) => {
+    const rows = await pgClient.query(`
+      SELECT * FROM services WHERE provider_id = $1 ORDER BY created_at DESC
+    `, [userId]);
+    return rows.map((row: any) => ({
+      ...row,
+      providerId: row.provider_id,
+      isOnline: row.is_online,
+      reviewCount: row.review_count,
+      images: row.images ? JSON.parse(row.images) : [],
+      tags: row.tags ? JSON.parse(row.tags) : []
+    }));
+  },
+  getServiceById: async (id: number) => {
+    const rows = await pgClient.query(`
+      SELECT s.*, u.name as provider_name, u.avatar as provider_avatar
+      FROM services s
+      LEFT JOIN users u ON u.id = s.provider_id
+      WHERE s.id = $1
+    `, [id]);
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+      ...row,
+      providerId: row.provider_id,
+      isOnline: row.is_online,
+      reviewCount: row.review_count,
+      images: row.images ? JSON.parse(row.images) : [],
+      tags: row.tags ? JSON.parse(row.tags) : []
+    };
+  },
+  createService: async (service: any) => {
+    const res = await pgClient.query(
+      `INSERT INTO services (
+        provider_id, title, description, category, price, duration, location,
+        is_online, rating, review_count, images, tags, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id`,
+      [
+        service.providerId, service.title, service.description, service.category, service.price,
+        service.duration, service.location, service.isOnline ?? false, service.rating ?? 0,
+        service.reviewCount ?? 0, JSON.stringify(service.images || []),
+        JSON.stringify(service.tags || []), service.status ?? 'active'
+      ]
+    );
+    return { lastID: res[0]?.id ?? null };
+  },
+  updateService: async (id: number, patch: any) => {
+    await pgClient.query(`
+      UPDATE services SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        category = COALESCE($3, category),
+        price = COALESCE($4, price),
+        duration = COALESCE($5, duration),
+        location = COALESCE($6, location),
+        is_online = COALESCE($7, is_online),
+        images = COALESCE($8, images),
+        tags = COALESCE($9, tags),
+        status = COALESCE($10, status),
+        updated_at = NOW()
+      WHERE id = $11
+    `, [
+      patch.title, patch.description, patch.category, patch.price, patch.duration,
+      patch.location, patch.is_online,
+      patch.images ? JSON.stringify(patch.images) : null,
+      patch.tags ? JSON.stringify(patch.tags) : null, patch.status, id
+    ]);
+  },
+  deleteService: async (id: number) => {
+    await pgClient.query(`DELETE FROM services WHERE id = $1`, [id]);
+  },
+} : {
+  // SQLite fallback (minimal implementation for compilation, but we are using Postgres)
   getAllServices: async () => [],
   getServicesByProvider: async (_userId: number) => [],
   getServiceById: async (_id: number) => null,
@@ -849,7 +984,107 @@ export const serviceQueries: any = {
   deleteService: async (_id: number) => undefined,
 };
 
-export const lodgingQueries: any = {
+export const lodgingQueries: any = usePostgres ? {
+  getAllLodging: async () => {
+    const rows = await pgClient.query(`
+      SELECT l.*, u.name as host_name, u.avatar as host_avatar
+      FROM lodging l
+      LEFT JOIN users u ON u.id = l.host_id
+      WHERE l.status = 'active'
+      ORDER BY l.created_at DESC
+    `);
+    return rows.map((row: any) => ({
+      ...row,
+      hostId: row.host_id,
+      pricePerNight: row.price_per_night,
+      maxGuests: row.max_guests,
+      reviewCount: row.review_count,
+      amenities: row.amenities ? JSON.parse(row.amenities) : [],
+      images: row.images ? JSON.parse(row.images) : [],
+      availableDates: row.available_dates ? JSON.parse(row.available_dates) : []
+    }));
+  },
+  getLodgingByHost: async (userId: number) => {
+    const rows = await pgClient.query(`
+      SELECT * FROM lodging WHERE host_id = $1 ORDER BY created_at DESC
+    `, [userId]);
+    return rows.map((row: any) => ({
+      ...row,
+      hostId: row.host_id,
+      pricePerNight: row.price_per_night,
+      maxGuests: row.max_guests,
+      reviewCount: row.review_count,
+      amenities: row.amenities ? JSON.parse(row.amenities) : [],
+      images: row.images ? JSON.parse(row.images) : [],
+      availableDates: row.available_dates ? JSON.parse(row.available_dates) : []
+    }));
+  },
+  getLodgingById: async (id: number) => {
+    const rows = await pgClient.query(`
+      SELECT l.*, u.name as host_name, u.avatar as host_avatar
+      FROM lodging l
+      LEFT JOIN users u ON u.id = l.host_id
+      WHERE l.id = $1
+    `, [id]);
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+      ...row,
+      hostId: row.host_id,
+      pricePerNight: row.price_per_night,
+      maxGuests: row.max_guests,
+      reviewCount: row.review_count,
+      amenities: row.amenities ? JSON.parse(row.amenities) : [],
+      images: row.images ? JSON.parse(row.images) : [],
+      availableDates: row.available_dates ? JSON.parse(row.available_dates) : []
+    };
+  },
+  createLodging: async (lodging: any) => {
+    const res = await pgClient.query(
+      `INSERT INTO lodging (
+        host_id, title, description, type, price_per_night, location, max_guests,
+        rating, review_count, amenities, images, available_dates, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      RETURNING id`,
+      [
+        lodging.hostId, lodging.title, lodging.description, lodging.type,
+        lodging.pricePerNight, lodging.location, lodging.maxGuests,
+        lodging.rating ?? 0, lodging.reviewCount ?? 0,
+        JSON.stringify(lodging.amenities || []), JSON.stringify(lodging.images || []),
+        JSON.stringify(lodging.availableDates || []), lodging.status ?? 'active'
+      ]
+    );
+    return { lastID: res[0]?.id ?? null };
+  },
+  updateLodging: async (id: number, patch: any) => {
+    await pgClient.query(`
+      UPDATE lodging SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        type = COALESCE($3, type),
+        price_per_night = COALESCE($4, price_per_night),
+        location = COALESCE($5, location),
+        max_guests = COALESCE($6, max_guests),
+        amenities = COALESCE($7, amenities),
+        images = COALESCE($8, images),
+        available_dates = COALESCE($9, available_dates),
+        status = COALESCE($10, status),
+        updated_at = NOW()
+      WHERE id = $11
+    `, [
+      patch.title, patch.description, patch.type, patch.pricePerNight, patch.location,
+      patch.maxGuests,
+      patch.amenities ? JSON.stringify(patch.amenities) : null,
+      patch.images ? JSON.stringify(patch.images) : null,
+      patch.availableDates ? JSON.stringify(patch.availableDates) : null,
+      patch.status, id
+    ]);
+  },
+  deleteLodging: async (id: number) => {
+    await pgClient.query(`DELETE FROM lodging WHERE id = $1`, [id]);
+  },
+} : {
+  // SQLite fallback (minimal implementation for compilation — we are using Postgres)
   getAllLodging: async () => [],
   getLodgingByHost: async (_userId: number) => [],
   getLodgingById: async (_id: number) => null,
