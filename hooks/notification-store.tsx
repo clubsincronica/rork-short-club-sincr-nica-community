@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@/hooks/user-store';
-import { getApiBaseUrl } from '@/utils/api-config';
+import { apiFetch } from '@/utils/apiClient';
 
 export interface Notification {
     id: number;
@@ -10,6 +10,7 @@ export interface Notification {
     message: string;
     type: 'info' | 'success' | 'warning' | 'error';
     read: boolean;
+    is_read?: boolean;
     created_at: string;
 }
 
@@ -31,19 +32,14 @@ const useNotificationStore = () => {
         queryKey: ['notifications', currentUser?.id],
         queryFn: async () => {
             if (!currentUser) return [];
-            const response = await fetch(`${getApiBaseUrl()}/api/notifications/${currentUser.id}`);
-            if (!response.ok) throw new Error('Failed to fetch notifications');
-            return await response.json();
+            return await apiFetch(`/api/notifications/${currentUser.id}`);
         },
         enabled: !!currentUser
     });
 
     const markAsReadMutation = useMutation({
         mutationFn: async (id: number) => {
-            const response = await fetch(`${getApiBaseUrl()}/api/notifications/${id}/read`, {
-                method: 'PUT'
-            });
-            if (!response.ok) throw new Error('Failed to mark notification as read');
+            await apiFetch(`/api/notifications/${id}/read`, { method: 'PUT' });
             return id;
         },
         onSuccess: () => {
@@ -54,10 +50,7 @@ const useNotificationStore = () => {
     const markAllAsReadMutation = useMutation({
         mutationFn: async () => {
             if (!currentUser) return;
-            const response = await fetch(`${getApiBaseUrl()}/api/notifications/read-all/${currentUser.id}`, {
-                method: 'PUT'
-            });
-            if (!response.ok) throw new Error('Failed to mark all notifications as read');
+            await apiFetch(`/api/notifications/read-all/${currentUser.id}`, { method: 'PUT' });
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notifications', currentUser?.id] });

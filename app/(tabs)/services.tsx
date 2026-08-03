@@ -13,7 +13,7 @@ interface UpcomingReservation {
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Star, Calendar, DollarSign, Users, ShoppingCart, Bell, MessageSquare, Clock, CreditCard, ChevronRight, Package, TrendingUp, AlertCircle, CheckCircle, Plus, QrCode } from '@/components/SmartIcons';
+import { Star, Calendar, DollarSign, Users, ShoppingCart, Bell, MessageSquare, Clock, CreditCard, ChevronRight, Package, TrendingUp, AlertCircle, CheckCircle, Plus, QrCode, Building } from '@/components/SmartIcons';
 import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useNotifications, Notification } from '@/hooks/notification-store';
@@ -120,8 +120,9 @@ export default function ServicesScreen() {
     message: n.message,
     time: new Date(n.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
     type: n.type,
-    isRead: n.is_read
+    isRead: n.is_read ?? n.read
   }));
+  const unreadNotifications = notifications.filter((n: { isRead?: boolean }) => !n.isRead);
   const followUpClients: any[] = [];
 
   const renderSectionButton = (section: ServiceSection, icon: React.ReactNode, title: string, subtitle: string, highlight?: boolean) => {
@@ -152,7 +153,23 @@ export default function ServicesScreen() {
         {renderSectionButton('reservations', <Clock size={24} color={Colors.secondary} />, 'Administrar Reservas', `${upcomingReservations.length} reservas`, upcomingReservations.length > 0)}
         {renderSectionButton('cart', <ShoppingCart size={24} color={Colors.accent} />, 'Carrito y Pagos', `${cartItems.length} items`, false)}
         {renderSectionButton('followup', <MessageSquare size={24} color={Colors.accentLight} />, 'Seguimiento', `${followUpClients.length} clientes`, false)}
-        {renderSectionButton('notifications', <Bell size={24} color={Colors.warning} />, 'Notificaciones', `${notifications.filter((n: any) => n.unread).length} nuevas`, notifications.some((n: any) => n.unread))}
+        {renderSectionButton('notifications', <Bell size={24} color={Colors.warning} />, 'Notificaciones', `${unreadNotifications.length} nuevas`, unreadNotifications.length > 0)}
+
+        {/* Co-Work Modality quick link */}
+        <TouchableOpacity
+          style={[styles.sectionButton, { backgroundColor: '#2c6d85', marginTop: 4, borderRadius: 16 }]}
+          onPress={() => router.push('/mis-espacios')}
+          testID="section-mis-espacios"
+        >
+          <View style={[styles.sectionIcon, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <Building size={24} color="#fff" />
+          </View>
+          <View style={styles.sectionInfo}>
+            <Text style={[styles.sectionButtonTitle, { color: '#fff' }]}>Mis Espacios Co-Work</Text>
+            <Text style={[styles.sectionButtonSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>Arrienda partes de tu espacio</Text>
+          </View>
+          <ChevronRight size={20} color="rgba(255,255,255,0.7)" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.recentActivity}>
