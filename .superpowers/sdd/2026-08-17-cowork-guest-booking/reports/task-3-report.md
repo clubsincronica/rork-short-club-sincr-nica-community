@@ -90,4 +90,4 @@ Ran all test suites matching availability.test.
 - `cellStates` now semantically interprets slot wall-clock times as UTC. If the business layer later feeds `now` derived from a *local* clock (e.g. `new Date()` rather than an ISO `...Z` instant), minAdvance cutoff will be offset — downstream tasks (booking/availability query endpoints) should pass UTC instants and/or standardize on interpreting expressed times as UTC.
 
 ### Commit hash
-`<pending>`
+`15fd9f1`
