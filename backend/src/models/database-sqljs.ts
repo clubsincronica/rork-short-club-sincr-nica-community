@@ -307,6 +307,80 @@ export async function initializeDatabase() {
       `);
 
       await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS spaces (
+          id SERIAL PRIMARY KEY,
+          owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          location TEXT,
+          images TEXT DEFAULT '[]',
+          amenities TEXT DEFAULT '[]',
+          calendar_mode TEXT DEFAULT 'unified',
+          is_published BOOLEAN DEFAULT false,
+          rating REAL DEFAULT 0,
+          review_count INTEGER DEFAULT 0,
+          tags TEXT DEFAULT '[]',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS subspaces (
+          id SERIAL PRIMARY KEY,
+          space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+          title TEXT NOT NULL,
+          description TEXT,
+          type TEXT DEFAULT 'other',
+          capacity INTEGER DEFAULT 1,
+          features TEXT DEFAULT '[]',
+          images TEXT DEFAULT '[]',
+          price_hour DECIMAL(10,2),
+          price_day DECIMAL(10,2),
+          price_week DECIMAL(10,2),
+          price_month DECIMAL(10,2),
+          billing_units TEXT DEFAULT '["hour"]',
+          is_active BOOLEAN DEFAULT true,
+          floor_label TEXT,
+          calendar_mode TEXT DEFAULT 'unified',
+          color TEXT,
+          instant_book BOOLEAN DEFAULT false,
+          business_hours TEXT DEFAULT '[]',
+          slot_granularity INTEGER DEFAULT 30,
+          min_advance INTEGER DEFAULT 120,
+          max_duration INTEGER DEFAULT 8,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`
+        CREATE TABLE IF NOT EXISTS space_bookings (
+          id SERIAL PRIMARY KEY,
+          space_id INTEGER NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+          subspace_id INTEGER NOT NULL REFERENCES subspaces(id) ON DELETE CASCADE,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          guest_name TEXT,
+          date DATE NOT NULL,
+          start_time TEXT NOT NULL,
+          end_time TEXT NOT NULL,
+          billing_unit TEXT DEFAULT 'hour',
+          quantity INTEGER DEFAULT 1,
+          total_price DECIMAL(10,2) NOT NULL,
+          status TEXT DEFAULT 'pending',
+          mode TEXT DEFAULT 'instant',
+          payment_status TEXT DEFAULT 'pending',
+          payment_provider TEXT,
+          payment_id TEXT,
+          notes TEXT,
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+
+      await pgClient.query(`CREATE INDEX IF NOT EXISTS idx_space_bookings_subspace ON space_bookings(subspace_id, date)`);
+
+      await pgClient.query(`
         CREATE TABLE IF NOT EXISTS notifications (
           id SERIAL PRIMARY KEY,
           user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -455,6 +529,80 @@ export async function initializeDatabase() {
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
           )
         `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS spaces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            location TEXT,
+            images TEXT DEFAULT '[]',
+            amenities TEXT DEFAULT '[]',
+            calendar_mode TEXT DEFAULT 'unified',
+            is_published INTEGER DEFAULT 0,
+            rating REAL DEFAULT 0,
+            review_count INTEGER DEFAULT 0,
+            tags TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS subspaces (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            space_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            type TEXT DEFAULT 'other',
+            capacity INTEGER DEFAULT 1,
+            features TEXT DEFAULT '[]',
+            images TEXT DEFAULT '[]',
+            price_hour REAL,
+            price_day REAL,
+            price_week REAL,
+            price_month REAL,
+            billing_units TEXT DEFAULT '["hour"]',
+            is_active INTEGER DEFAULT 1,
+            floor_label TEXT,
+            calendar_mode TEXT DEFAULT 'unified',
+            color TEXT,
+            instant_book INTEGER DEFAULT 0,
+            business_hours TEXT DEFAULT '[]',
+            slot_granularity INTEGER DEFAULT 30,
+            min_advance INTEGER DEFAULT 120,
+            max_duration INTEGER DEFAULT 8,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS space_bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            space_id INTEGER NOT NULL,
+            subspace_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            guest_name TEXT,
+            date TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            billing_unit TEXT DEFAULT 'hour',
+            quantity INTEGER DEFAULT 1,
+            total_price REAL NOT NULL,
+            status TEXT DEFAULT 'pending',
+            mode TEXT DEFAULT 'instant',
+            payment_status TEXT DEFAULT 'pending',
+            payment_provider TEXT,
+            payment_id TEXT,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+
+        db.run(`CREATE INDEX IF NOT EXISTS idx_space_bookings_subspace ON space_bookings(subspace_id, date)`);
 
         db.run(`
           CREATE TABLE IF NOT EXISTS blocked_emails (
