@@ -50,7 +50,9 @@ export function cellStates(
     const cell: SlotCell = { date, start, end, state: 'available' };
     const isBlocked = active.some(b => b.status === 'blocked' && timesOverlap(start, end, b.startTime, b.endTime));
     const isBooked = active.some(b => b.status !== 'blocked' && timesOverlap(start, end, b.startTime, b.endTime));
-    const cellTime = new Date(`${date}T${start}:00`);
+    const [y, mo, d] = date.split('-').map(Number);
+    const [h, mi] = start.split(':').map(Number);
+    const cellTime = new Date(Date.UTC(y, mo - 1, d, h, mi, 0));
     if (cellTime.getTime() - now.getTime() < advanceMs) cell.state = 'closed';
     else if (isBlocked) cell.state = 'blocked';
     else if (isBooked) cell.state = 'booked';

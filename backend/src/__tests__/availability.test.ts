@@ -37,4 +37,11 @@ describe('availability engine', () => {
     expect(nextAvailable(cells, '09:30')).toBe('09:30');
     expect(nextAvailable(cells, '10:00')).toBe('12:00');
   });
+
+  it('cellStates stops at business end — no cell at 22:00 or later (09:00–22:00 @ 30min)', () => {
+    const cells = cellStates(sub, DATE, [], new Date('2026-08-16T00:00:00Z'));
+    expect(cells.filter(c => c.start >= '22:00')).toHaveLength(0);
+    expect(cells.find(c => c.start === '21:30')).toBeDefined();
+    expect(cells.find(c => c.start === '22:00')).toBeUndefined();
+  });
 });
