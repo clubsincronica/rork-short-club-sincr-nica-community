@@ -58,3 +58,6 @@ out.txt
 analog-codex-472715-d7-d584cc6ebc11.json
 sa-key.json
 sa-key.base64.txt
+# worktrees
+.worktrees/
+
