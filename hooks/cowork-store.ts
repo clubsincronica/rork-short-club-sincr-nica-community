@@ -55,7 +55,7 @@ interface CoWorkStore {
   getSpacesByOwnerId: (ownerId: string) => CoWorkSpace[];
   publishSpace: (id: string, isPublished: boolean) => Promise<void>;
   fetchPublishedSpaces: (filters?: SpaceFilters) => Promise<CoWorkSpace[]>;
-  fetchSpaceDetail: (id: string) => Promise<CoWorkSpace | null>;
+  fetchSpaceDetail: (id: string, range?: { from?: string; to?: string }) => Promise<CoWorkSpace | null>;
   fetchOwnerSpaces: () => Promise<CoWorkSpace[]>;
 
   // SubSpace actions
@@ -151,6 +151,7 @@ const subSpaceFromRow = (row: any): SubSpace => ({
   calendarMode: (row.calendar_mode ?? 'unified') as CalendarMode,
   color: row.color ?? undefined,
   instantBook: !!row.instant_book,
+  cancellationPolicy: row.cancellation_policy ?? row.cancellationPolicy ?? undefined,
   businessHours: row.business_hours ?? undefined,
   slotGranularity: Number(row.slot_granularity ?? 30),
   minAdvance: Number(row.min_advance ?? 120),
@@ -380,9 +381,15 @@ export const useCoWork = create<CoWorkStore>((set, get) => ({
     return mapped;
   },
 
-  fetchSpaceDetail: async (id) => {
+  fetchSpaceDetail: async (id, range) => {
     try {
-      const row: any = await apiFetch(`/api/spaces/${id}`);
+      // The backend only computes subspace availability when a date range is
+      // provided (GET /api/spaces/:id?from=YYYY-MM-DD&to=YYYY-MM-DD).
+      let path = `/api/spaces/${id}`;
+      if (range?.from && range?.to) {
+        path += `?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`;
+      }
+      const row: any = await apiFetch(path);
       const detail = spaceFromRow(row);
       const others = get().spaces.filter(s => s.id !== detail.id);
       const spaces = [...others, detail];

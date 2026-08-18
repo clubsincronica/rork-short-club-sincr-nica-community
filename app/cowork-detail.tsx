@@ -1,23 +1,26 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Dimensions, Modal, TextInput
+  Alert, Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { StripeProvider, useStripe } from '@stripe/stripe-react-native';
 import { useCoWork } from '@/hooks/cowork-store';
 import { useUser } from '@/hooks/user-store';
 import { Colors } from '@/constants/colors';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
 import { TouchableScale } from '@/components/TouchableScale';
+import { SkeletonCard } from '@/components/SkeletonLoader';
+import { SlotGrid, suggestNextSlot } from '@/components/SlotGrid';
+import { ApiError, apiFetch } from '@/utils/apiClient';
 import {
-  ArrowLeft, MapPin, Star, Users, Clock, DollarSign, Calendar,
-  CheckCircle, ChevronRight, Layers, Building, Key
+  ArrowLeft, MapPin, Star, Users, Clock, Calendar, CheckCircle,
+  CreditCard, Lock, AlertCircle, Building, Info,
 } from '@/components/SmartIcons';
-import { SubSpace, CoWorkSpace, BillingUnit, SpaceBooking } from '@/types/user';
-
-const { width } = Dimensions.get('window');
+import { SubSpace, CoWorkSpace, BillingUnit, SlotCell } from '@/types/user';
 
 const BILLING_LABELS: Record<BillingUnit, { label: string; plural: string }> = {
   hour: { label: 'hora', plural: 'horas' },
@@ -32,144 +35,535 @@ const TYPE_ICONS: Record<string, string> = {
   'coworking-desk': '💻', 'other': '🏠',
 };
 
-const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+const DURATION_MAX = 31;
 
-const HOURS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
+type TimeRef = { date: string; time: string };
 
-export default function CoWorkDetailScreen() {
+interface BookingDraft {
+  date: string;
+  startTime: string;
+  endTime: string;
+  quantity: number;
+  endDate: string;
+}
+
+interface DoneState {
+  mode: 'instant' | 'request';
+  totalPrice: number;
+  date: string;
+  subspaceTitle: string;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+const formatDate = (d: Date) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const todayStr = () => formatDate(new Date());
+
+const monthStartStr = (dateStr: string) => `${dateStr.slice(0, 7)}-01`;
+
+const monthEndStr = (monthFirst: string) => {
+  const y = Number(monthFirst.slice(0, 4));
+  const m = Number(monthFirst.slice(5, 7));
+  return `${y}-${pad2(m)}-${pad2(new Date(y, m, 0).getDate())}`;
+};
+
+const addDays = (dateStr: string, days: number): string => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return formatDate(new Date(y, m - 1, d + days));
+};
+
+const addMonths = (dateStr: string, months: number): string => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return formatDate(new Date(y, m - 1 + months, d));
+};
+
+const dateDiffDays = (a: string, b: string): number => {
+  const [ay, am, ad] = a.split('-').map(Number);
+  const [by, bm, bd] = b.split('-').map(Number);
+  return Math.round(
+    (new Date(by, bm - 1, bd).getTime() - new Date(ay, am - 1, ad).getTime()) / 86400000
+  );
+};
+
+const timeToMinute = (t: string): number => {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+};
+
+const minutesToTime = (min: number): string => {
+  const c = ((min % 1440) + 1440) % 1440;
+  return `${pad2(Math.floor(c / 60))}:${pad2(c % 60)}`;
+};
+
+const STATE_RANK: Record<SlotCell['state'], number> = { available: 3, booked: 2, blocked: 1, closed: 0 };
+
+// unified calendar mode: overlay every active subspace's availability into one grid.
+// A time-slot shows as available when any subspace offers it; otherwise the least
+// restrictive state (booked > blocked > closed) wins.
+function mergeAvailability(subs: SubSpace[]): { date: string; cells: SlotCell[] }[] {
+  const byDate: Record<string, Record<string, SlotCell>> = {};
+  for (const sub of subs) {
+    for (const day of sub.availability ?? []) {
+      if (!byDate[day.date]) byDate[day.date] = {};
+      for (const cell of day.cells) {
+        const cur = byDate[day.date][cell.start];
+        if (!cur || STATE_RANK[cell.state] > STATE_RANK[cur.state]) {
+          byDate[day.date][cell.start] = cell;
+        }
+      }
+    }
+  }
+  return Object.keys(byDate)
+    .sort()
+    .map(d => ({
+      date: d,
+      cells: Object.values(byDate[d]).sort((a, b) => a.start.localeCompare(b.start)),
+    }));
+}
+
+const STRIPE_PUBLISHABLE_KEY = (() => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Constants = require('expo-constants').default;
+    const key =
+      Constants?.expoConfig?.extra?.stripePublishableKey ||
+      Constants?.manifest?.extra?.stripePublishableKey;
+    if (key) return key;
+  } catch { /* expo-constants unavailable */ }
+  if (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_STRIPE_KEY) {
+    return process.env.EXPO_PUBLIC_STRIPE_KEY;
+  }
+  return '';
+})();
+
+function CoWorkDetailInner() {
   const insets = useSafeAreaInsets();
   const { spaceId, subSpaceId } = useLocalSearchParams<{ spaceId: string; subSpaceId?: string }>();
   const { currentUser } = useUser();
-  const { getSpaceById, getBookingsForSubSpace, addBooking, isSlotAvailable, loadData } = useCoWork();
+  const { fetchSpaceDetail, createBooking, fetchGuestBookings } = useCoWork();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
-  const [selectedSubSpace, setSelectedSubSpace] = useState<SubSpace | null>(null);
+  const [space, setSpace] = useState<CoWorkSpace | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(() => monthStartStr(todayStr()));
+  const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<BillingUnit | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [startTime, setStartTime] = useState('09:00');
   const [quantity, setQuantity] = useState(1);
-  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [selectedStart, setSelectedStart] = useState<TimeRef | null>(null);
+  const [selectedEnd, setSelectedEnd] = useState<TimeRef | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [pendingPayment, setPendingPayment] = useState<{ bookingId: number; totalPrice: number } | null>(null);
+  const [paymentBusy, setPaymentBusy] = useState<'stripe' | 'mp' | null>(null);
+  const [done, setDone] = useState<DoneState | null>(null);
 
-  useEffect(() => { loadData(); }, []);
+  const loadDetail = useCallback(
+    async (monthFirst: string, silent = false) => {
+      if (!spaceId) return;
+      if (!silent) setIsLoading(true);
+      try {
+        const detail = await fetchSpaceDetail(spaceId, {
+          from: monthFirst,
+          to: monthEndStr(monthFirst),
+        });
+        if (!detail) {
+          setSpace(null);
+          setNotFound(true);
+          return;
+        }
+        setSpace(detail);
+        setNotFound(false);
+        setSelectedSubId(prev => {
+          if (prev && detail.subSpaces.some(s => s.id === prev)) return prev;
+          return subSpaceId && detail.subSpaces.some(s => s.id === subSpaceId) ? subSpaceId : null;
+        });
+        setHint(null);
+      } catch {
+        Alert.alert('Error', 'No se pudo cargar el espacio. Revisa tu conexión e inténtalo de nuevo.');
+      } finally {
+        if (!silent) setIsLoading(false);
+      }
+    },
+    [spaceId, subSpaceId, fetchSpaceDetail]
+  );
 
-  const space = useMemo(() => getSpaceById(spaceId || ''), [spaceId, getSpaceById]);
-
-  // Pre-select sub-space from params
   useEffect(() => {
-    if (space && subSpaceId) {
-      const sub = space.subSpaces.find(s => s.id === subSpaceId);
-      if (sub) setSelectedSubSpace(sub);
+    if (!spaceId) {
+      setNotFound(true);
+      setIsLoading(false);
+      return;
     }
-  }, [space, subSpaceId]);
+    loadDetail(monthStartStr(todayStr()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const subSpaceBookings = useMemo(() =>
-    selectedSubSpace ? getBookingsForSubSpace(selectedSubSpace.id) : [],
-    [selectedSubSpace, getBookingsForSubSpace]
+  const activeSubs = useMemo(() => (space?.subSpaces ?? []).filter(s => s.isActive), [space]);
+
+  const selectedSubSpace = useMemo(
+    () => activeSubs.find(s => s.id === selectedSubId) ?? null,
+    [activeSubs, selectedSubId]
+  );
+
+  const calendarMode = space?.calendarMode === 'separate' ? 'separate' : 'unified';
+
+  const gridDays = useMemo(() => {
+    if (!space) return [];
+    return calendarMode === 'unified' ? mergeAvailability(activeSubs) : (selectedSubSpace?.availability ?? []);
+  }, [space, calendarMode, activeSubs, selectedSubSpace]);
+
+  const availableDates = useMemo(
+    () => gridDays.filter(d => d.cells.some(c => c.state === 'available')).map(d => d.date),
+    [gridDays]
   );
 
   const priceForBilling = useMemo((): number => {
     if (!selectedSubSpace || !selectedBilling) return 0;
-    return {
-      hour: selectedSubSpace.pricePerHour,
-      day: selectedSubSpace.pricePerDay,
-      week: selectedSubSpace.pricePerWeek,
-      month: selectedSubSpace.pricePerMonth,
-    }[selectedBilling] || 0;
+    return (
+      {
+        hour: selectedSubSpace.pricePerHour,
+        day: selectedSubSpace.pricePerDay,
+        week: selectedSubSpace.pricePerWeek,
+        month: selectedSubSpace.pricePerMonth,
+      }[selectedBilling] || 0
+    );
   }, [selectedSubSpace, selectedBilling]);
 
-  const totalPrice = priceForBilling * quantity;
+  const showGrid = selectedBilling === 'hour' || selectedBilling === 'day';
 
-  const calculateEndTime = (start: string, hrs: number) => {
-    const [h] = start.split(':').map(Number);
-    return `${String((h + hrs) % 24).padStart(2, '0')}:00`;
+  const bookingDraft = useMemo<BookingDraft | null>(() => {
+    if (!selectedSubSpace || !selectedStart || !selectedBilling) return null;
+    const startDate = selectedStart.date;
+    if (selectedBilling === 'hour') {
+      const start = selectedStart.time;
+      let quantityH = 1;
+      if (selectedEnd) {
+        const totalMin =
+          dateDiffDays(startDate, selectedEnd.date) * 1440 +
+          (timeToMinute(selectedEnd.time) - timeToMinute(start));
+        quantityH = Math.max(1, Math.round(totalMin / 60));
+      }
+      const q = Math.min(DURATION_MAX, quantityH);
+      return {
+        date: startDate,
+        startTime: start,
+        endTime: minutesToTime(timeToMinute(start) + q * 60),
+        quantity: q,
+        endDate: startDate,
+      };
+    }
+    if (selectedBilling === 'day') {
+      const q = Math.min(
+        DURATION_MAX,
+        Math.max(1, selectedEnd ? dateDiffDays(startDate, selectedEnd.date) : 1)
+      );
+      return {
+        date: startDate,
+        startTime: '09:00',
+        endTime: '23:59',
+        quantity: q,
+        endDate: addDays(startDate, q),
+      };
+    }
+    const q = Math.max(1, Math.min(DURATION_MAX, quantity));
+    return {
+      date: startDate,
+      startTime: '09:00',
+      endTime: '23:59',
+      quantity: q,
+      endDate: selectedBilling === 'week' ? addDays(startDate, q * 7) : addMonths(startDate, q),
+    };
+  }, [selectedSubSpace, selectedStart, selectedEnd, selectedBilling, quantity]);
+
+  const totalPrice = useMemo(() => {
+    if (!bookingDraft) return 0;
+    return Math.round(priceForBilling * bookingDraft.quantity * 100) / 100;
+  }, [bookingDraft, priceForBilling]);
+
+  const selectSubSpace = (sub: SubSpace) => {
+    setSelectedSubId(sub.id);
+    setSelectedBilling(sub.billingUnits[0] ?? 'hour');
+    setQuantity(1);
+    setSelectedStart(null);
+    setSelectedEnd(null);
+    setHint(null);
   };
 
-  const endTime = selectedBilling === 'hour' ? calculateEndTime(startTime, quantity) : '23:59';
+  const selectBilling = (unit: BillingUnit) => {
+    setSelectedBilling(unit);
+    setQuantity(1);
+    setSelectedStart(null);
+    setSelectedEnd(null);
+    setHint(null);
+  };
 
-  const dateStr = selectedDate
-    ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
-    : '';
+  const handleSelectRange = (start: TimeRef, end: TimeRef | null) => {
+    setSelectedStart(start);
+    setSelectedEnd(end);
+    setHint(null);
+  };
 
-  const isAvailable = useMemo(() => {
-    if (!selectedSubSpace || !dateStr) return true;
-    return isSlotAvailable(selectedSubSpace.id, dateStr, startTime, endTime);
-  }, [selectedSubSpace, dateStr, startTime, endTime]);
+  const handleSelectDate = (date: string) => {
+    setSelectedStart({ date, time: '09:00' });
+    setSelectedEnd(null);
+    setHint(null);
+  };
 
-  const daysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  const firstDayOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+  const applySuggestion = (date: string, preferredTime: string) => {
+    const cells = gridDays.find(d => d.date === date)?.cells ?? [];
+    const suggested = suggestNextSlot(cells, preferredTime);
+    if (!suggested) {
+      setHint('No quedan horarios disponibles para ese día.');
+      return;
+    }
+    if (selectedBilling === 'hour') {
+      setSelectedStart({ date, time: suggested });
+    } else {
+      setSelectedStart({ date, time: '09:00' });
+    }
+    setSelectedEnd(null);
+  };
 
-  const bookedDays = useMemo(() => {
-    if (!selectedSubSpace) return new Set<string>();
-    return new Set(subSpaceBookings.filter(b => b.status !== 'cancelled').map(b => b.date));
-  }, [subSpaceBookings, selectedSubSpace]);
+  const handleSuggest = (date: string, suggestedTime: string, _original: string) => {
+    setHint(`Sugerimos ${suggestedTime}, que está disponible. Tócalo para reservar.`);
+    applySuggestion(date, suggestedTime);
+  };
+
+  const handleMonthChange = (monthFirst: string) => {
+    setVisibleMonth(monthFirst);
+    setSelectedStart(null);
+    setSelectedEnd(null);
+    setHint(null);
+    loadDetail(monthFirst);
+  };
+
+  const finishInstant = async () => {
+    if (!pendingPayment) return;
+    try {
+      await fetchGuestBookings();
+    } catch { /* ignore cache refresh errors */ }
+    if (bookingDraft && selectedSubSpace) {
+      setDone({
+        mode: 'instant',
+        totalPrice: pendingPayment.totalPrice,
+        date: bookingDraft.date,
+        subspaceTitle: selectedSubSpace.title,
+      });
+    }
+    setPendingPayment(null);
+  };
+
+  const handlePayStripe = async () => {
+    if (!pendingPayment) return;
+    setPaymentBusy('stripe');
+    try {
+      const data = await apiFetch<{ clientSecret?: string }>(
+        `/api/spaces/pay/stripe/${pendingPayment.bookingId}`,
+        { method: 'POST' }
+      );
+      if (!data?.clientSecret) {
+        Alert.alert('Error', 'No se recibió el secreto de pago del servidor.');
+        return;
+      }
+      const initResult = await initPaymentSheet({
+        paymentIntentClientSecret: data.clientSecret,
+        merchantDisplayName: 'Club Sincrónica',
+      });
+      if (initResult.error) {
+        Alert.alert('Stripe', `Error iniciando el pago: ${initResult.error.message}`);
+        return;
+      }
+      const presentResult = await presentPaymentSheet();
+      if (presentResult.error) {
+        if (presentResult.error.code !== 'Canceled') {
+          Alert.alert('Stripe', presentResult.error.message);
+        }
+        return;
+      }
+      await finishInstant();
+    } catch (e) {
+      Alert.alert('Error', e instanceof ApiError ? e.message : 'No se pudo iniciar el pago.');
+    } finally {
+      setPaymentBusy(null);
+    }
+  };
+
+  const handlePayMercadoPago = async () => {
+    if (!pendingPayment) return;
+    setPaymentBusy('mp');
+    try {
+      const data = await apiFetch<{ init_point?: string; sandbox_init_point?: string }>(
+        `/api/spaces/pay/mercadopago/${pendingPayment.bookingId}`,
+        {
+          method: 'POST',
+          body: {
+            back_urls: {
+              success: 'https://clubsincronica.app/payment-success',
+              failure: 'https://clubsincronica.app/payment-failure',
+              pending: 'https://clubsincronica.app/payment-pending',
+            },
+          },
+        }
+      );
+      const url = __DEV__ ? (data.sandbox_init_point || data.init_point) : data.init_point;
+      if (!url) {
+        Alert.alert('Error', 'No se recibió el punto de pago de MercadoPago.');
+        return;
+      }
+      await WebBrowser.openBrowserAsync(url);
+      await finishInstant();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 402) {
+        Alert.alert('MercadoPago', e.message);
+      } else {
+        Alert.alert('Error', e instanceof ApiError ? e.message : 'No se pudo iniciar el pago.');
+      }
+    } finally {
+      setPaymentBusy(null);
+    }
+  };
+
+  const requireSelection = (): boolean => {
+    if (!currentUser) {
+      Alert.alert('Inicia sesión', 'Necesitas estar logueado para reservar.');
+      return false;
+    }
+    if (!selectedSubSpace || !selectedStart || !selectedBilling || !bookingDraft) {
+      Alert.alert('Faltan datos', 'Selecciona un sub-espacio, una fecha/horario y el tipo de facturación.');
+      return false;
+    }
+    return true;
+  };
 
   const handleBook = async () => {
-    if (!currentUser) { Alert.alert('Inicia sesión', 'Necesitas estar logueado para reservar.'); return; }
-    if (!selectedSubSpace || !selectedDate || !selectedBilling) {
-      Alert.alert('Faltan datos', 'Selecciona un sub-espacio, fecha y tipo de facturación.'); return;
-    }
-    if (!isAvailable) { Alert.alert('No disponible', 'Ese horario ya está reservado.'); return; }
-
+    if (!requireSelection() || !bookingDraft || !selectedSubSpace) return;
+    setSubmitting(true);
     try {
-      await addBooking({
-        subSpaceId: selectedSubSpace.id,
-        spaceId: space!.id,
-        userId: String(currentUser.id),
-        date: dateStr,
-        startTime,
-        endTime,
-        billingUnit: selectedBilling,
-        quantity,
-        totalPrice,
-        notes,
+      const result = await createBooking({
+        subspaceId: selectedSubSpace.id,
+        date: bookingDraft.date,
+        startTime: bookingDraft.startTime,
+        endTime: bookingDraft.endTime,
+        billingUnit: selectedBilling!,
+        quantity: bookingDraft.quantity,
+        notes: notes.trim() || undefined,
       });
       setShowBookingModal(false);
-      setBookingConfirmed(true);
+      if (result.mode === 'instant') {
+        setPendingPayment({ bookingId: result.bookingId, totalPrice: result.totalPrice });
+      } else {
+        try {
+          await fetchGuestBookings();
+        } catch { /* ignore cache refresh errors */ }
+        setDone({
+          mode: 'request',
+          totalPrice: result.totalPrice,
+          date: bookingDraft.date,
+          subspaceTitle: selectedSubSpace.title,
+        });
+      }
     } catch (e) {
-      Alert.alert('Error', 'No se pudo completar la reserva.');
+      if (e instanceof ApiError && e.status === 409) {
+        Alert.alert('Ese horario ya no está disponible', 'Sugerimos el próximo horario libre.');
+        applySuggestion(bookingDraft.date, bookingDraft.startTime);
+        loadDetail(visibleMonth, true);
+      } else {
+        Alert.alert('Error', 'No se pudo completar la reserva. Inténtalo de nuevo.');
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  if (!space) {
+  const dateRangeLabel = bookingDraft
+    ? bookingDraft.date === bookingDraft.endDate
+      ? bookingDraft.date
+      : `${bookingDraft.date} → ${bookingDraft.endDate}`
+    : '';
+
+  // ── Loading skeleton ──────────────────────────────────────────────────────
+  if (isLoading && !space) {
+    return (
+      <ConstellationBackground intensity="light">
+        <View style={[styles.container, { paddingTop: insets.top }]}>
+          <View style={styles.heroContainer}>
+            <LinearGradient colors={['#2c6d85', '#4f8497']} style={styles.hero} />
+            <TouchableOpacity style={[styles.backBtn, { top: 16 + insets.top }]} onPress={() => router.back()}>
+              <ArrowLeft size={22} color={Colors.white} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={styles.skeletonContent}>
+            <SkeletonCard lines={2} />
+            <SkeletonCard lines={1} />
+            <SkeletonCard lines={3} />
+          </ScrollView>
+        </View>
+      </ConstellationBackground>
+    );
+  }
+
+  // ── Not found ─────────────────────────────────────────────────────────────
+  if (notFound || !space) {
     return (
       <ConstellationBackground intensity="light">
         <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
           <Building size={60} color={Colors.textLight} />
-          <Text style={{ fontSize: 16, color: Colors.text, marginTop: 12 }}>Espacio no encontrado</Text>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, padding: 12, backgroundColor: Colors.primary, borderRadius: 12 }}>
-            <Text style={{ color: Colors.white, fontWeight: '700' }}>Volver</Text>
+          <Text style={styles.notFoundTitle}>Espacio no encontrado</Text>
+          <TouchableOpacity onPress={() => router.back()} style={styles.notFoundBtn}>
+            <Text style={styles.notFoundBtnText}>Volver</Text>
           </TouchableOpacity>
         </View>
       </ConstellationBackground>
     );
   }
 
-  if (bookingConfirmed) {
+  // ── Success screens ───────────────────────────────────────────────────────
+  if (done) {
+    const isInstant = done.mode === 'instant';
     return (
       <ConstellationBackground intensity="light">
         <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }]}>
           <LinearGradient colors={['#4f8497', '#9bdbbf']} style={styles.confirmIcon}>
             <CheckCircle size={48} color={Colors.white} />
           </LinearGradient>
-          <Text style={styles.confirmTitle}>¡Reserva confirmada!</Text>
-          <Text style={styles.confirmSub}>
-            Tu reserva en {selectedSubSpace?.title} está confirmada para el {dateStr}.
+          <Text style={styles.confirmTitle}>
+            {isInstant ? '¡Reserva confirmada!' : 'Solicitud enviada'}
           </Text>
-          <Text style={styles.confirmPrice}>Total: ${totalPrice.toLocaleString()}</Text>
+          <Text style={styles.confirmSub}>
+            {isInstant
+              ? `Tu reserva en ${done.subspaceTitle} está confirmada para el ${done.date} con el pago ya realizado.`
+              : `Tu solicitud en ${done.subspaceTitle} para el ${done.date} fue enviada.`}
+          </Text>
+          {!isInstant && (
+            <View style={styles.requestNote}>
+              <AlertCircle size={16} color={Colors.primary} />
+              <Text style={styles.requestNoteText}>
+                Sin cargo todavía: el anfitrión confirmará tu reserva en las próximas 48 horas.
+              </Text>
+            </View>
+          )}
+          <Text style={styles.confirmPrice}>Total: ${done.totalPrice.toLocaleString()}</Text>
           <TouchableOpacity style={styles.confirmBtn} onPress={() => router.back()}>
-            <Text style={styles.confirmBtnText}>Volver al inicio</Text>
+            <Text style={styles.confirmBtnText}>Listo</Text>
           </TouchableOpacity>
         </View>
       </ConstellationBackground>
     );
   }
 
+  const canBook = !!bookingDraft && selectedStart !== null;
+
   return (
     <ConstellationBackground intensity="light">
-      <ScrollView style={[styles.container, { paddingTop: insets.top }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={[styles.container, { paddingTop: insets.top }]}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
         {/* Header Image */}
         <View style={styles.heroContainer}>
           <LinearGradient
@@ -209,21 +603,19 @@ export default function CoWorkDetailScreen() {
           </View>
         </View>
 
-        {/* Sub-spaces */}
+        {/* Sub-space selector */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Elige un espacio para reservar</Text>
           <Text style={styles.sectionSub}>Selecciona el ambiente que mejor se adapte a tus necesidades</Text>
-          {space.subSpaces.filter(s => s.isActive).map(sub => (
+          {activeSubs.length === 0 && (
+            <Text style={styles.emptyText}>No hay ambientes disponibles en este espacio.</Text>
+          )}
+          {activeSubs.map(sub => (
             <SubSpaceCard
               key={sub.id}
               sub={sub}
               isSelected={selectedSubSpace?.id === sub.id}
-              onSelect={() => {
-                setSelectedSubSpace(sub);
-                setSelectedBilling(sub.billingUnits[0]);
-                setQuantity(1);
-                setSelectedDate(null);
-              }}
+              onSelect={() => selectSubSpace(sub)}
             />
           ))}
         </View>
@@ -234,12 +626,18 @@ export default function CoWorkDetailScreen() {
             <Text style={styles.sectionTitle}>¿Cómo quieres reservar?</Text>
             <View style={styles.billingRow}>
               {selectedSubSpace.billingUnits.map(unit => {
-                const price = { hour: selectedSubSpace.pricePerHour, day: selectedSubSpace.pricePerDay, week: selectedSubSpace.pricePerWeek, month: selectedSubSpace.pricePerMonth }[unit] || 0;
+                const price =
+                  {
+                    hour: selectedSubSpace.pricePerHour,
+                    day: selectedSubSpace.pricePerDay,
+                    week: selectedSubSpace.pricePerWeek,
+                    month: selectedSubSpace.pricePerMonth,
+                  }[unit] || 0;
                 return (
                   <TouchableOpacity
                     key={unit}
                     style={[styles.billingChip, selectedBilling === unit && styles.billingChipActive]}
-                    onPress={() => { setSelectedBilling(unit); setQuantity(1); }}
+                    onPress={() => selectBilling(unit)}
                   >
                     <Text style={[styles.billingChipLabel, selectedBilling === unit && styles.billingChipLabelActive]}>
                       por {BILLING_LABELS[unit].label}
@@ -252,119 +650,115 @@ export default function CoWorkDetailScreen() {
               })}
             </View>
 
-            {/* Quantity */}
-            <View style={styles.quantityRow}>
-              <Text style={styles.quantityLabel}>Cantidad de {selectedBilling ? BILLING_LABELS[selectedBilling].plural : ''}:</Text>
-              <View style={styles.quantityControls}>
-                <TouchableOpacity style={styles.quantityBtn} onPress={() => setQuantity(Math.max(1, quantity - 1))}>
-                  <Text style={styles.quantityBtnText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.quantityValue}>{quantity}</Text>
-                <TouchableOpacity style={styles.quantityBtn} onPress={() => setQuantity(quantity + 1)}>
-                  <Text style={styles.quantityBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Hour start time */}
-            {selectedBilling === 'hour' && (
-              <View style={styles.timeRow}>
-                <Text style={styles.quantityLabel}>Hora de inicio:</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
-                  {['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'].map(h => (
-                    <TouchableOpacity
-                      key={h}
-                      style={[styles.timeChip, startTime === h && styles.timeChipActive]}
-                      onPress={() => setStartTime(h)}
-                    >
-                      <Text style={[styles.timeChipText, startTime === h && styles.timeChipTextActive]}>{h}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+            {/* Quantity (week/month only; hour/day derive from the grid) */}
+            {!showGrid && (
+              <View style={styles.quantityRow}>
+                <Text style={styles.quantityLabel}>
+                  Cantidad de {selectedBilling ? BILLING_LABELS[selectedBilling].plural : ''}:
+                </Text>
+                <View style={styles.quantityControls}>
+                  <TouchableOpacity style={styles.quantityBtn} onPress={() => setQuantity(Math.max(1, quantity - 1))}>
+                    <Text style={styles.quantityBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.quantityValue}>{quantity}</Text>
+                  <TouchableOpacity style={styles.quantityBtn} onPress={() => setQuantity(quantity + 1)}>
+                    <Text style={styles.quantityBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
         )}
 
-        {/* Date picker */}
+        {/* Availability */}
         {selectedSubSpace && selectedBilling && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Selecciona una fecha</Text>
-            <View style={styles.monthNav}>
-              <TouchableOpacity onPress={() => { const d = new Date(selectedMonth); d.setMonth(d.getMonth() - 1); setSelectedMonth(d); }}>
-                <Text style={styles.navArrow}>‹</Text>
-              </TouchableOpacity>
-              <Text style={styles.monthTitle}>{MONTHS[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}</Text>
-              <TouchableOpacity onPress={() => { const d = new Date(selectedMonth); d.setMonth(d.getMonth() + 1); setSelectedMonth(d); }}>
-                <Text style={styles.navArrow}>›</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.weekHeaders}>
-              {WEEKDAYS.map(d => <Text key={d} style={styles.weekHeader}>{d}</Text>)}
-            </View>
-            <View style={styles.calGrid}>
-              {[...Array(firstDayOfMonth(selectedMonth)).fill(null), ...Array.from({ length: daysInMonth(selectedMonth) }, (_, i) => i + 1)].map((day, idx) => {
-                if (!day) return <View key={`e-${idx}`} style={styles.calCell} />;
-                const dStr = `${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                const isBooked = bookedDays.has(dStr);
-                const isPast = new Date(dStr) < new Date(new Date().toDateString());
-                const isSel = selectedDate?.getDate() === day && selectedDate?.getMonth() === selectedMonth.getMonth() && selectedDate?.getFullYear() === selectedMonth.getFullYear();
-                return (
-                  <TouchableOpacity
-                    key={day}
-                    style={[styles.calCell, isSel && styles.calCellSelected, (isBooked || isPast) && styles.calCellUnavailable]}
-                    onPress={() => {
-                      if (!isBooked && !isPast) setSelectedDate(new Date(dStr));
-                    }}
-                    disabled={isBooked || isPast}
-                  >
-                    <Text style={[styles.calDayText, isSel && styles.calDayTextSelected, (isBooked || isPast) && styles.calDayTextUnavailable]}>
-                      {day}
-                    </Text>
-                    {isBooked && <View style={styles.bookedDot} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {selectedDate && (
-              <View style={styles.selectedDateBadge}>
-                <Calendar size={14} color={Colors.primary} />
-                <Text style={styles.selectedDateText}>
-                  {WEEKDAYS[selectedDate.getDay()]} {selectedDate.getDate()} de {MONTHS[selectedDate.getMonth()]} {selectedDate.getFullYear()}
-                </Text>
+            <Text style={styles.sectionTitle}>Disponibilidad</Text>
+            <Text style={styles.sectionSub}>
+              {showGrid
+                ? 'Toca un horario disponible para comenzar y otro para terminar.'
+                : 'Elige la fecha de inicio.'}
+            </Text>
+
+            {hint && (
+              <View style={styles.hintBanner}>
+                <Info size={16} color={Colors.success} />
+                <Text style={styles.hintText}>{hint}</Text>
+                <TouchableOpacity onPress={() => setHint(null)} accessibilityRole="button" accessibilityLabel="Ocultar sugerencia">
+                  <Text style={styles.hintClose}>✕</Text>
+                </TouchableOpacity>
               </View>
+            )}
+
+            {showGrid ? (
+              <SlotGrid
+                days={gridDays}
+                selectedStart={selectedStart}
+                selectedEnd={selectedEnd}
+                onSelectRange={handleSelectRange}
+                onSuggest={handleSuggest}
+                onMonthChange={handleMonthChange}
+              />
+            ) : (
+              <>
+                {availableDates.length === 0 ? (
+                  <Text style={styles.emptyText}>Sin fechas disponibles.</Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateChipsRow}>
+                    {availableDates.map(date => {
+                      const isSel = selectedStart?.date === date;
+                      return (
+                        <TouchableOpacity
+                          key={date}
+                          style={[styles.dateChip, isSel && styles.dateChipActive]}
+                          onPress={() => handleSelectDate(date)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Elegir fecha ${date}`}
+                        >
+                          <Calendar size={14} color={isSel ? Colors.white : Colors.primary} />
+                          <Text style={[styles.dateChipText, isSel && styles.dateChipTextActive]}>{date}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+
+                {selectedStart && selectedBilling && bookingDraft && (
+                  <View style={styles.selectedDateBadge}>
+                    <Clock size={14} color={Colors.primary} />
+                    <Text style={styles.selectedDateText}>
+                      Inicio {bookingDraft.date} · {bookingDraft.quantity}{' '}
+                      {BILLING_LABELS[selectedBilling].plural} hasta {bookingDraft.endDate}
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         )}
-
-        {/* Price summary & Book button */}
-        {selectedSubSpace && selectedBilling && selectedDate && (
-          <View style={styles.bookingFooter}>
-            <View>
-              <Text style={styles.totalLabel}>Total estimado</Text>
-              <Text style={styles.totalPrice}>${totalPrice.toLocaleString()}</Text>
-              <Text style={styles.totalSub}>
-                {quantity} {BILLING_LABELS[selectedBilling].plural} · {selectedSubSpace.title}
-              </Text>
-            </View>
-            <TouchableScale
-              style={[styles.bookBtn, !isAvailable && { backgroundColor: Colors.error }]}
-              onPress={() => isAvailable ? setShowBookingModal(true) : Alert.alert('No disponible', 'Ese horario ya está reservado.')}
-            >
-              <Text style={styles.bookBtnText}>
-                {isAvailable ? 'Reservar ahora' : 'No disponible'}
-              </Text>
-            </TouchableScale>
-          </View>
-        )}
-
-        <View style={{ height: 60 }} />
       </ScrollView>
 
+      {/* Sticky price summary + CTA */}
+      {canBook && (
+        <View style={[styles.bookingFooter, { paddingBottom: 12 + insets.bottom }]}>
+          <View style={styles.footerLeft}>
+            <Text style={styles.totalLabel}>Total estimado</Text>
+            <Text style={styles.totalPrice}>${totalPrice.toLocaleString()}</Text>
+            <Text style={styles.totalSub}>
+              {bookingDraft!.quantity} {selectedBilling ? BILLING_LABELS[selectedBilling].plural : ''} ·{' '}
+              {selectedSubSpace?.title}
+            </Text>
+          </View>
+          <TouchableScale style={styles.bookBtn} onPress={() => setShowBookingModal(true)}>
+            <Text style={styles.bookBtnText}>Reservar ahora</Text>
+          </TouchableScale>
+        </View>
+      )}
+
       {/* Booking Confirmation Modal */}
-      <Modal visible={showBookingModal} animationType="slide" transparent>
+      <Modal visible={showBookingModal} animationType="slide" transparent onRequestClose={() => setShowBookingModal(false)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { paddingBottom: 28 + insets.bottom }]}>
             <Text style={styles.modalTitle}>Confirmar Reserva</Text>
             <View style={styles.modalRow}>
               <Text style={styles.modalLabel}>Espacio:</Text>
@@ -372,22 +766,36 @@ export default function CoWorkDetailScreen() {
             </View>
             <View style={styles.modalRow}>
               <Text style={styles.modalLabel}>Fecha:</Text>
-              <Text style={styles.modalValue}>{dateStr}</Text>
+              <Text style={styles.modalValue}>{dateRangeLabel}</Text>
             </View>
-            {selectedBilling === 'hour' && (
+            {selectedBilling === 'hour' && bookingDraft && (
               <View style={styles.modalRow}>
                 <Text style={styles.modalLabel}>Horario:</Text>
-                <Text style={styles.modalValue}>{startTime} – {endTime}</Text>
+                <Text style={styles.modalValue}>{bookingDraft.startTime} – {bookingDraft.endTime}</Text>
               </View>
             )}
             <View style={styles.modalRow}>
               <Text style={styles.modalLabel}>Duración:</Text>
-              <Text style={styles.modalValue}>{quantity} {selectedBilling ? BILLING_LABELS[selectedBilling].plural : ''}</Text>
+              <Text style={styles.modalValue}>
+                {bookingDraft?.quantity} {selectedBilling ? BILLING_LABELS[selectedBilling].plural : ''}
+              </Text>
             </View>
-            <View style={[styles.modalRow, { borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 8, paddingTop: 12 }]}>
-              <Text style={[styles.modalLabel, { fontWeight: '800', fontSize: 16 }]}>Total:</Text>
-              <Text style={[styles.modalValue, { fontWeight: '800', fontSize: 18, color: Colors.primary }]}>${totalPrice.toLocaleString()}</Text>
+            {selectedSubSpace?.instantBook && (
+              <View style={styles.modalRow}>
+                <Text style={styles.modalLabel}>Modalidad:</Text>
+                <Text style={[styles.modalValue, { color: Colors.success }]}>Instantáneo (pago inmediato)</Text>
+              </View>
+            )}
+            <View style={[styles.modalRow, styles.modalTotalRow]}>
+              <Text style={[styles.modalLabel, styles.modalTotalLabel]}>Total:</Text>
+              <Text style={[styles.modalValue, styles.modalTotalValue]}>${totalPrice.toLocaleString()}</Text>
             </View>
+            {selectedSubSpace?.cancellationPolicy ? (
+              <View style={styles.cancelPolicyBox}>
+                <ShieldIcon size={14} color={Colors.textLight} />
+                <Text style={styles.cancelPolicyText}>{selectedSubSpace.cancellationPolicy}</Text>
+              </View>
+            ) : null}
             <TextInput
               style={styles.notesInput}
               placeholder="Notas adicionales (opcional)..."
@@ -398,18 +806,82 @@ export default function CoWorkDetailScreen() {
               placeholderTextColor={Colors.textLight}
             />
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowBookingModal(false)}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowBookingModal(false)} disabled={submitting}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableScale style={styles.modalConfirmBtn} onPress={handleBook}>
-                <Text style={styles.modalConfirmText}>Confirmar</Text>
+              <TouchableScale style={[styles.modalConfirmBtn, submitting && { opacity: 0.7 }]} onPress={handleBook} disabled={submitting}>
+                {submitting ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <Text style={styles.modalConfirmText}>Confirmar</Text>
+                )}
               </TouchableScale>
             </View>
           </View>
         </View>
       </Modal>
+
+      {/* Payment handoff modal (instant bookings) */}
+      <Modal
+        visible={!!pendingPayment}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          if (!paymentBusy) setPendingPayment(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { paddingBottom: 28 + insets.bottom }]}>
+            <Text style={styles.modalTitle}>Completa el pago</Text>
+            <View style={styles.payAmountRow}>
+              <Text style={styles.payAmountLabel}>Total a pagar</Text>
+              <Text style={styles.payAmountValue}>${pendingPayment?.totalPrice.toLocaleString()}</Text>
+            </View>
+            <TouchableScale
+              style={[styles.payStripeBtn, paymentBusy === 'stripe' && styles.payBtnBusy]}
+              onPress={handlePayStripe}
+              disabled={!!paymentBusy}
+            >
+              {paymentBusy === 'stripe' ? (
+                <ActivityIndicator color={Colors.text} />
+              ) : (
+                <>
+                  <CreditCard size={20} color={Colors.text} />
+                  <Text style={styles.payStripeText}>Pagar con Stripe</Text>
+                </>
+              )}
+            </TouchableScale>
+            <TouchableScale
+              style={[styles.payMpBtn, paymentBusy === 'mp' && styles.payBtnBusy]}
+              onPress={handlePayMercadoPago}
+              disabled={!!paymentBusy}
+            >
+              {paymentBusy === 'mp' ? (
+                <ActivityIndicator color={Colors.white} />
+              ) : (
+                <>
+                  <Text style={styles.payMpLogo}>MP</Text>
+                  <Text style={styles.payMpText}>Pagar con MercadoPago</Text>
+                </>
+              )}
+            </TouchableScale>
+            <TouchableOpacity
+              style={styles.payCancel}
+              onPress={() => setPendingPayment(null)}
+              disabled={!!paymentBusy}
+            >
+              <Lock size={13} color={Colors.textLight} />
+              <Text style={styles.payCancelText}>Pago seguro. Podrás pagar después desde tus reservas.</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ConstellationBackground>
   );
+}
+
+function ShieldIcon(props: { size?: number; color?: string }) {
+  return <View style={[styles.shieldDot, { backgroundColor: (props.color || Colors.textLight) + '22' }]}><Text style={[styles.shieldText, { color: props.color || Colors.textLight }]}>i</Text></View>;
 }
 
 function SubSpaceCard({ sub, isSelected, onSelect }: { sub: SubSpace; isSelected: boolean; onSelect: () => void }) {
@@ -430,6 +902,11 @@ function SubSpaceCard({ sub, isSelected, onSelect }: { sub: SubSpace; isSelected
         <View style={[subCard.selectedBadge, { backgroundColor: sub.color || Colors.primary }]}>
           <CheckCircle size={14} color={Colors.white} />
           <Text style={subCard.selectedBadgeText}>Seleccionado</Text>
+        </View>
+      )}
+      {sub.instantBook && (
+        <View style={subCard.instantTag}>
+          <Text style={subCard.instantTagText}>Instantáneo ✓</Text>
         </View>
       )}
       <View style={[subCard.colorStrip, { backgroundColor: sub.color || Colors.primary }]} />
@@ -469,6 +946,14 @@ function SubSpaceCard({ sub, isSelected, onSelect }: { sub: SubSpace; isSelected
   );
 }
 
+export default function CoWorkDetailScreen() {
+  return (
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+      <CoWorkDetailInner />
+    </StripeProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   heroContainer: { height: 240, position: 'relative' },
@@ -497,6 +982,11 @@ const styles = StyleSheet.create({
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   tag: { backgroundColor: Colors.primary + '15', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 },
   tagText: { fontSize: 12, color: Colors.primary, fontWeight: '600' },
+  emptyText: { fontSize: 13, color: Colors.textLight, marginVertical: 8 },
+  skeletonContent: { padding: 16, gap: 12 },
+  notFoundTitle: { fontSize: 16, color: Colors.text, marginTop: 12 },
+  notFoundBtn: { marginTop: 20, padding: 12, backgroundColor: Colors.primary, borderRadius: 12 },
+  notFoundBtnText: { color: Colors.white, fontWeight: '700' },
   billingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   billingChip: {
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: 14,
@@ -513,25 +1003,21 @@ const styles = StyleSheet.create({
   quantityBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: Colors.primary + '20', alignItems: 'center', justifyContent: 'center' },
   quantityBtnText: { fontSize: 20, color: Colors.primary, fontWeight: '700', lineHeight: 22 },
   quantityValue: { fontSize: 20, fontWeight: '800', color: Colors.text, minWidth: 28, textAlign: 'center' },
-  timeRow: { marginTop: 8 },
-  timeScroll: { gap: 6, paddingVertical: 8 },
-  timeChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
-  timeChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  timeChipText: { fontSize: 13, color: Colors.textLight, fontWeight: '600' },
-  timeChipTextActive: { color: Colors.white },
-  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  navArrow: { fontSize: 28, color: Colors.primary, fontWeight: '300', paddingHorizontal: 8 },
-  monthTitle: { fontSize: 16, fontWeight: '700', color: Colors.text },
-  weekHeaders: { flexDirection: 'row', marginBottom: 6 },
-  weekHeader: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: Colors.textLight },
-  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  calCell: { width: (width - 32) / 7, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  calCellSelected: { backgroundColor: Colors.primary },
-  calCellUnavailable: { opacity: 0.35 },
-  calDayText: { fontSize: 14, color: Colors.text, fontWeight: '500' },
-  calDayTextSelected: { color: Colors.white, fontWeight: '800' },
-  calDayTextUnavailable: { color: Colors.textLight },
-  bookedDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.error, marginTop: 2 },
+  hintBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.success + '15', borderRadius: 12, padding: 12, marginBottom: 12,
+  },
+  hintText: { flex: 1, fontSize: 13, color: Colors.success, fontWeight: '600' },
+  hintClose: { fontSize: 14, color: Colors.success, fontWeight: '800', paddingHorizontal: 6 },
+  dateChipsRow: { gap: 8, paddingVertical: 4 },
+  dateChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1.5, borderColor: Colors.border, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 9, backgroundColor: Colors.white,
+  },
+  dateChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  dateChipText: { fontSize: 13, fontWeight: '700', color: Colors.text },
+  dateChipTextActive: { color: Colors.white },
   selectedDateBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     marginTop: 12, backgroundColor: Colors.primary + '15',
@@ -539,12 +1025,14 @@ const styles = StyleSheet.create({
   },
   selectedDateText: { fontSize: 14, fontWeight: '600', color: Colors.primary },
   bookingFooter: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 20,
+    paddingHorizontal: 16, paddingTop: 14,
     backgroundColor: Colors.white,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 8,
     borderTopWidth: 1, borderTopColor: Colors.border + '40',
   },
+  footerLeft: { flex: 1, paddingRight: 12 },
   totalLabel: { fontSize: 12, color: Colors.textLight, fontWeight: '600' },
   totalPrice: { fontSize: 26, fontWeight: '900', color: Colors.text },
   totalSub: { fontSize: 11, color: Colors.textLight, marginTop: 2 },
@@ -557,12 +1045,22 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: {
     backgroundColor: Colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24, paddingBottom: 40,
+    padding: 24,
   },
   modalTitle: { fontSize: 20, fontWeight: '800', color: Colors.text, marginBottom: 20 },
   modalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   modalLabel: { fontSize: 14, color: Colors.textLight, fontWeight: '600' },
   modalValue: { fontSize: 14, color: Colors.text, fontWeight: '700' },
+  modalTotalRow: { borderTopWidth: 1, borderTopColor: Colors.border, marginTop: 8, paddingTop: 12 },
+  modalTotalLabel: { fontWeight: '800', fontSize: 16 },
+  modalTotalValue: { fontWeight: '800', fontSize: 18, color: Colors.primary },
+  cancelPolicyBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.background, borderRadius: 10, padding: 10, marginTop: 4,
+  },
+  cancelPolicyText: { flex: 1, fontSize: 12, color: Colors.textLight, lineHeight: 17 },
+  shieldDot: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  shieldText: { fontSize: 11, fontWeight: '800' },
   notesInput: {
     marginTop: 12, borderWidth: 1, borderColor: Colors.border, borderRadius: 12,
     padding: 12, fontSize: 14, color: Colors.text, minHeight: 70, textAlignVertical: 'top',
@@ -572,11 +1070,39 @@ const styles = StyleSheet.create({
   modalCancelText: { fontSize: 15, fontWeight: '700', color: Colors.textLight },
   modalConfirmBtn: { flex: 1.5, paddingVertical: 14, borderRadius: 14, backgroundColor: Colors.primary, alignItems: 'center' },
   modalConfirmText: { fontSize: 15, fontWeight: '800', color: Colors.white },
+  payAmountRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: Colors.background, borderRadius: 12, padding: 16, marginBottom: 16,
+  },
+  payAmountLabel: { fontSize: 14, color: Colors.textLight, fontWeight: '600' },
+  payAmountValue: { fontSize: 22, fontWeight: '900', color: Colors.text },
+  payStripeBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.gold, borderRadius: 14, paddingVertical: 15, marginBottom: 12,
+  },
+  payMpBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#009EE3', borderRadius: 14, paddingVertical: 15, marginBottom: 12,
+  },
+  payBtnBusy: { opacity: 0.7 },
+  payStripeText: { fontSize: 15, fontWeight: '800', color: Colors.text },
+  payMpLogo: {
+    width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.white,
+    textAlign: 'center', lineHeight: 20, fontSize: 10, fontWeight: '800', color: '#009EE3', overflow: 'hidden',
+  },
+  payMpText: { fontSize: 15, fontWeight: '800', color: Colors.white },
+  payCancel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  payCancelText: { fontSize: 12, color: Colors.textLight },
   confirmIcon: { width: 96, height: 96, borderRadius: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
   confirmTitle: { fontSize: 24, fontWeight: '900', color: Colors.text, marginBottom: 12, textAlign: 'center' },
   confirmSub: { fontSize: 14, color: Colors.textLight, textAlign: 'center', lineHeight: 21, marginBottom: 8 },
+  requestNote: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.primary + '12', borderRadius: 12, padding: 12, marginTop: 8,
+  },
+  requestNoteText: { flex: 1, fontSize: 13, color: Colors.primary, fontWeight: '600', lineHeight: 18 },
   confirmPrice: { fontSize: 22, fontWeight: '800', color: Colors.primary, marginTop: 8 },
-  confirmBtn: { marginTop: 28, backgroundColor: Colors.primary, borderRadius: 16, paddingHorizontal: 32, paddingVertical: 14 },
+  confirmBtn: { marginTop: 28, backgroundColor: Colors.primary, borderRadius: 16, paddingHorizontal: 40, paddingVertical: 14 },
   confirmBtnText: { color: Colors.white, fontWeight: '800', fontSize: 16 },
 });
 
@@ -592,6 +1118,11 @@ const subCard = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4,
   },
   selectedBadgeText: { fontSize: 11, fontWeight: '700', color: Colors.white },
+  instantTag: {
+    position: 'absolute', top: 10, left: 10, zIndex: 5,
+    backgroundColor: Colors.success, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
+  },
+  instantTagText: { fontSize: 10, fontWeight: '800', color: Colors.white },
   colorStrip: { width: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 6 },
   emoji: { fontSize: 22, marginRight: 8 },
