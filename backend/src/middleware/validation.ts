@@ -202,3 +202,16 @@ export const validateCreateReservation: ValidationChain[] = [
   body('paymentMethod').optional().isString().isLength({ max: 50 }),
   body('notes').optional().isString().isLength({ max: 500 }),
 ];
+
+/**
+ * Space booking checkout validation
+ */
+export const validateSpaceBooking: ValidationChain[] = [
+  body('subspaceId').isInt({ min: 1 }),
+  body('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('date must be YYYY-MM-DD'),
+  body('startTime').matches(/^\d{2}:\d{2}$/),
+  body('endTime').matches(/^\d{2}:\d{2}$/),
+  body('billingUnit').isIn(['hour', 'day', 'week', 'month']),
+  body('quantity').optional().isInt({ min: 1, max: 31 }),
+  body('notes').optional().isString().isLength({ max: 500 }),
+];
