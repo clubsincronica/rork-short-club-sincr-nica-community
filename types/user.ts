@@ -472,6 +472,21 @@ export type SubSpaceType =
 
 export type CalendarMode = 'unified' | 'separate';
 
+export interface SlotCell {
+  date: string;
+  start: string;
+  end: string;
+  state: 'available' | 'booked' | 'blocked' | 'closed';
+}
+
+export interface BusinessHoursEntry {
+  day: string;
+  start: string;
+  end: string;
+}
+
+export type CoWorkAvailability = Array<{ date: string; cells: SlotCell[] }>;
+
 export interface SubSpace {
   id: string;
   spaceId: string;
@@ -490,6 +505,14 @@ export interface SubSpace {
   floorLabel?: string; // e.g., 'Subsuelo', 'Planta Baja', 'Mezzanine'
   calendarMode: CalendarMode; // 'unified' shares parent space calendar, 'separate' has its own
   color?: string; // optional color tag for calendar display
+  instantBook?: boolean;
+  businessHours?: Record<string, { start: string; end: string }> | BusinessHoursEntry[];
+  slotGranularity?: number;
+  minAdvance?: number;
+  maxDuration?: number;
+  cancellationPolicy?: string;
+  guestName?: string;
+  availability?: CoWorkAvailability;
 }
 
 export interface CoWorkSpace {
@@ -525,5 +548,9 @@ export interface SpaceBooking {
   paymentStatus: PaymentStatus;
   notes?: string;
   createdAt: string;
+  mode?: 'instant' | 'request';
+  paymentProvider?: string;
+  paymentId?: string;
+  guestName?: string;
 }
 

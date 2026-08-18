@@ -7,6 +7,7 @@
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = 'test-secret-key-for-testing-only';
 process.env.PORT = '3002'; // Use different port for testing
+process.env.STRIPE_SECRET_KEY = 'test-stripe-key-for-testing-only'; // Enable stripe client construction in tests
 
 // Suppress console output during tests (optional)
 // global.console = {
