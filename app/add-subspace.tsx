@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCoWork } from '@/hooks/cowork-store';
+import { useUser } from '@/hooks/user-store';
 import { Colors } from '@/constants/colors';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
 import { TouchableScale } from '@/components/TouchableScale';
@@ -36,6 +37,7 @@ export default function AddSubSpaceScreen() {
   const isEditing = editMode === 'true';
 
   const { getSpaceById, addSubSpace, updateSubSpace, loadData } = useCoWork();
+  const { currentUser } = useUser();
 
   const [type, setType] = useState<SubSpaceType>('office');
   const [title, setTitle] = useState('');
@@ -51,6 +53,11 @@ export default function AddSubSpaceScreen() {
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('unified');
   const [color, setColor] = useState(COLORS[0]);
   const [isActive, setIsActive] = useState(true);
+  const [instantBook, setInstantBook] = useState(false);
+  const [slotGranularity, setSlotGranularity] = useState(30);
+  const [minAdvance, setMinAdvance] = useState(120);
+  const [maxDuration, setMaxDuration] = useState(8);
+  const [cancellationPolicy, setCancellationPolicy] = useState('');
   const [customFeature, setCustomFeature] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -75,6 +82,11 @@ export default function AddSubSpaceScreen() {
         setCalendarMode(sub.calendarMode);
         setColor(sub.color || COLORS[0]);
         setIsActive(sub.isActive);
+        setInstantBook(sub.instantBook ?? false);
+        setSlotGranularity(sub.slotGranularity ?? 30);
+        setMinAdvance(sub.minAdvance ?? 120);
+        setMaxDuration(sub.maxDuration ?? 8);
+        setCancellationPolicy(sub.cancellationPolicy ?? '');
       }
     }
   }, [isEditing, spaceId, subSpaceId]);
@@ -93,6 +105,17 @@ export default function AddSubSpaceScreen() {
     if (!title.trim()) { Alert.alert('Error', 'El nombre del sub-espacio es requerido.'); return; }
     if (billingUnits.includes('hour') && !pricePerHour) { Alert.alert('Error', 'Ingresa el precio por hora.'); return; }
     if (billingUnits.includes('day') && !pricePerDay) { Alert.alert('Error', 'Ingresa el precio por día.'); return; }
+    if (billingUnits.includes('week') && !pricePerWeek) { Alert.alert('Error', 'Ingresa el precio por semana.'); return; }
+    if (billingUnits.includes('month') && !pricePerMonth) { Alert.alert('Error', 'Ingresa el precio por mes.'); return; }
+    // Week/month billing unit requires price > 0
+    if (billingUnits.includes('week') && (pricePerWeek === '' || parseFloat(pricePerWeek) <= 0)) {
+      Alert.alert('Error', 'El precio por semana debe ser mayor a 0.');
+      return;
+    }
+    if (billingUnits.includes('month') && (pricePerMonth === '' || parseFloat(pricePerMonth) <= 0)) {
+      Alert.alert('Error', 'El precio por mes debe ser mayor a 0.');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -112,6 +135,11 @@ export default function AddSubSpaceScreen() {
         calendarMode,
         color,
         isActive,
+        instantBook,
+        slotGranularity: slotGranularity || 30,
+        minAdvance: minAdvance || 120,
+        maxDuration: maxDuration || 8,
+        cancellationPolicy: cancellationPolicy || undefined,
       };
 
       if (isEditing && subSpaceId) {
@@ -322,6 +350,78 @@ export default function AddSubSpaceScreen() {
             </View>
           </View>
 
+          {/* Booking modal settings */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>⏱️ Modalidad de reserva</Text>
+            <View style={styles.row}>
+              <View style={styles.optionRow}>
+                <TouchableOpacity
+                  style={[styles.optionChip, instantBook && styles.optionChipActive]}
+                  onPress={() => setInstantBook(true)}
+                >
+                  <Text style={[styles.optionText, instantBook && styles.optionTextActive]}>⚡ Instantánea</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.optionChip, !instantBook && styles.optionChipActive]}
+                  onPress={() => setInstantBook(false)}
+                >
+                  <Text style={[styles.optionText, !instantBook && styles.optionTextActive]}>Con solicitud</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.row}>
+              <View style={styles.optionRow}>
+                <TouchableOpacity
+                  style={[styles.optionChip, slotGranularity === 15 && styles.optionChipActive]}
+                  onPress={() => setSlotGranularity(15)}
+                >
+                  <Text style={[styles.optionText, slotGranularity === 15 && styles.optionTextActive]}>15 min</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.optionChip, slotGranularity === 30 && styles.optionChipActive]}
+                  onPress={() => setSlotGranularity(30)}
+                >
+                  <Text style={[styles.optionText, slotGranularity === 30 && styles.optionTextActive]}>30 min</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.optionChip, slotGranularity === 60 && styles.optionChipActive]}
+                  onPress={() => setSlotGranularity(60)}
+                >
+                  <Text style={[styles.optionText, slotGranularity === 60 && styles.optionTextActive]}>60 min</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Anticipo mínimo (min)</Text>
+              <TextInput
+                style={styles.input}
+                value={minAdvance.toString()}
+                onChangeText={v => setMinAdvance(parseInt(v) || 120)}
+                keyboardType="numeric"
+                placeholder="120"
+              />
+              <Text style={styles.label}>Duración máxima (horas)</Text>
+              <TextInput
+                style={styles.input}
+                value={maxDuration.toString()}
+                onChangeText={v => setMaxDuration(parseInt(v) || 8)}
+                keyboardType="numeric"
+                placeholder="8"
+              />
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.label}>Política de cancelación</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 60 }]}
+                value={cancellationPolicy}
+                onChangeText={v => setCancellationPolicy(v)}
+                placeholder="Ej: Cancelación gratis hasta 24h antes..."
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </View>
+
           {/* Color picker */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>🎨 Color en el calendario</Text>
@@ -457,4 +557,10 @@ const styles = StyleSheet.create({
   },
   saveBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 18 },
   saveBtnText: { fontSize: 17, fontWeight: '800', color: Colors.white },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  optionRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 8 },
+  optionChip: { padding: 8, borderRadius: 20, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  optionChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  optionText: { fontSize: 12, color: Colors.textLight },
+  optionTextActive: { color: Colors.white },
 });
