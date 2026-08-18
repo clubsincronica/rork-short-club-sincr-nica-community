@@ -148,6 +148,8 @@ function CoWorkDetailInner() {
   const [space, setSpace] = useState<CoWorkSpace | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [payNotice, setPayNotice] = useState<string | null>(null);
   const [visibleMonth, setVisibleMonth] = useState(() => monthStartStr(todayStr()));
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const [selectedBilling, setSelectedBilling] = useState<BillingUnit | null>(null);
@@ -174,17 +176,22 @@ function CoWorkDetailInner() {
         if (!detail) {
           setSpace(null);
           setNotFound(true);
+          setLoadError(false);
           return;
         }
         setSpace(detail);
         setNotFound(false);
+        setLoadError(false);
         setSelectedSubId(prev => {
           if (prev && detail.subSpaces.some(s => s.id === prev)) return prev;
           return subSpaceId && detail.subSpaces.some(s => s.id === subSpaceId) ? subSpaceId : null;
         });
         setHint(null);
       } catch {
-        Alert.alert('Error', 'No se pudo cargar el espacio. Revisa tu conexión e inténtalo de nuevo.');
+        // 404s map to null inside fetchSpaceDetail; anything reaching here is a
+        // real failure (network/server), so render the retryable error state.
+        setLoadError(true);
+        setNotFound(false);
       } finally {
         if (!silent) setIsLoading(false);
       }
@@ -208,6 +215,13 @@ function CoWorkDetailInner() {
     () => activeSubs.find(s => s.id === selectedSubId) ?? null,
     [activeSubs, selectedSubId]
   );
+
+  // Single source of truth for instant mode, aligned with the backend: checkout
+  // derives mode from sub.instant_book (the same column the store maps into
+  // SubSpace.instantBook). The confirm-modal row and the payment handoff
+  // therefore read the same signal, so the "Instantáneo" label can never
+  // disagree with the flow that opens the pay modal.
+  const isInstantBook = !!selectedSubSpace?.instantBook;
 
   const calendarMode = space?.calendarMode === 'separate' ? 'separate' : 'unified';
 
@@ -233,7 +247,9 @@ function CoWorkDetailInner() {
     );
   }, [selectedSubSpace, selectedBilling]);
 
-  const showGrid = selectedBilling === 'hour' || selectedBilling === 'day';
+  // Only hour billing uses the two-tap SlotGrid. day/week/month use the simple
+  // date chips (start date + quantity) per the global constraint.
+  const showGrid = selectedBilling === 'hour';
 
   const bookingDraft = useMemo<BookingDraft | null>(() => {
     if (!selectedSubSpace || !selectedStart || !selectedBilling) return null;
@@ -247,7 +263,10 @@ function CoWorkDetailInner() {
           (timeToMinute(selectedEnd.time) - timeToMinute(start));
         quantityH = Math.max(1, Math.round(totalMin / 60));
       }
-      const q = Math.min(DURATION_MAX, quantityH);
+      // Respect the subspace's max duration (owner-configured hour cap), defaulting
+      // to 8h like the store, while never exceeding the backend 31-max validation.
+      const hourCap = Math.min(DURATION_MAX, selectedSubSpace.maxDuration || 8);
+      const q = Math.min(hourCap, quantityH);
       return {
         date: startDate,
         startTime: start,
@@ -256,26 +275,18 @@ function CoWorkDetailInner() {
         endDate: startDate,
       };
     }
-    if (selectedBilling === 'day') {
-      const q = Math.min(
-        DURATION_MAX,
-        Math.max(1, selectedEnd ? dateDiffDays(startDate, selectedEnd.date) : 1)
-      );
-      return {
-        date: startDate,
-        startTime: '09:00',
-        endTime: '23:59',
-        quantity: q,
-        endDate: addDays(startDate, q),
-      };
-    }
     const q = Math.max(1, Math.min(DURATION_MAX, quantity));
     return {
       date: startDate,
-      startTime: '09:00',
+      startTime: '00:00',
       endTime: '23:59',
       quantity: q,
-      endDate: selectedBilling === 'week' ? addDays(startDate, q * 7) : addMonths(startDate, q),
+      endDate:
+        selectedBilling === 'day'
+          ? addDays(startDate, q)
+          : selectedBilling === 'week'
+            ? addDays(startDate, q * 7)
+            : addMonths(startDate, q),
     };
   }, [selectedSubSpace, selectedStart, selectedEnd, selectedBilling, quantity]);
 
@@ -308,7 +319,7 @@ function CoWorkDetailInner() {
   };
 
   const handleSelectDate = (date: string) => {
-    setSelectedStart({ date, time: '09:00' });
+    setSelectedStart({ date, time: '00:00' });
     setSelectedEnd(null);
     setHint(null);
   };
@@ -323,7 +334,7 @@ function CoWorkDetailInner() {
     if (selectedBilling === 'hour') {
       setSelectedStart({ date, time: suggested });
     } else {
-      setSelectedStart({ date, time: '09:00' });
+      setSelectedStart({ date, time: '00:00' });
     }
     setSelectedEnd(null);
   };
@@ -414,8 +425,26 @@ function CoWorkDetailInner() {
         Alert.alert('Error', 'No se recibió el punto de pago de MercadoPago.');
         return;
       }
-      await WebBrowser.openBrowserAsync(url);
-      await finishInstant();
+      const result = await WebBrowser.openBrowserAsync(url);
+      // openBrowserAsync for a hosted redirect cannot report the payment outcome
+      // itself (type is CANCEL/DISMISS/OPENED/LOCKED, not SUCCESS). MP is a true
+      // redirect to back_urls we don't deep-link, so the source of truth is the
+      // backend: the webhook flips the booking to confirmed/paid. Only show
+      // success when the backend confirms it; otherwise keep the booking held.
+      const wasCancelled =
+        result.type === WebBrowser.WebBrowserResultType.CANCEL ||
+        result.type === WebBrowser.WebBrowserResultType.DISMISS;
+      const paid = await isBookingPaid(pendingPayment.bookingId);
+      if (paid) {
+        await finishInstant();
+      } else {
+        setPendingPayment(null);
+        setPayNotice(
+          wasCancelled
+            ? 'El pago no se completó. Podrás pagar desde Mis reservas.'
+            : 'No pudimos confirmar el pago. Podrás pagar desde Mis reservas.'
+        );
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 402) {
         Alert.alert('MercadoPago', e.message);
@@ -424,6 +453,24 @@ function CoWorkDetailInner() {
       }
     } finally {
       setPaymentBusy(null);
+    }
+  };
+
+  // Server-side verification of a payment outcome. The MP webhook lands in the
+  // transactions table and, for space bookings, marks the booking confirmed/paid
+  // (backend/src/models/transaction.ts updateTransactionStatus). The guest can
+  // read that through GET /api/spaces/bookings/guest (no per-booking status is
+  // exposed today), so a cancelled browser is only acknowledged when the backend
+  // actually reports the booking as confirmed (which the webhook only sets
+  // alongside paid for space bookings). On any failure we conservatively
+  // report "not paid" (booking stays held, cancellable via Mis reservas).
+  const isBookingPaid = async (bookingId: number): Promise<boolean> => {
+    try {
+      const rows = await fetchGuestBookings();
+      const found = rows.find(b => b.id === String(bookingId));
+      return !!found && found.status === 'confirmed';
+    } catch {
+      return false;
     }
   };
 
@@ -501,6 +548,24 @@ function CoWorkDetailInner() {
             <SkeletonCard lines={1} />
             <SkeletonCard lines={3} />
           </ScrollView>
+        </View>
+      </ConstellationBackground>
+    );
+  }
+
+  // ── Loading error (network/server) ──────────────────────────────────────
+  if (loadError) {
+    return (
+      <ConstellationBackground intensity="light">
+        <View style={[styles.container, { paddingTop: insets.top, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }]}>
+          <AlertCircle size={60} color={Colors.textLight} />
+          <Text style={styles.notFoundTitle}>No se pudo cargar el espacio</Text>
+          <Text style={styles.loadErrorSub}>
+            Revisa tu conexión e inténtalo de nuevo.
+          </Text>
+          <TouchableOpacity onPress={() => loadDetail(visibleMonth)} style={styles.notFoundBtn}>
+            <Text style={styles.notFoundBtnText}>Reintentar</Text>
+          </TouchableOpacity>
         </View>
       </ConstellationBackground>
     );
@@ -591,6 +656,15 @@ function CoWorkDetailInner() {
         </View>
 
         {/* Space description */}
+        {payNotice && (
+          <View style={styles.payNoticeBanner}>
+            <Info size={16} color={Colors.textLight} />
+            <Text style={styles.payNoticeText}>{payNotice}</Text>
+            <TouchableOpacity onPress={() => setPayNotice(null)} accessibilityRole="button" accessibilityLabel="Ocultar aviso">
+              <Text style={styles.hintClose}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre este espacio</Text>
           <Text style={styles.description}>{space.description}</Text>
@@ -650,7 +724,7 @@ function CoWorkDetailInner() {
               })}
             </View>
 
-            {/* Quantity (week/month only; hour/day derive from the grid) */}
+            {/* Quantity (day/week/month via chips; hour duration derives from the grid) */}
             {!showGrid && (
               <View style={styles.quantityRow}>
                 <Text style={styles.quantityLabel}>
@@ -780,7 +854,7 @@ function CoWorkDetailInner() {
                 {bookingDraft?.quantity} {selectedBilling ? BILLING_LABELS[selectedBilling].plural : ''}
               </Text>
             </View>
-            {selectedSubSpace?.instantBook && (
+            {isInstantBook && (
               <View style={styles.modalRow}>
                 <Text style={styles.modalLabel}>Modalidad:</Text>
                 <Text style={[styles.modalValue, { color: Colors.success }]}>Instantáneo (pago inmediato)</Text>
@@ -985,8 +1059,15 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 13, color: Colors.textLight, marginVertical: 8 },
   skeletonContent: { padding: 16, gap: 12 },
   notFoundTitle: { fontSize: 16, color: Colors.text, marginTop: 12 },
+  loadErrorSub: { fontSize: 13, color: Colors.textLight, marginTop: 6, textAlign: 'center' },
   notFoundBtn: { marginTop: 20, padding: 12, backgroundColor: Colors.primary, borderRadius: 12 },
   notFoundBtnText: { color: Colors.white, fontWeight: '700' },
+  payNoticeBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: Colors.textLight + '12', borderRadius: 12,
+    padding: 12, marginHorizontal: 16, marginTop: 14,
+  },
+  payNoticeText: { flex: 1, fontSize: 13, color: Colors.textLight, fontWeight: '600', lineHeight: 18 },
   billingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   billingChip: {
     borderWidth: 1.5, borderColor: Colors.border, borderRadius: 14,
