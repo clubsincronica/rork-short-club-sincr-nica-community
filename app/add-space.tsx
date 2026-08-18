@@ -13,6 +13,7 @@ import { ConstellationBackground } from '@/components/ConstellationBackground';
 import { TouchableScale } from '@/components/TouchableScale';
 import { ArrowLeft, Building, MapPin, Check, Plus, X } from '@/components/SmartIcons';
 import { CalendarMode } from '@/types/user';
+import { ImageUploader } from '@/components/ImageUploader';
 
 const AMENITY_OPTIONS = ['WiFi', 'Aire Acondicionado', 'Calefacción', 'Baño privado', 'Cocina compartida', 'Estacionamiento', 'Acceso discapacitados', 'Seguridad 24hs', 'Recepción', 'Sala de espera', 'Proyector', 'Sonido', 'Iluminación profesional', 'Terraza', 'Jardín'];
 
@@ -31,8 +32,35 @@ export default function AddSpaceScreen() {
   const [location, setLocation] = useState('');
   const [amenities, setAmenities] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [images, setImages] = useState<string[]>([]);
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('unified');
   const [isPublished, setIsPublished] = useState(false);
+  const [businessHours, setBusinessHours] = useState<Record<string, { start: string; end: string }>>({
+    lun: { start: '09:00', end: '22:00' },
+    mar: { start: '09:00', end: '22:00' },
+    mié: { start: '09:00', end: '22:00' },
+    jue: { start: '09:00', end: '22:00' },
+    vie: { start: '09:00', end: '22:00' },
+    sáb: { start: '10:00', end: '18:00' },
+    dom: { start: '', end: '' },
+  });
+
+  // Publish gate state
+  const [publishGateStatus, setPublishGateStatus] = useState<{passed: boolean; missing: string[]}>({passed: false, missing: []});
+
+  useEffect(() => {
+    const hasMinImages = images.length >= 3;
+    // When editing, get subSpaces from the space; otherwise use empty array
+    const subSpacesEdit = isEditing && spaceId ? (getSpaceById(spaceId)?.subSpaces || []) : [];
+    const hasPriceAndSubspace = subSpacesEdit.some((s: any) => s.isActive && (s.pricePerHour || s.pricePerDay || s.pricePerWeek || s.pricePerMonth));
+    const hasBusinessHours = Object.values(businessHours).some(v => v.start && v.end);
+    const passed = hasMinImages && hasPriceAndSubspace && hasBusinessHours;
+    const missing: string[] = [];
+    if (!hasMinImages) missing.push('≥3 imágenes');
+    if (!hasPriceAndSubspace) missing.push('≥1 sub-espacio con precio');
+    if (!hasBusinessHours) missing.push('horario de atención');
+    setPublishGateStatus({passed, missing});
+  }, [images, isEditing, spaceId, businessHours]);
   const [customAmenity, setCustomAmenity] = useState('');
   const [customTag, setCustomTag] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -76,6 +104,11 @@ export default function AddSpaceScreen() {
     if (!location.trim()) { Alert.alert('Error', 'La ubicación es requerida.'); return; }
     if (!currentUser) { Alert.alert('Error', 'Debes estar logueado.'); return; }
 
+    if (!publishGateStatus.passed) {
+      Alert.alert('Publicación incomplete', `Para publicar es necesario: ${publishGateStatus.missing.join(', ')}.`);
+      return;
+    }
+
     setIsSaving(true);
     try {
       const spaceData = {
@@ -83,11 +116,12 @@ export default function AddSpaceScreen() {
         title: title.trim(),
         description: description.trim(),
         location: location.trim(),
-        images: [],
+        images,
         amenities,
         tags,
         calendarMode,
-        isPublished,
+        isPublished: true,
+        businessHours: businessHours && Object.keys(businessHours).length > 0 ? Object.entries(businessHours).map(([day, v]) => ({ day, start: v.start, end: v.end })) : undefined,
         subSpaces: [],
       };
 
@@ -207,6 +241,50 @@ export default function AddSpaceScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Business Hours */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>🕐 Horario de atención</Text>
+            <Text style={styles.cardSub}>Selecciona los horarios por día de la semana</Text>
+            <View style={styles.businessHoursRow}>
+              {['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'].map(dayKey => {
+                const dayLabels: Record<string, string> = {
+                  lun: 'Lun', mar: 'Mar', mié: 'Mié', jue: 'Jue', vie: 'Vie', sáb: 'Sáb', dom: 'Dom',
+                };
+                const bh = businessHours[dayKey] || { start: '', end: '' };
+                const isWeekday = ['lun', 'mar', 'mié', 'jue', 'vie'].includes(dayKey);
+                const isWeekend = dayKey === 'sáb';
+                const isOff = dayKey === 'dom';
+                return (
+                  <View key={dayKey} style={styles.bhCell}>
+                    <Text style={styles.bhLabel}>{dayLabels[dayKey]}</Text>
+                    <View style={styles.bhTimeRow}>
+                      <TextInput
+                        style={styles.bhInput}
+                        value={bh.start}
+                        onChangeText={v => setBusinessHours(prev => ({ ...prev, [dayKey]: { start: v, end: bh.end } }))}
+                        placeholder="HH:MM"
+                        keyboardType="numeric"
+                        maxLength={5}
+                      />
+                      <Text style={styles.bhSeparator}>–</Text>
+                      <TextInput
+                        style={styles.bhInput}
+                        value={bh.end}
+                        onChangeText={v => setBusinessHours(prev => ({ ...prev, [dayKey]: { start: bh.start, end: v } }))}
+                        placeholder="HH:MM"
+                        keyboardType="numeric"
+                        maxLength={5}
+                      />
+                    </View>
+                    {isOff && <Text style={styles.bhNote}>Domingo: cerrado</Text>}
+                    {isWeekend && <Text style={styles.bhNote}>Sábado: {bh.start || '10:00'} – {bh.end || '18:00'}</Text>}
+                    {isWeekday && <Text style={styles.bhNote}>Lun–Vie: {bh.start || '09:00'} – {bh.end || '22:00'}</Text>}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
           {/* Amenities */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>🏢 Comodidades del espacio</Text>
@@ -280,7 +358,14 @@ export default function AddSpaceScreen() {
                 onValueChange={setIsPublished}
                 trackColor={{ false: Colors.border, true: Colors.primary }}
                 thumbColor={Colors.white}
+                disabled={!publishGateStatus.passed}
               />
+              {!publishGateStatus.passed && (
+                <View style={{ marginLeft: 12 }}>
+                  <Text style={{ fontSize: 12, marginLeft: 12, marginBottom: 4 }}>Faltan:</Text>
+                  <Text style={{ marginLeft: 12, marginBottom: 4 }}>{publishGateStatus.missing.join(', ')}</Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -410,4 +495,11 @@ const styles = StyleSheet.create({
     gap: 10, paddingVertical: 18,
   },
   saveBtnText: { fontSize: 17, fontWeight: '800', color: Colors.white },
+  businessHoursRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  bhCell: { flex: 1, minWidth: 80 },
+  bhLabel: { fontSize: 11, fontWeight: '600', color: Colors.textLight, marginBottom: 4 },
+  bhTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  bhInput: { flex: 1, fontSize: 12, height: 30, borderWidth: 1, borderColor: Colors.border, borderRadius: 6, paddingHorizontal: 8, backgroundColor: Colors.background, color: Colors.text, minWidth: 50 },
+  bhSeparator: { color: Colors.border, fontSize: 14 },
+  bhNote: { fontSize: 9, color: Colors.textSecondary, marginTop: 2 },
 });
