@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+// @ts-ignore
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Modal, Dimensions, FlatList
@@ -34,8 +35,8 @@ export default function ManageSpaceScreen() {
   const insets = useSafeAreaInsets();
   const { spaceId } = useLocalSearchParams<{ spaceId: string }>();
   const { currentUser } = useUser();
-  const { getSpaceById, getBookingsForSpace, deleteSubSpace, updateSubSpace, loadData } = useCoWork();
-  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'bookings'>('overview');
+  const { getSpaceById, getBookingsForSpace, deleteSubSpace, updateSubSpace, updateBookingStatus, loadData } = useCoWork();
+  const [activeTab, setActiveTab] = useState<'overview' | 'calendar' | 'bookings' | 'solicitudes'>('overview');
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [filterSubSpace, setFilterSubSpace] = useState<string>('all');
 
@@ -130,14 +131,14 @@ export default function ManageSpaceScreen() {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          {(['overview', 'calendar', 'bookings'] as const).map(tab => (
+          {(['overview', 'calendar', 'bookings', 'solicitudes'] as const).map(tab => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}
               onPress={() => setActiveTab(tab)}
             >
               <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'overview' ? '🏠 Sub-espacios' : tab === 'calendar' ? '📅 Calendario' : '📋 Reservas'}
+                {tab === 'overview' ? '🏠 Sub-espacios' : tab === 'calendar' ? '📅 Calendario' : tab === 'bookings' ? '📋 Reservas' : '⚠️ Solicitudes'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -169,6 +170,9 @@ export default function ManageSpaceScreen() {
           )}
           {activeTab === 'bookings' && (
             <BookingsTab bookings={bookings} space={space} />
+          )}
+          {activeTab === 'solicitudes' && (
+            <SolicitudesTab bookings={bookings} space={space} onRefresh={() => setActiveTab('solicitudes')} />
           )}
           <View style={{ height: 100 }} />
         </ScrollView>
@@ -409,6 +413,75 @@ function CalendarTab({ space, bookings, selectedMonth, onMonthChange, filterSubS
           )}
         </View>
       )}
+    </View>
+  );
+}
+
+// ─── Solicitudes Tab ──────────────────────────────────────────────────────────
+
+function SolicitudesTab({ bookings, space, onRefresh }: { bookings: SpaceBooking[]; space: CoWorkSpace; onRefresh: () => void }) {
+  const pending = bookings.filter(b => b.mode === 'request' && b.status === 'pending');
+
+  if (pending.length === 0) {
+    return (
+      <View style={tabStyles.empty}>
+        <Layers size={56} color={Colors.border} />
+        <Text style={tabStyles.emptyTitle}>Sin solicitudes</Text>
+        <Text style={tabStyles.emptySub}>No hay reservas pendientes de aceptar.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ padding: 16 }}>
+{pending.map(b => {
+        const sub = space.subSpaces.find(s => s.id === b.subSpaceId)!
+        return (
+          <View key={b.id} style={subItemStyles.card}>
+            <View style={[subItemStyles.colorBar, { backgroundColor: sub?.color || Colors.primary }]} />
+            <View style={{ flex: 1, paddingLeft: 12 }}>
+              <View style={subItemStyles.titleRow}>
+                <Text style={subItemStyles.typeEmoji}>{TYPE_ICONS[sub.type] || '🏠'}</Text>
+                <Text style={subItemStyles.title} numberOfLines={1}>{sub.title}</Text>
+                <View style={[subItemStyles.activeBadge, { backgroundColor: sub?.isActive ? Colors.success + '20' : Colors.border }]}>
+                  <Text style={[subItemStyles.activeBadgeText, { color: sub?.isActive ? Colors.success : Colors.textLight }]}>
+                    {sub?.isActive ? 'Activo' : 'Inactivo'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={subItemStyles.description} numberOfLines={2}>{sub.description}</Text>
+              <View style={subItemStyles.metaRow}>
+                <View style={subItemStyles.metaItem}>
+                  <Users size={11} color={Colors.textLight} />
+                  <Text style={subItemStyles.metaText}>{sub.capacity} personas</Text>
+                </View>
+                <View style={subItemStyles.metaItem}>
+                  <DollarSign size={11} color={Colors.primary} />
+                  <Text style={[subItemStyles.metaText, { color: Colors.primary, fontWeight: '700' }]}>
+                    ${sub.pricePerHour?.toLocaleString()}{sub.billingUnits.includes('hour') ? '/hr' : ''}
+                  </Text>
+                </View>
+              </View>
+              <View style={subItemStyles.actionsRow}>
+                <TouchableOpacity style={subItemStyles.actionBtn} onPress={() => {
+                  updateBookingStatus(b.id, 'approved');
+                  onRefresh();
+                }}>
+                  <Check size={13} color={Colors.success} />
+                  <Text style={[subItemStyles.actionBtnText, { color: Colors.success }]}>Aceptar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={subItemStyles.actionBtn} onPress={() => {
+                  updateBookingStatus(b.id, 'declined');
+                  onRefresh();
+                }}>
+                  <Trash2 size={13} color={Colors.error} />
+                  <Text style={[subItemStyles.actionBtnText, { color: Colors.error }]}>Declinar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
