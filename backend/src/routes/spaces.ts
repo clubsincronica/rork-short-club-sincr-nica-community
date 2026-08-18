@@ -55,6 +55,17 @@ router.get('/', async (req: any, res: express.Response) => {
   }
 });
 
+// Get current user's own spaces (published or not).
+// Registered before GET /:id so /owner is not shadowed by the single-segment param route.
+router.get('/owner', authenticateJWT, async (req: any, res: express.Response) => {
+  try {
+    const spaces = await SpaceModel.getSpacesByOwner(req.user.userId);
+    res.json(spaces);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get space with subspaces + availability (public for published; owner sees own unpublished)
 router.get('/:id', async (req: any, res: express.Response) => {
   try {

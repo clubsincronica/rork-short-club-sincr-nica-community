@@ -56,6 +56,7 @@ interface CoWorkStore {
   publishSpace: (id: string, isPublished: boolean) => Promise<void>;
   fetchPublishedSpaces: (filters?: SpaceFilters) => Promise<CoWorkSpace[]>;
   fetchSpaceDetail: (id: string) => Promise<CoWorkSpace | null>;
+  fetchOwnerSpaces: () => Promise<CoWorkSpace[]>;
 
   // SubSpace actions
   addSubSpace: (spaceId: string, subSpace: Omit<SubSpace, 'id' | 'spaceId'>) => Promise<string>;
@@ -349,6 +350,20 @@ export const useCoWork = create<CoWorkStore>((set, get) => ({
         set({ error: e?.message ?? String(e), isLoading: false });
       }
     }
+
+    // When a user is logged in, also pull their own spaces (incl. unpublished) so
+    // mis-espacios finds them on a fresh device. Non-fatal on failure (offline/unauth).
+    try {
+      const stored = await AsyncStorage.getItem('currentUser');
+      if (stored) {
+        const owner = JSON.parse(stored);
+        if (owner && owner.id != null) {
+          await get().fetchOwnerSpaces();
+        }
+      }
+    } catch {
+      // ignore
+    }
   },
 
   fetchPublishedSpaces: async (filters) => {
@@ -378,6 +393,16 @@ export const useCoWork = create<CoWorkStore>((set, get) => ({
       if (e instanceof ApiError && e.status === 404) return null;
       throw e;
     }
+  },
+
+  fetchOwnerSpaces: async () => {
+    const rows: any[] = await apiFetch('/api/spaces/owner');
+    const mapped = rows.map(spaceFromRow);
+    // Merge over current state so richer cached/detail copies of subspaces are kept.
+    const merged = mergeCachedInto(mapped, get().spaces);
+    set({ spaces: merged, error: null });
+    await save(merged, get().bookings);
+    return mapped;
   },
 
   addSpace: async (spaceData) => {

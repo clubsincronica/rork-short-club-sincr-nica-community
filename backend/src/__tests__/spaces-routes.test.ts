@@ -1,8 +1,10 @@
+import express from 'express';
+import request from 'supertest';
 import spacesRouter from '../routes/spaces';
 import * as SpaceModel from '../models/space';
 import * as BookingModel from '../models/space-booking';
 import * as AvailabilityModel from '../models/availability';
-import { mockRequest, mockResponse } from './helpers';
+import { mockRequest, mockResponse, generateTestToken } from './helpers';
 
 jest.mock('../models/space', () => ({
   createSpace: jest.fn(),
@@ -96,6 +98,52 @@ describe('GET /api/spaces', () => {
     });
     expect(res.status).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(rows);
+  });
+});
+
+describe('GET /api/spaces/owner', () => {
+  it("returns the authenticated user's own spaces (published or not)", async () => {
+    const rows = [
+      { id: 1, owner_id: 5, is_published: true, title: 'Published' },
+      { id: 2, owner_id: 5, is_published: false, title: 'Draft' },
+    ];
+    spaceModel.getSpacesByOwner.mockResolvedValue(rows);
+    const req = mockRequest({ user: { userId: 5, role: 'user' } });
+    const res = mockResponse();
+
+    const handler = findHandler('get', '/owner');
+    await handler(req, res);
+
+    expect(spaceModel.getSpacesByOwner).toHaveBeenCalledWith(5);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(rows);
+  });
+
+  it('GET /owner is not shadowed by GET /:id (real dispatch via express)', async () => {
+    spaceModel.getSpacesByOwner.mockResolvedValue([{ id: 1, owner_id: 5, is_published: false, title: 'Draft' }]);
+    spaceModel.getSpaceById.mockResolvedValue(undefined);
+
+    const app = express();
+    app.use('/api/spaces', spacesRouter);
+    const token = generateTestToken(5, 'owner@test.com');
+
+    const res = await request(app)
+      .get('/api/spaces/owner')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([{ id: 1, owner_id: 5, is_published: false, title: 'Draft' }]);
+    expect(spaceModel.getSpacesByOwner).toHaveBeenCalledWith(5);
+    expect(spaceModel.getSpaceById).not.toHaveBeenCalled();
+  });
+
+  it('401 without a valid token', async () => {
+    const app = express();
+    app.use('/api/spaces', spacesRouter);
+
+    const res = await request(app).get('/api/spaces/owner');
+
+    expect(res.status).toBe(401);
   });
 });
 
