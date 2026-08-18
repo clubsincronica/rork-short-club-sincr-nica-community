@@ -88,7 +88,7 @@ export default function MyBookingsScreen() {
       for (const b of rows) {
         next[b.id] = b.status;
         const prev = lastKnown[b.id];
-        if (prev && prev !== b.status && b.status !== 'pending') {
+        if (prev && prev !== b.status && b.status !== 'pending' && !(prev === 'cancelled' && b.status === 'cancelled')) {
           if (b.status === 'confirmed') {
             addNotification({
               title: 'Reserva confirmada',
@@ -109,6 +109,24 @@ export default function MyBookingsScreen() {
       console.warn('Booking status tracking failed (non-fatal):', e);
     }
   }, [fetchGuestBookings, addNotification, bookingTitle]);
+
+  const markSelfCancelled = useCallback(async (id: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(STATUS_KEY);
+      const latest: Record<string, string> = raw ? JSON.parse(raw) : {};
+      latest[id] = 'cancelled';
+      await AsyncStorage.setItem(STATUS_KEY, JSON.stringify(latest));
+    } catch (e) {
+      console.warn('Booking status tracking failed (non-fatal):', e);
+    }
+    // Ensure the flip-detection snapshot for this id reflects 'cancelled'
+    // so loadBookings() below does NOT fire "El anfitrión canceló tu reserva"
+    try {
+      await AsyncStorage.setItem(STATUS_KEY, JSON.stringify({ [id]: 'cancelled' }));
+    } catch (e) {
+      console.warn('Failed to persist self-cancel snapshot:', e);
+    }
+  }, []);
 
   const loadBookingsRef = useRef(loadBookings);
   loadBookingsRef.current = loadBookings;
@@ -164,6 +182,7 @@ export default function MyBookingsScreen() {
             setCancellingId(booking.id);
             try {
               await updateBookingStatus(booking.id, 'cancelled');
+              await markSelfCancelled(booking.id);
               await loadBookings();
               addNotification({
                 title: 'Reserva cancelada',
@@ -180,7 +199,7 @@ export default function MyBookingsScreen() {
         },
       ]
     );
-  }, [bookingTitle, updateBookingStatus, loadBookings, addNotification]);
+  }, [bookingTitle, updateBookingStatus, markSelfCancelled, loadBookings, addNotification]);
 
   if (!currentUser) {
     return (
