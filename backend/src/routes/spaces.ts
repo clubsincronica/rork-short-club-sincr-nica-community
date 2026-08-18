@@ -146,7 +146,8 @@ router.post('/:id/subspaces', authenticateJWT, async (req: any, res: express.Res
     if (!isOwner(space, req)) {
       return res.status(403).json({ error: 'Forbidden: You do not own this space' });
     }
-    const result = await SpaceModel.createSubSpace({ spaceId, ...req.body });
+    const { spaceId: _ignoredSpaceId, space_id: _ignoredSpaceIdSnake, ...subspaceBody } = req.body;
+    const result = await SpaceModel.createSubSpace({ spaceId, ...subspaceBody });
     res.status(201).json({ id: result.lastID, message: 'Subspace created' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

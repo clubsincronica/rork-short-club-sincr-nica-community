@@ -229,6 +229,19 @@ describe('POST /api/spaces/:id/subspaces', () => {
 
     expect(res.status).toHaveBeenCalledWith(403);
   });
+
+  it('ignores a body.spaceId that differs from the URL param', async () => {
+    spaceModel.getSpaceById.mockResolvedValue({ id: 1, owner_id: 5 });
+    spaceModel.createSubSpace.mockResolvedValue({ lastID: 12 });
+    const req = mockRequest({ params: { id: '1' }, body: { title: 'Desk 2', spaceId: 99, space_id: 99 }, user: { userId: 5, role: 'user' } });
+    const res = mockResponse();
+
+    const handler = findHandler('post', '/:id/subspaces');
+    await handler(req, res);
+
+    expect(spaceModel.createSubSpace).toHaveBeenCalledWith({ spaceId: 1, title: 'Desk 2' });
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
 });
 
 describe('POST /api/spaces/checkout', () => {
