@@ -37,6 +37,30 @@ const useNotificationStore = () => {
         enabled: !!currentUser
     });
 
+    const addNotificationMutation = useMutation({
+        mutationFn: async (input: { title: string; message: string; type?: Notification['type'] }) => {
+            if (!currentUser) return;
+            // In-app inbox entry via the backend's create endpoint. Best-effort:
+            // failures never block the caller (booking cancellation, etc.).
+            try {
+                await apiFetch('/api/notifications', {
+                    method: 'POST',
+                    body: {
+                        user_id: currentUser.id,
+                        title: input.title,
+                        message: input.message,
+                        type: input.type ?? 'info',
+                    },
+                });
+            } catch (e) {
+                console.warn('addNotification failed (non-fatal):', e);
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['notifications', currentUser?.id] });
+        }
+    });
+
     const markAsReadMutation = useMutation({
         mutationFn: async (id: number) => {
             await apiFetch(`/api/notifications/${id}/read`, { method: 'PUT' });
@@ -65,6 +89,7 @@ const useNotificationStore = () => {
         notifications,
         unreadCount,
         isLoading,
+        addNotification: addNotificationMutation.mutate,
         markAsRead: markAsReadMutation.mutate,
         markAllAsRead: markAllAsReadMutation.mutate,
         refetch

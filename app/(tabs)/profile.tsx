@@ -267,6 +267,14 @@ export default function ProfileScreen() {
       testId: 'mis-espacios',
       highlight: true,
     },
+    {
+      icon: Calendar,
+      title: 'Mis Reservas',
+      subtitle: 'Consulta y gestiona tus reservas de espacios',
+      onPress: () => router.push('/my-bookings'),
+      testId: 'my-bookings',
+      highlight: true,
+    },
   ];
 
   const miCuentaItems = [
