@@ -137,6 +137,12 @@ export async function updateSpaceBookingStatus(id: number, status: string, payme
   }
 }
 
+export async function expireStaleRequests(): Promise<void> {
+  await query(
+    `UPDATE space_bookings SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW() WHERE status = 'pending' AND mode = 'request' AND created_at < NOW() - INTERVAL '48 hours'`
+  );
+}
+
 export function computeBookingPrice(sub: any, billingUnit: string, quantity: number): number {
   const key = { hour: 'price_hour', day: 'price_day', week: 'price_week', month: 'price_month' }[billingUnit];
   const price = key ? Number(sub?.[key] || 0) : 0;

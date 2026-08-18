@@ -29,6 +29,7 @@ jest.mock('../models/space-booking', () => ({
   getBookingsForSubSpace: jest.fn(),
   updateSpaceBookingStatus: jest.fn(),
   computeBookingPrice: jest.fn(),
+  expireStaleRequests: jest.fn(),
 }));
 
 jest.mock('../models/availability', () => ({
@@ -73,6 +74,7 @@ beforeEach(() => {
   bookingModel.getBookingsForSubSpace.mockReset();
   bookingModel.updateSpaceBookingStatus.mockReset();
   bookingModel.computeBookingPrice.mockReset();
+  bookingModel.expireStaleRequests.mockReset();
   availabilityModel.cellStates.mockReset();
   availabilityModel.nextAvailable.mockReset();
 });

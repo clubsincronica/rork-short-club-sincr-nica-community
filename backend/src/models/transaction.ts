@@ -91,8 +91,23 @@ export async function updateTransactionStatus(paymentProvider: string, paymentId
   if (status === 'succeeded' || status === 'approved') {
     const transaction = await findTransactionByPaymentId(paymentProvider, paymentId);
     if (transaction && transaction.booking_id) {
-      const { updateReservationStatus } = require('./reservation');
-      await updateReservationStatus(transaction.booking_id, 'confirmed', 'completed');
+      let metadata: any = {};
+      if (typeof transaction.metadata === 'string') {
+        try {
+          metadata = JSON.parse(transaction.metadata);
+        } catch {
+          metadata = {};
+        }
+      } else if (transaction.metadata && typeof transaction.metadata === 'object') {
+        metadata = transaction.metadata;
+      }
+      if (metadata?.resource === 'space') {
+        const { updateSpaceBookingStatus } = require('./space-booking');
+        await updateSpaceBookingStatus(transaction.booking_id, 'confirmed', 'paid');
+      } else {
+        const { updateReservationStatus } = require('./reservation');
+        await updateReservationStatus(transaction.booking_id, 'confirmed', 'completed');
+      }
     }
   }
 }

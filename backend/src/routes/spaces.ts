@@ -1,11 +1,18 @@
 import express, { Router } from 'express';
+import Stripe from 'stripe';
+import { MercadoPagoConfig, Preference } from 'mercadopago';
 import * as SpaceModel from '../models/space';
 import * as BookingModel from '../models/space-booking';
 import { cellStates, nextAvailable } from '../models/availability';
 import { authenticateJWT } from '../middleware/security';
 import { validateSpaceBooking, handleValidationErrors } from '../middleware/validation';
+import { createTransaction, getCommissionRate } from '../models/transaction';
+import { query } from '../db/postgres-client';
 
 const router = Router();
+
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey) : null;
 
 const isOwner = (space: any, req: any) => space.owner_id === req.user.userId || req.user.role === 'admin';
 
@@ -247,9 +254,147 @@ router.post('/checkout', authenticateJWT, validateSpaceBooking, handleValidation
   }
 });
 
+// Pay for a space booking via Stripe PaymentIntent (price always from DB)
+router.post('/pay/stripe/:bookingId', authenticateJWT, async (req: any, res: express.Response) => {
+  try {
+    if (!stripe) {
+      return res.status(503).json({ error: 'Stripe is not configured on this server' });
+    }
+
+    const bookingId = parseInt(req.params.bookingId);
+    const booking = await BookingModel.getSpaceBookingById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (booking.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'You are not authorized to pay for this booking' });
+    }
+
+    const space = await SpaceModel.getSpaceById(booking.space_id);
+    const providerId = space ? space.owner_id : null;
+
+    // Price comes from the DB booking, never from the client
+    const amountCents = Math.round(Number(booking.total_price) * 100);
+    const amountDecimal = amountCents / 100;
+    const commissionRate = await getCommissionRate();
+    const appFeeAmount = Math.round(amountDecimal * commissionRate * 100) / 100;
+    const providerAmount = Math.round((amountDecimal - appFeeAmount) * 100) / 100;
+    const currency = req.body.currency || 'usd';
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amountCents,
+      currency,
+      metadata: { buyerId: req.user.userId, providerId, bookingId: bookingId.toString(), resource: 'space' }
+    });
+
+    await createTransaction({
+      paymentProvider: 'stripe',
+      paymentId: paymentIntent.id,
+      status: 'pending',
+      amount: amountDecimal,
+      currency,
+      buyerId: req.user.userId,
+      providerId,
+      bookingId,
+      metadata: { resource: 'space' },
+      appFeeAmount,
+      providerAmount
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (error: any) {
+    console.error('Stripe error:', error);
+    res.status(500).json({ error: 'Payment processing error. Please try again.' });
+  }
+});
+
+// Pay for a space booking via MercadoPago preference (vendor token flow)
+router.post('/pay/mercadopago/:bookingId', authenticateJWT, async (req: any, res: express.Response) => {
+  try {
+    const bookingId = parseInt(req.params.bookingId);
+    const booking = await BookingModel.getSpaceBookingById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+    if (booking.user_id !== req.user.userId) {
+      return res.status(403).json({ error: 'You are not authorized to pay for this booking' });
+    }
+
+    const space = await SpaceModel.getSpaceById(booking.space_id);
+    const providerId = space ? space.owner_id : null;
+
+    // Look up the vendor's MP access token (marketplace OAuth)
+    const vendorRows: any = await query(
+      `SELECT mp_access_token, mp_token_expires_at FROM users WHERE id = $1`,
+      [providerId]
+    );
+    const vendor = vendorRows[0];
+    if (!vendor || !vendor.mp_access_token) {
+      return res.status(402).json({
+        error: 'vendor_not_connected',
+        message: 'El vendedor aún no ha vinculado su cuenta de MercadoPago. Por favor contacta al proveedor.',
+      });
+    }
+    if (vendor.mp_token_expires_at && new Date(vendor.mp_token_expires_at) < new Date()) {
+      return res.status(402).json({
+        error: 'vendor_token_expired',
+        message: 'El token de MercadoPago del vendedor ha expirado. Por favor pídele que reconecte su cuenta.',
+      });
+    }
+
+    // Price always from the DB booking
+    const totalAmount = Number(booking.total_price);
+    const commissionRate = await getCommissionRate();
+    const appFeeAmount = Math.round(totalAmount * commissionRate * 100) / 100;
+    const providerAmount = Math.round((totalAmount - appFeeAmount) * 100) / 100;
+    const currency = (req.body.currency) || 'ARS';
+    const securedItems = [{
+      id: bookingId.toString(),
+      title: `Reserva #${bookingId}`,
+      quantity: 1,
+      currency_id: currency,
+      unit_price: totalAmount,
+    }];
+
+    const vendorMpClient = new MercadoPagoConfig({ accessToken: vendor.mp_access_token });
+    const vendorMpPreference = new Preference(vendorMpClient);
+
+    const result = await vendorMpPreference.create({
+      body: {
+        items: securedItems,
+        payer: req.body.payer,
+        marketplace_fee: appFeeAmount,
+        back_urls: req.body.back_urls || {},
+        auto_return: 'approved' as const,
+        external_reference: bookingId.toString()
+      }
+    });
+
+    await createTransaction({
+      paymentProvider: 'mercadopago',
+      paymentId: result.id!.toString(),
+      status: 'pending',
+      amount: totalAmount,
+      currency,
+      buyerId: req.user.userId,
+      providerId,
+      bookingId,
+      metadata: { resource: 'space' },
+      appFeeAmount,
+      providerAmount
+    });
+
+    res.json({ init_point: result.init_point, sandbox_init_point: result.sandbox_init_point });
+  } catch (error: any) {
+    console.error('MercadoPago error:', error);
+    res.status(500).json({ error: 'Payment processing error. Please try again.' });
+  }
+});
+
 // Owner's bookings
 router.get('/bookings/owner', authenticateJWT, async (req: any, res: express.Response) => {
   try {
+    await BookingModel.expireStaleRequests();
     const bookings = await BookingModel.getBookingsForOwner(req.user.userId);
     res.json(bookings);
   } catch (error: any) {
@@ -260,6 +405,7 @@ router.get('/bookings/owner', authenticateJWT, async (req: any, res: express.Res
 // Guest's bookings
 router.get('/bookings/guest', authenticateJWT, async (req: any, res: express.Response) => {
   try {
+    await BookingModel.expireStaleRequests();
     const bookings = await BookingModel.getBookingsForGuest(req.user.userId);
     res.json(bookings);
   } catch (error: any) {
@@ -294,6 +440,46 @@ router.put('/bookings/:id/status', authenticateJWT, async (req: any, res: expres
 
     await BookingModel.updateSpaceBookingStatus(id, status, paymentStatus);
     res.json({ message: 'Booking status updated' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Owner accepts a booking request (capture semantics → confirmed + paid)
+router.post('/bookings/:id/accepted', authenticateJWT, async (req: any, res: express.Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const booking = await BookingModel.getSpaceBookingById(id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const sub = await SpaceModel.getSubSpaceById(booking.subspace_id);
+    const space = sub ? await SpaceModel.getSpaceById(sub.space_id) : null;
+    if (!space || (space.owner_id !== req.user.userId && req.user.role !== 'admin')) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this booking' });
+    }
+
+    await BookingModel.updateSpaceBookingStatus(id, 'confirmed', 'paid');
+    res.json({ message: 'Booking accepted' });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Owner declines a booking request (release hold → cancelled + refunded)
+router.post('/bookings/:id/declined', authenticateJWT, async (req: any, res: express.Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    const booking = await BookingModel.getSpaceBookingById(id);
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const sub = await SpaceModel.getSubSpaceById(booking.subspace_id);
+    const space = sub ? await SpaceModel.getSpaceById(sub.space_id) : null;
+    if (!space || (space.owner_id !== req.user.userId && req.user.role !== 'admin')) {
+      return res.status(403).json({ error: 'Forbidden: You do not own this booking' });
+    }
+
+    await BookingModel.updateSpaceBookingStatus(id, 'cancelled', 'refunded');
+    res.json({ message: 'Booking declined' });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
