@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Search, Filter } from '@/components/SmartIcons';
+import { Search, Filter, Users } from '@/components/SmartIcons';
 import { ServiceCard } from '@/components/ServiceCard';
 import { LodgingCard } from '@/components/LodgingCard';
 import { OfferingCard } from '@/components/OfferingCard';
+import { SpaceCard } from '@/components/SpaceCard';
 import { CategoryFilter } from '@/components/CategoryFilter';
 import { OnTodayBoard } from '@/components/OnTodayBoard';
 import { TouchableScale } from '@/components/TouchableScale';
@@ -16,11 +17,24 @@ import { useUser } from '@/hooks/user-store';
 import { useServices } from '@/hooks/services-store';
 import { useLodging } from '@/hooks/lodging-store';
 import { useProducts } from '@/hooks/products-store';
-import { ServiceCategory } from '@/types/user';
+import { useCoWork } from '@/hooks/cowork-store';
+import { ServiceCategory, SubSpaceType } from '@/types/user';
 import { Colors } from '@/constants/colors';
 import { router } from 'expo-router';
 
-type ViewMode = 'services' | 'lodging' | 'products' | 'events';
+type ViewMode = 'services' | 'lodging' | 'products' | 'events' | 'spaces';
+
+const SPACE_TYPE_FILTERS: { key: SubSpaceType | 'all'; label: string }[] = [
+  { key: 'all', label: 'Todos' },
+  { key: 'office', label: 'Oficina' },
+  { key: 'studio', label: 'Estudio' },
+  { key: 'meeting-room', label: 'Sala de reuniones' },
+  { key: 'event-space', label: 'Evento' },
+  { key: 'streaming-set', label: 'Streaming' },
+  { key: 'recording-booth', label: 'Cabina de grabación' },
+  { key: 'coworking-desk', label: 'Escritorio' },
+  { key: 'other', label: 'Otros' },
+];
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -29,15 +43,27 @@ export default function DiscoverScreen() {
   const { services: allServices, isLoading: isServicesLoading } = useServices();
   const { lodgings: allLodgings, fetchLodgings, isLoading: isLodgingLoading } = useLodging();
   const { products: allProducts, isLoading: isProductsLoading } = useProducts();
+  const { spaces: allSpaces, loadData: loadCoWork } = useCoWork();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<ServiceCategory | 'all'>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('services');
+  const [isLoadingSpaces, setIsLoadingSpaces] = useState(false);
+  const [isFiltersVisible, setIsFiltersVisible] = useState(false);
+  const [spaceTypeFilter, setSpaceTypeFilter] = useState<SubSpaceType | 'all'>('all');
+  const [spaceCapacity, setSpaceCapacity] = useState<string>('');
+  const [spaceMaxPrice, setSpaceMaxPrice] = useState<string>('');
+  const [spaceInstantBookOnly, setSpaceInstantBookOnly] = useState(false);
 
-  const isLoading = isServicesLoading || isLodgingLoading || isProductsLoading;
+  const isLoading = isServicesLoading || isLodgingLoading || isProductsLoading || isLoadingSpaces;
 
   useEffect(() => {
     fetchLodgings();
   }, [fetchLodgings]);
+
+  useEffect(() => {
+    setIsLoadingSpaces(true);
+    loadCoWork().finally(() => setIsLoadingSpaces(false));
+  }, [loadCoWork]);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
@@ -95,6 +121,70 @@ export default function DiscoverScreen() {
     return filtered;
   }, [debouncedSearchQuery, allProducts]);
 
+  const minActiveHourlyPrice = (subSpaces: any[]): number | null => {
+    const prices = (subSpaces ?? [])
+      .filter((sub: any) => sub.isActive && typeof sub.pricePerHour === 'number' && sub.pricePerHour > 0)
+      .map((sub: any) => sub.pricePerHour as number);
+    if (prices.length === 0) return null;
+    return Math.min(...prices);
+  };
+
+  const filteredSpaces = useMemo(() => {
+    let filtered = (allSpaces as any[]).filter((space: any) => space.isPublished !== false);
+
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter((space: any) =>
+        space.title.toLowerCase().includes(query) ||
+        space.description.toLowerCase().includes(query) ||
+        space.location?.toLowerCase().includes(query)
+      );
+    }
+
+    if (spaceTypeFilter !== 'all') {
+      filtered = filtered.filter((space: any) =>
+        (space.subSpaces ?? []).some((sub: any) => sub.type === spaceTypeFilter)
+      );
+    }
+
+    const capacity = parseInt(spaceCapacity, 10);
+    if (!Number.isNaN(capacity) && capacity > 0) {
+      filtered = filtered.filter((space: any) => {
+        const subs = (space.subSpaces ?? []) as any[];
+        if (subs.length === 0) return true;
+        return subs.some((sub: any) => sub.isActive && sub.capacity >= capacity);
+      });
+    }
+
+    const maxPrice = parseFloat(spaceMaxPrice);
+    if (!Number.isNaN(maxPrice) && maxPrice > 0) {
+      filtered = filtered.filter((space: any) => {
+        const from = minActiveHourlyPrice(space.subSpaces ?? []);
+        return from == null || from <= maxPrice;
+      });
+    }
+
+    if (spaceInstantBookOnly) {
+      // The flat /api/spaces list does not return instant_book at space-level, so
+      // this filter only applies when nested sub-spaces are present (cached/demo
+      // data or after the Task 10 detail fetch). Spaces without sub-spaces pass.
+      filtered = filtered.filter((space: any) => {
+        const subs = (space.subSpaces ?? []) as any[];
+        if (subs.length === 0) return true;
+        return subs.some((sub: any) => sub.isActive && !!sub.instantBook);
+      });
+    }
+
+    return filtered;
+  }, [
+    allSpaces,
+    debouncedSearchQuery,
+    spaceTypeFilter,
+    spaceCapacity,
+    spaceMaxPrice,
+    spaceInstantBookOnly,
+  ]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -119,10 +209,11 @@ export default function DiscoverScreen() {
                 />
               </View>
               <TouchableScale
-                style={styles.filterButton}
+                style={[styles.filterButton, viewMode === 'spaces' && isFiltersVisible && styles.activeFilterButton]}
+                onPress={() => setIsFiltersVisible(viewMode === 'spaces' ? !isFiltersVisible : false)}
                 testID="filter-button"
               >
-                <Filter size={20} color={Colors.gold} />
+                <Filter size={20} color={viewMode === 'spaces' && isFiltersVisible ? Colors.textOnGold : Colors.gold} />
               </TouchableScale>
             </View>
 
@@ -159,6 +250,14 @@ export default function DiscoverScreen() {
                   Eventos
                 </AccessibleText>
               </TouchableScale>
+              <TouchableScale
+                style={[styles.viewModeButton, viewMode === 'spaces' && styles.activeViewMode]}
+                onPress={() => setViewMode('spaces')}
+              >
+                <AccessibleText style={[styles.viewModeText, viewMode === 'spaces' && styles.activeViewModeText]}>
+                  Espacios
+                </AccessibleText>
+              </TouchableScale>
             </View>
           </View>
         </View>
@@ -171,6 +270,70 @@ export default function DiscoverScreen() {
               params: { eventId: event.id, eventName: event.title }
             })}
           />
+
+          {viewMode === 'spaces' && isFiltersVisible && (
+            <View style={styles.spacesFilterContainer}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.spacesTypeContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {SPACE_TYPE_FILTERS.map((filter) => {
+                  const isSelected = spaceTypeFilter === filter.key;
+                  return (
+                    <TouchableScale
+                      key={filter.key}
+                      style={[styles.spaceTypePill, isSelected && styles.spaceTypePillSelected]}
+                      onPress={() => setSpaceTypeFilter(filter.key)}
+                    >
+                      <AccessibleText style={[styles.spaceTypePillText, isSelected && styles.spaceTypePillTextSelected]}>
+                        {filter.label}
+                      </AccessibleText>
+                    </TouchableScale>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={styles.spacesFilterRow}>
+                <View style={styles.spaceFilterInputBox}>
+                  <Users size={16} color={Colors.textLight} />
+                  <TextInput
+                    style={styles.spaceFilterInput}
+                    placeholder="Capacidad"
+                    placeholderTextColor={Colors.textLight}
+                    value={spaceCapacity}
+                    onChangeText={setSpaceCapacity}
+                    keyboardType="number-pad"
+                    testID="space-capacity-input"
+                  />
+                </View>
+                <View style={styles.spaceFilterInputBox}>
+                  <AccessibleText style={styles.spaceFilterPrefix}>$</AccessibleText>
+                  <TextInput
+                    style={styles.spaceFilterInput}
+                    placeholder="Precio máx/h"
+                    placeholderTextColor={Colors.textLight}
+                    value={spaceMaxPrice}
+                    onChangeText={setSpaceMaxPrice}
+                    keyboardType="numbers-and-punctuation"
+                    testID="space-maxprice-input"
+                  />
+                </View>
+                <TouchableScale
+                  style={[styles.instantBookToggle, spaceInstantBookOnly && styles.instantBookToggleActive]}
+                  onPress={() => setSpaceInstantBookOnly((prev) => !prev)}
+                  testID="space-instantbook-toggle"
+                >
+                  <AccessibleText
+                    style={[styles.instantBookText, spaceInstantBookOnly && styles.instantBookTextActive]}
+                  >
+                    Sólo Instant Book
+                  </AccessibleText>
+                </TouchableScale>
+              </View>
+            </View>
+          )}
 
           {viewMode === 'services' && (
             <>
@@ -265,6 +428,28 @@ export default function DiscoverScreen() {
                     onPress={() => router.push({
                       pathname: '/event-detail',
                       params: { eventId: event.id, eventName: event.title }
+                    })}
+                  />
+                ))}
+              </View>
+            </>
+          )}
+
+          {viewMode === 'spaces' && (
+            <>
+              <View style={styles.resultsContainer}>
+                <AccessibleText style={styles.resultsText}>
+                  {filteredSpaces.length} espacios encontrados
+                </AccessibleText>
+              </View>
+              <View style={styles.spacesContainer}>
+                {filteredSpaces.map((space) => (
+                  <SpaceCard
+                    key={space.id}
+                    space={space}
+                    onPress={() => router.push({
+                      pathname: '/cowork-detail',
+                      params: { spaceId: space.id }
                     })}
                   />
                 ))}
@@ -395,6 +580,93 @@ const styles = StyleSheet.create({
   },
   servicesContainer: {
     paddingBottom: 20,
+  },
+  spacesContainer: {
+    paddingBottom: 20,
+  },
+  spacesFilterContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  spacesTypeContent: {
+    gap: 8,
+    paddingRight: 8,
+  },
+  spaceTypePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  spaceTypePillSelected: {
+    backgroundColor: Colors.gold,
+    borderColor: Colors.goldDark,
+  },
+  spaceTypePillText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  spaceTypePillTextSelected: {
+    color: Colors.textOnGold,
+    fontWeight: '700',
+  },
+  spacesFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  spaceFilterInputBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  spaceFilterInput: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+    minWidth: 60,
+  },
+  spaceFilterPrefix: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textLight,
+  },
+  instantBookToggle: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  instantBookToggleActive: {
+    backgroundColor: Colors.gold,
+    borderColor: Colors.goldDark,
+  },
+  instantBookText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+  },
+  instantBookTextActive: {
+    color: Colors.textOnGold,
+    fontWeight: '700',
+  },
+  activeFilterButton: {
+    backgroundColor: Colors.gold,
+    borderColor: Colors.goldDark,
   },
   lodgingContainer: {
     paddingBottom: 20,
