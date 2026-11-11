@@ -10,7 +10,13 @@ const STORAGE_KEYS = {
   RESERVATIONS: 'calendar_reservations',
   CART: 'calendar_cart',
   SETTINGS: 'calendar_settings',
+  SEED: 'calendar_events_seed',
 };
+
+// Versión del contenido semilla. Al cambiarla, la próxima carga reemplaza los
+// eventos guardados por los de la temporada (evita quedar con datos viejos en
+// el dispositivo después de actualizar el cronograma).
+const SEED_VERSION = 'verano-26-27';
 
 export const [CalendarProvider, useCalendar] = createContextHook(() => {
   const { currentUser } = useUser();
@@ -34,20 +40,22 @@ export const [CalendarProvider, useCalendar] = createContextHook(() => {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [eventsData, reservationsData, cartData, settingsData] = await Promise.all([
+      const [eventsData, reservationsData, cartData, settingsData, seedVersion] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.EVENTS),
         AsyncStorage.getItem(STORAGE_KEYS.RESERVATIONS),
         AsyncStorage.getItem(STORAGE_KEYS.CART),
         AsyncStorage.getItem(STORAGE_KEYS.SETTINGS),
+        AsyncStorage.getItem(STORAGE_KEYS.SEED),
       ]);
 
-      // Load events from storage or use mock data if empty
-      if (eventsData) {
+      // Load events from storage or use mock data if empty / outdated
+      if (eventsData && seedVersion === SEED_VERSION) {
         setEvents(JSON.parse(eventsData));
       } else {
-        // Initialize with mock events for demonstration
+        // Initialize with the current season events for demonstration
         setEvents(mockCalendarEvents);
         await AsyncStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(mockCalendarEvents));
+        await AsyncStorage.setItem(STORAGE_KEYS.SEED, SEED_VERSION);
       }
       
       if (reservationsData) setReservations(JSON.parse(reservationsData));

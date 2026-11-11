@@ -30,6 +30,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCalendar } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
 import { Colors } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { CalendarEvent, ServiceCategory } from '@/types/user';
 
 const SERVICE_CATEGORIES: { value: ServiceCategory; label: string; icon: string }[] = [
@@ -482,7 +483,7 @@ export default function AddEventScreen() {
       </View>
 
       <View style={styles.inputGroup}>
-        <Text style={styles.inputLabel}>Precio (€)</Text>
+        <Text style={styles.inputLabel}>Precio (ARS)</Text>
         <View style={styles.priceContainer}>
           <DollarSign size={20} color={Colors.textLight} />
           <TextInput
@@ -566,7 +567,7 @@ export default function AddEventScreen() {
           <View style={styles.reviewDetail}>
             <DollarSign size={16} color={Colors.primary} />
             <Text style={styles.reviewDetailText}>
-              {eventForm.price > 0 ? `€${eventForm.price}` : 'Gratuito'}
+              {eventForm.price > 0 ? formatPrice(eventForm.price) : 'Gratuito'}
             </Text>
           </View>
         </View>

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Edit2, Trash2, Eye, DollarSign, Package, TrendingUp, Clock, Star } from 'lucide-react-native';
 import { Colors, Gradients } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
 import { useVendorStore } from '@/hooks/vendor-store';
@@ -23,7 +24,7 @@ export default function VendorDashboard() {
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
           <DollarSign size={24} color={Colors.gold} />
-          <Text style={styles.statValue}>€{stats.todayRevenue.toFixed(2)}</Text>
+          <Text style={styles.statValue}>{formatPrice(stats.todayRevenue)}</Text>
           <Text style={styles.statLabel}>Ingresos Hoy</Text>
         </View>
         <View style={styles.statCard}>
@@ -58,7 +59,7 @@ export default function VendorDashboard() {
               </View>
             </View>
             <Text style={styles.orderCustomer}>{order.user.name}</Text>
-            <Text style={styles.orderTotal}>€{order.total.toFixed(2)}</Text>
+            <Text style={styles.orderTotal}>{formatPrice(order.total)}</Text>
             <View style={styles.orderTime}>
               <Clock size={14} color={Colors.textLight} />
               <Text style={styles.orderTimeText}>
@@ -87,7 +88,7 @@ export default function VendorDashboard() {
             <View style={styles.menuItemInfo}>
               <Text style={styles.menuItemName}>{item.name}</Text>
               <Text style={styles.menuItemDescription}>{item.description}</Text>
-              <Text style={styles.menuItemPrice}>€{item.price.toFixed(2)}</Text>
+              <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
             </View>
             <View style={styles.menuItemActions}>
               <TouchableOpacity 
@@ -164,7 +165,7 @@ export default function VendorDashboard() {
             </View>
 
             <View style={styles.orderFooter}>
-              <Text style={styles.orderTotal}>€{order.total.toFixed(2)}</Text>
+              <Text style={styles.orderTotal}>{formatPrice(order.total)}</Text>
               <Text style={styles.orderTime}>
                 {new Date(order.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
               </Text>
@@ -192,7 +193,7 @@ export default function VendorDashboard() {
       <View style={styles.analyticsStats}>
         <View style={styles.analyticCard}>
           <Text style={styles.analyticLabel}>Ingresos Totales</Text>
-          <Text style={styles.analyticValue}>€{stats.monthRevenue.toFixed(2)}</Text>
+          <Text style={styles.analyticValue}>{formatPrice(stats.monthRevenue)}</Text>
           <Text style={styles.analyticChange}>+12% vs mes anterior</Text>
         </View>
         <View style={styles.analyticCard}>
@@ -202,7 +203,7 @@ export default function VendorDashboard() {
         </View>
         <View style={styles.analyticCard}>
           <Text style={styles.analyticLabel}>Ticket Promedio</Text>
-          <Text style={styles.analyticValue}>€{(stats.monthRevenue / stats.monthOrders).toFixed(2)}</Text>
+          <Text style={styles.analyticValue}>{formatPrice(stats.monthRevenue / stats.monthOrders)}</Text>
           <Text style={styles.analyticChange}>+5% vs mes anterior</Text>
         </View>
       </View>
@@ -216,7 +217,7 @@ export default function VendorDashboard() {
               <Text style={styles.topItemName}>{item.name}</Text>
               <Text style={styles.topItemSales}>{item.sales} vendidos</Text>
             </View>
-            <Text style={styles.topItemRevenue}>€{item.revenue.toFixed(2)}</Text>
+            <Text style={styles.topItemRevenue}>{formatPrice(item.revenue)}</Text>
           </View>
         ))}
       </View>

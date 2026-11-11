@@ -39,7 +39,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
 
   // Generate star positions based on screen size
   const generateStars = () => {
-    const starCount = intensity === 'light' ? 50 : intensity === 'medium' ? 80 : 120;
+    const starCount = intensity === 'light' ? 40 : intensity === 'medium' ? 70 : 100;
     const stars = [];
     
     for (let i = 0; i < starCount; i++) {
@@ -47,8 +47,8 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
         id: i,
         x: Math.random() * width,
         y: Math.random() * height,
-        size: Math.random() * 3 + 1, // Larger stars
-        opacity: Math.random() * 0.9 + 0.4, // Brighter stars
+        size: Math.random() * 2 + 0.5,
+        opacity: Math.random() * 0.8 + 0.3,
         twinkleDelay: Math.random() * 2000,
       });
     }
@@ -57,7 +57,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
 
   // Generate constellation connections
   const generateConstellations = () => {
-    const constellationCount = intensity === 'light' ? 4 : intensity === 'medium' ? 7 : 12;
+    const constellationCount = intensity === 'light' ? 3 : intensity === 'medium' ? 5 : 8;
     const constellations = [];
     
     for (let i = 0; i < constellationCount; i++) {
@@ -95,7 +95,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
     <View style={styles.container}>
       {/* Deep space gradient background */}
       <LinearGradient
-        colors={Gradients.constellation || ['rgba(44, 109, 133, 0.8)', 'rgba(79, 132, 151, 0.4)', 'rgba(106, 170, 202, 0.2)']}
+        colors={Gradients.darkToLight}
         style={StyleSheet.absoluteFillObject}
         locations={[0, 0.6, 1]}
       />
@@ -108,16 +108,15 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
       >
         <Defs>
           <RadialGradient id="starGlow" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-            <Stop offset="40%" stopColor="#E6E6FA" stopOpacity="0.8" />
-            <Stop offset="70%" stopColor="#8B6BB1" stopOpacity="0.6" />
-            <Stop offset="100%" stopColor="#6B4C8A" stopOpacity="0.3" />
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+            <Stop offset="50%" stopColor="#9db1ba" stopOpacity="0.4" />
+            <Stop offset="100%" stopColor="#69b0d1" stopOpacity="0.2" />
           </RadialGradient>
           <RadialGradient id="brightStar" cx="50%" cy="50%" r="50%">
-            <Stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-            <Stop offset="30%" stopColor="#F0F8FF" stopOpacity="0.9" />
-            <Stop offset="60%" stopColor="#9CAF88" stopOpacity="0.7" />
-            <Stop offset="100%" stopColor="#F5F5DC" stopOpacity="0.4" />
+            <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
+            <Stop offset="40%" stopColor="#9db1ba" stopOpacity="0.7" />
+            <Stop offset="70%" stopColor="#69b0d1" stopOpacity="0.5" />
+            <Stop offset="100%" stopColor="#4d8cb4" stopOpacity="0.3" />
           </RadialGradient>
         </Defs>
         
@@ -134,10 +133,9 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
                   y1={point.y}
                   x2={nextPoint.x}
                   y2={nextPoint.y}
-                  stroke="rgba(156, 175, 136, 0.6)"
-                  strokeWidth={1}
-                  opacity={0.8}
-                  strokeDasharray="2,3"
+                  stroke="rgba(105, 176, 209, 0.5)"
+                  strokeWidth={0.5}
+                  opacity={0.6}
                 />
               );
             })}
@@ -177,7 +175,7 @@ export function ConstellationBackground({ children, intensity = 'medium' }: Cons
           StyleSheet.absoluteFillObject,
           {
             opacity: twinkleOpacity,
-            backgroundColor: 'rgba(156, 175, 136, 0.08)',
+            backgroundColor: 'rgba(153, 238, 245, 0.05)',
           },
         ]}
       />

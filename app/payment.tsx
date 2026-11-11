@@ -26,6 +26,7 @@ import {
   MapPin,
 } from 'lucide-react-native';
 import { Colors, Gradients } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Stack } from 'expo-router';
@@ -131,7 +132,7 @@ export default function PaymentScreen() {
   const handlePayment = () => {
     Alert.alert(
       'Confirmar Pago',
-      `Total: €${total}\n¿Proceder con el pago?`,
+      `Total: ${formatPrice(total)}\n¿Proceder con el pago?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -279,7 +280,7 @@ export default function PaymentScreen() {
                   </View>
                 </View>
                 <View style={styles.bookingPrice}>
-                  <Text style={styles.bookingPriceText}>€{item.price}</Text>
+                  <Text style={styles.bookingPriceText}>{formatPrice(item.price)}</Text>
                 </View>
               </View>
             ))}
@@ -407,15 +408,15 @@ export default function PaymentScreen() {
             <View style={styles.priceBreakdown}>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Subtotal</Text>
-                <Text style={styles.priceValue}>€{subtotal}</Text>
+                <Text style={styles.priceValue}>{formatPrice(subtotal)}</Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Comisión de servicio</Text>
-                <Text style={styles.priceValue}>€{serviceFee}</Text>
+                <Text style={styles.priceValue}>{formatPrice(serviceFee)}</Text>
               </View>
               <View style={[styles.priceRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>€{total}</Text>
+                <Text style={styles.totalValue}>{formatPrice(total)}</Text>
               </View>
             </View>
           </View>
@@ -447,7 +448,7 @@ export default function PaymentScreen() {
         <View style={styles.paymentFooter}>
           <TouchableOpacity style={styles.paymentButton} onPress={handlePayment}>
             <Lock size={20} color={Colors.white} />
-            <Text style={styles.paymentButtonText}>Pagar €{total}</Text>
+            <Text style={styles.paymentButtonText}>Pagar {formatPrice(total)}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -569,7 +570,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.cream,
+    backgroundColor: Colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

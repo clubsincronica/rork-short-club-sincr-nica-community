@@ -100,9 +100,13 @@ export default function DiscoverScreen() {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.greeting}>
-              <AccessibleText style={styles.welcomeText}>Hola, bienvenido</AccessibleText>
-              <Heading level={1} style={styles.titleText}>Club Sincrónica</Heading>
-              <AccessibleText style={styles.subtitleText}>Encuentra tu bienestar</AccessibleText>
+              <AccessibleText style={styles.welcomeText}>CLUB SINCRÓNICA · MAR DEL PLATA</AccessibleText>
+              <Heading level={1} style={styles.titleText}>microCósmos</Heading>
+              <AccessibleText style={styles.seasonText}>VERANO 26/27</AccessibleText>
+              <AccessibleText style={styles.subtitleText}>tu universo interno despierta</AccessibleText>
+              <AccessibleText style={styles.heroNote}>
+                navegaciones de la consciencia en 10 auriculares
+              </AccessibleText>
             </View>
             
             <View style={styles.searchContainer}>
@@ -258,19 +262,34 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   welcomeText: {
-    fontSize: 16,
-    color: Colors.textLight,
-    marginBottom: 4,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: '600',
+    color: Colors.clay,
+    marginBottom: 6,
   },
   titleText: {
-    fontSize: 28,
+    fontSize: 36,
     fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 4,
+    letterSpacing: -0.5,
+    color: Colors.textLight,
+    marginBottom: 2,
+  },
+  seasonText: {
+    fontSize: 20,
+    fontWeight: '700',
+    letterSpacing: 4,
+    color: Colors.accent,
+    marginBottom: 10,
   },
   subtitleText: {
     fontSize: 16,
     color: Colors.textLight,
+  },
+  heroNote: {
+    fontSize: 13,
+    color: Colors.secondary,
+    marginTop: 4,
   },
   searchContainer: {
     flexDirection: 'row',

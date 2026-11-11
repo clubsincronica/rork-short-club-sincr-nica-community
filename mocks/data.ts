@@ -285,134 +285,145 @@ export const mockFoodProviders: FoodProvider[] = [
   },
 ];
 
-// Mock Calendar Events for testing "ON Today" feature
-// Using fixed times that will always be in the future for the current day
-const today = new Date();
-const todayStr = today.toISOString().split('T')[0];
+// ─── Temporada Verano 26/27 · microCósmos (Mar del Plata) ────────────────────
+// Eventos reales de la temporada. Las fechas se generan como próximas
+// ocurrencias desde hoy (nunca en el pasado) para que el tablero "HOY EN VIVO"
+// y el calendario tengan material real de demo en cualquier momento.
 
-console.log('Mock Data: Creating events for today:', todayStr);
-console.log('Mock Data: Current time:', today.toISOString());
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Use fixed afternoon/evening times that are likely to be in the future
-// These will work for most testing scenarios
-const futureTime1 = '14:00';
-const futureTime2 = '15:30';
-const futureTime3 = '17:00';
-const futureTime4 = '19:00';
-const futureTime5 = '20:30';
+const FRIDAY = 5;
+const SUNDAY = 0;
+const WEDNESDAY = 3;
 
-console.log('Mock Data: Using fixed future times:', { futureTime1, futureTime2, futureTime3, futureTime4, futureTime5 });
+function isoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date.getTime() + days * DAY_MS);
+  next.setHours(12, 0, 0, 0);
+  return next;
+}
+
+/** Próxima fecha (a partir de mañana) que caiga en `weekday` (0=dom … 6=sáb). */
+function nextWeekday(weekday: number): Date {
+  let cursor = addDays(new Date(), 1);
+  while (cursor.getDay() !== weekday) {
+    cursor = addDays(cursor, 1);
+  }
+  return cursor;
+}
+
+// La temporada arranca un viernes; los domingos y miércoles cuelgan de esa misma
+// semana para que el orden del calendario tenga sentido (vie → dom → mié).
+const seasonAnchor = nextWeekday(FRIDAY);
+const fridays = Array.from({ length: 6 }, (_, i) => addDays(seasonAnchor, i * 7));
+const sundays = fridays.map((friday) => addDays(friday, 2));
+const wednesdays = fridays.slice(0, 5).map((friday) => addDays(friday, 5));
+
+const SEASON_LOCATION = 'Casa Sincrónica · Mar del Plata';
+
+interface SeasonEventInput {
+  id: string;
+  providerIndex: number;
+  title: string;
+  description: string;
+  category: ServiceCategory;
+  date: Date;
+  startTime: string;
+  endTime: string;
+  price: number;
+  maxParticipants: number;
+  currentParticipants: number;
+  image?: string;
+  tags: string[];
+}
+
+function seasonEvent(input: SeasonEventInput): CalendarEvent {
+  const provider = mockUsers[input.providerIndex] ?? mockUsers[0];
+  return {
+    id: input.id,
+    providerId: provider.id,
+    provider,
+    title: input.title,
+    description: input.description,
+    category: input.category,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    date: isoDate(input.date),
+    location: SEASON_LOCATION,
+    isOnline: false,
+    maxParticipants: input.maxParticipants,
+    currentParticipants: input.currentParticipants,
+    price: input.price,
+    image: input.image,
+    tags: input.tags,
+    status: 'upcoming',
+  };
+}
 
 export const mockCalendarEvents: CalendarEvent[] = [
-  {
-    id: 'event1',
-    providerId: '1',
-    provider: mockUsers[0],
-    title: 'Círculo de Sanación Reiki Grupal',
-    description: 'Únete a nuestro círculo de sanación mensual. Experimenta el poder del Reiki en comunidad.',
-    category: 'healing',
-    startTime: futureTime1,
-    endTime: '15:30',
-    date: todayStr,
-    location: 'Centro Holístico Sincrónica',
-    isOnline: false,
-    maxParticipants: 20,
-    currentParticipants: 3, // Low occupation - will be featured
-    price: 45,
-    image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=300&fit=crop',
-    tags: ['reiki', 'sanación-grupal', 'energía'],
-    status: 'upcoming',
-  },
-  {
-    id: 'event2',
-    providerId: '2',
-    provider: mockUsers[1],
-    title: 'Taller de Respiración Consciente',
-    description: 'Aprende técnicas de respiración para reducir el estrés y aumentar tu vitalidad.',
-    category: 'coaching',
-    startTime: futureTime2,
-    endTime: '16:00',
-    date: todayStr,
-    location: 'Sala de Meditación Luna',
-    isOnline: true,
-    maxParticipants: 15,
-    currentParticipants: 2, // Very low occupation - high priority
-    price: 60,
-    tags: ['respiración', 'mindfulness', 'bienestar'],
-    status: 'upcoming',
-  },
-  {
-    id: 'event3',
-    providerId: '3',
-    provider: mockUsers[2],
-    title: 'Yoga al Atardecer con Cuencos Tibetanos',
-    description: 'Fluye con el atardecer mientras los cuencos tibetanos armonizan tu energía.',
-    category: 'yoga',
-    startTime: futureTime3,
-    endTime: '19:30',
-    date: todayStr,
-    location: 'Jardín de Paz',
-    isOnline: false,
-    maxParticipants: 25,
-    currentParticipants: 8, // Medium-low occupation
-    price: 35,
-    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop',
-    tags: ['yoga', 'sonido', 'atardecer'],
-    status: 'upcoming',
-  },
-  {
-    id: 'event4',
-    providerId: '1',
-    provider: mockUsers[0],
-    title: 'Meditación Guiada de Luna Nueva',
-    description: 'Conecta con la energía de la luna nueva para manifestar tus intenciones.',
-    category: 'meditation',
-    startTime: futureTime4,
-    endTime: '21:00',
-    date: todayStr,
-    location: 'Online - Zoom',
-    isOnline: true,
-    maxParticipants: 50,
-    currentParticipants: 45, // High occupation - won't be featured prominently
-    price: 25,
-    tags: ['meditación', 'luna-nueva', 'manifestación'],
-    status: 'upcoming',
-  },
-  {
-    id: 'event5',
-    providerId: '2',
-    provider: mockUsers[1],
-    title: 'Sesión de Coaching Grupal: Encuentra tu Propósito',
-    description: 'Descubre tu propósito de vida en esta sesión transformadora.',
-    category: 'coaching',
-    startTime: futureTime1,
-    endTime: '15:00',
-    date: todayStr,
-    location: 'Centro de Desarrollo Personal',
-    isOnline: false,
-    maxParticipants: 10,
-    currentParticipants: 1, // Very low occupation - highest priority
-    price: 75,
-    tags: ['propósito', 'coaching-grupal', 'transformación'],
-    status: 'upcoming',
-  },
-  {
-    id: 'event6',
-    providerId: '3',
-    provider: mockUsers[2],
-    title: 'Baño de Gong: Viaje Sonoro Profundo',
-    description: 'Sumérgete en las vibraciones sanadoras del gong para una relajación profunda.',
-    category: 'energy-work',
-    startTime: futureTime5,
-    endTime: '17:30',
-    date: todayStr,
-    location: 'Templo del Sonido',
-    isOnline: false,
-    maxParticipants: 12,
-    currentParticipants: 4, // Low occupation
-    price: 50,
-    image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop',
-    tags: ['gong', 'sanación-sonora', 'relajación'],
-    status: 'upcoming',
-  },
+  // Viernes 21 h · microCósmos (evento premium, 10 auriculares)
+  ...fridays.map((date, index) =>
+    seasonEvent({
+      id: `microcosmos-${index + 1}`,
+      providerIndex: 0,
+      title: 'microCósmos · travesía sonora',
+      description:
+        'Navegación de la consciencia en 10 auriculares. Una luna del calendario, una travesía: te guiamos al oído por un paisaje sonoro en vivo, sin altavoces, sin pantallas.',
+      category: 'meditation',
+      date,
+      startTime: '21:00',
+      endTime: '22:30',
+      price: 40000,
+      maxParticipants: 10,
+      currentParticipants: index === 0 ? 2 : index === 1 ? 4 : 1,
+      image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&h=300&fit=crop',
+      tags: ['microCósmos', 'silent', '10 auriculares', 'travesía'],
+    })
+  ),
+
+  // Domingos 7:30 h · Meditación del amanecer (puerta de entrada)
+  ...sundays.map((date, index) =>
+    seasonEvent({
+      id: `amanecer-${index + 1}`,
+      providerIndex: 1,
+      title: 'Meditación del amanecer',
+      description:
+        'Salimos al amanecer con auriculares y una guía suave. La forma más simple de entrar al microCósmos: respiración, silencio y el mar de fondo.',
+      category: 'meditation',
+      date,
+      startTime: '07:30',
+      endTime: '08:30',
+      price: 12000,
+      maxParticipants: 10,
+      currentParticipants: index === 0 ? 3 : index === 1 ? 5 : 2,
+      image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=300&fit=crop',
+      tags: ['amanecer', 'meditación', 'auriculares'],
+    })
+  ),
+
+  // Miércoles 19 h · Yoga del Kin
+  ...wednesdays.map((date, index) =>
+    seasonEvent({
+      id: `yoga-kin-${index + 1}`,
+      providerIndex: 2,
+      title: 'Yoga del Kin',
+      description:
+        'Práctica suave guiada por el kin del día: la energía del calendario maya aplicada al cuerpo. Ideal si venís del trabajo y querés aterrizar.',
+      category: 'yoga',
+      date,
+      startTime: '19:00',
+      endTime: '20:15',
+      price: 20000,
+      maxParticipants: 12,
+      currentParticipants: index === 0 ? 4 : index === 1 ? 7 : 3,
+      image: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400&h=300&fit=crop',
+      tags: ['yoga', 'kin', 'calendario maya'],
+    })
+  ),
 ];

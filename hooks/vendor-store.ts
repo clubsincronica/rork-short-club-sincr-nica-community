@@ -84,7 +84,7 @@ export const [VendorProvider, useVendorStore] = createContextHook(() => {
             specialties: ['Ensaladas', 'Bowls', 'Smoothies'],
             rating: 4.8,
             reviewCount: 156,
-            priceRange: '€€',
+            priceRange: '$$',
             deliveryTime: '30-45 min',
             minimumOrder: 15,
             deliveryFee: 3.50,

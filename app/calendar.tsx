@@ -38,6 +38,7 @@ import {
 import { useCalendar, useEventsForDate } from '@/hooks/calendar-store';
 import { useUser } from '@/hooks/user-store';
 import { Colors, Gradients } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CalendarEvent, ServiceCategory } from '@/types/user';
 import { router } from 'expo-router';
@@ -222,7 +223,7 @@ export default function CalendarScreen() {
 
     Alert.alert(
       'Confirmar Pago',
-      `Total: €${cartTotal.toFixed(2)}\n¿Proceder con el pago?`,
+      `Total: ${formatPrice(cartTotal)}\n¿Proceder con el pago?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -362,7 +363,7 @@ export default function CalendarScreen() {
           {item.price > 0 && (
             <View style={styles.eventDetail}>
               <DollarSign size={12} color={Colors.textLight} />
-              <Text style={styles.eventDetailText}>€{item.price}</Text>
+              <Text style={styles.eventDetailText}>{formatPrice(item.price)}</Text>
             </View>
           )}
         </View>
@@ -578,7 +579,7 @@ export default function CalendarScreen() {
                         <Users size={12} color={Colors.textLight} /> {reservation.numberOfSpots} plaza(s)
                       </Text>
                       <Text style={styles.reservationDetail}>
-                        <DollarSign size={12} color={Colors.textLight} /> €{reservation.totalPrice}
+                        <DollarSign size={12} color={Colors.textLight} /> {formatPrice(reservation.totalPrice)}
                       </Text>
                     </View>
                     <TouchableOpacity
@@ -763,7 +764,7 @@ export default function CalendarScreen() {
                   />
                 </View>
                 <View style={[styles.inputGroup, styles.inputGroupHalf]}>
-                  <Text style={styles.inputLabel}>Precio (€)</Text>
+                  <Text style={styles.inputLabel}>Precio (ARS)</Text>
                   <TextInput
                     style={styles.input}
                     value={eventForm.price.toString()}
@@ -876,7 +877,7 @@ export default function CalendarScreen() {
                       {item.event.date} • {item.event.startTime}
                     </Text>
                     <Text style={styles.cartItemPrice}>
-                      {item.numberOfSpots} plaza(s) × €{item.event.price} = €{item.price}
+                      {item.numberOfSpots} plaza(s) × {formatPrice(item.event.price)} = {formatPrice(item.price)}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -890,7 +891,7 @@ export default function CalendarScreen() {
 
               <View style={styles.cartTotal}>
                 <Text style={styles.cartTotalLabel}>Total:</Text>
-                <Text style={styles.cartTotalAmount}>€{cartTotal.toFixed(2)}</Text>
+                <Text style={styles.cartTotalAmount}>{formatPrice(cartTotal)}</Text>
               </View>
             </ScrollView>
 
@@ -954,7 +955,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   headerTabActive: {
-    backgroundColor: Colors.cream,
+    backgroundColor: Colors.surfaceLight,
   },
   headerTabText: {
     fontSize: 11,

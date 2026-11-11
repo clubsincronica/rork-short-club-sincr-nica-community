@@ -1,11 +1,42 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, Users, MapPin, TrendingUp } from 'lucide-react-native';
+import { Clock, Users, MapPin, TrendingUp, CalendarDays } from 'lucide-react-native';
 import { Colors, Gradients } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { CalendarEvent } from '@/types/user';
 import { FloatingCard } from '@/components/FloatingCard';
 
+type BoardEvent = CalendarEvent & {
+  occupationRatio: number;
+  availableSpots: number;
+};
+
+const MONTHS_SHORT = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+const DAYS_SHORT = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+
+function toLocalISODate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function withOccupation(event: CalendarEvent): BoardEvent {
+  const max = event.maxParticipants || 1;
+  return {
+    ...event,
+    occupationRatio: Math.min(1, event.currentParticipants / max),
+    availableSpots: Math.max(0, event.maxParticipants - event.currentParticipants),
+  };
+}
+
+function formatEventDate(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const parsed = new Date(year, (month ?? 1) - 1, day ?? 1);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return `${DAYS_SHORT[parsed.getDay()]} ${parsed.getDate()} ${MONTHS_SHORT[parsed.getMonth()]}`;
+}
 
 interface OnTodayBoardProps {
   events: CalendarEvent[];
@@ -13,97 +44,41 @@ interface OnTodayBoardProps {
 }
 
 export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
-  // Filter and sort events that are happening today or soon with low occupation
-  const featuredEvents = useMemo(() => {
+  const todayEvents = useMemo(() => {
     const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().split('T')[0];
-    
-    if (__DEV__) {
-      console.log('OnTodayBoard: Filtering events');
-      console.log('OnTodayBoard: Total events:', events.length);
-      console.log('OnTodayBoard: Today string:', todayStr);
-      console.log('OnTodayBoard: Current time:', now.toISOString());
-    }
-    
-    // Get events happening today
-    const upcomingEvents = events.filter(event => {
-      if (__DEV__) {
-        console.log('OnTodayBoard: Checking event:', event.title);
-        console.log('OnTodayBoard: Event date:', event.date);
-        console.log('OnTodayBoard: Event time:', event.startTime);
-        console.log('OnTodayBoard: Event status:', event.status);
-      }
-      
-      // Check if event is today and upcoming
-      const isToday = event.date === todayStr;
-      const isUpcoming = event.status === 'upcoming';
-      
-      // For demo purposes, show all today's upcoming events regardless of time
-      // This ensures events are visible in testing
-      if (isToday && isUpcoming) {
-        return true;
-      }
-      
-      // Also check if event time is in the future (more strict check)
-      try {
+    const todayStr = toLocalISODate(now);
+
+    return events
+      .filter((event) => event.date === todayStr && event.status === 'upcoming')
+      .filter((event) => {
         const [hours, minutes] = event.startTime.split(':').map(Number);
-        const eventDate = new Date(event.date);
-        eventDate.setHours(hours, minutes, 0, 0);
-        
-        const isInFuture = eventDate > now;
-        if (__DEV__) {
-          console.log('OnTodayBoard: Event datetime:', eventDate.toISOString(), 'isInFuture:', isInFuture);
-        }
-        
-        return isToday && isUpcoming && isInFuture;
-      } catch (error) {
-        if (__DEV__) {
-          console.log('OnTodayBoard: Error parsing date for event:', event.title, error);
-        }
-        // If we can't parse the date, show the event anyway for demo purposes
-        return isToday && isUpcoming;
-      }
-    });
-    
-    if (__DEV__) {
-      console.log('OnTodayBoard: Filtered upcoming events:', upcomingEvents.length);
-    }
-
-    // Calculate occupation ratio and sort by lowest occupation first
-    const eventsWithOccupation = upcomingEvents.map(event => ({
-      ...event,
-      occupationRatio: event.currentParticipants / event.maxParticipants,
-      availableSpots: event.maxParticipants - event.currentParticipants,
-    }));
-
-    // Sort by occupation ratio (lowest first) and then by time
-    return eventsWithOccupation
-      .sort((a, b) => {
-        // Prioritize events with lower occupation
-        if (a.occupationRatio !== b.occupationRatio) {
-          return a.occupationRatio - b.occupationRatio;
-        }
-        // Then sort by time
-        const timeA = new Date(a.date + ' ' + a.startTime).getTime();
-        const timeB = new Date(b.date + ' ' + b.startTime).getTime();
-        return timeA - timeB;
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return true;
+        const startsAt = new Date(now);
+        startsAt.setHours(hours, minutes, 0, 0);
+        // Tolerancia de 30 min: se puede entrar a una sesión ya empezada.
+        return startsAt.getTime() >= now.getTime() - 30 * 60 * 1000;
       })
-      .slice(0, 5); // Show top 5 events
+      .map(withOccupation)
+      .sort((a, b) => a.occupationRatio - b.occupationRatio)
+      .slice(0, 5);
   }, [events]);
 
-  if (__DEV__) {
-    console.log('OnTodayBoard: Final featured events count:', featuredEvents.length);
-  }
-  
-  if (featuredEvents.length === 0) {
-    // Show a debug message when no events are found
-    if (__DEV__) {
-      console.log('OnTodayBoard: No featured events to display');
-      console.log('OnTodayBoard: Total events received:', events.length);
-      console.log('OnTodayBoard: Events data:', events);
-    }
+  // Si hoy no hay nada, el tablero muestra los próximos encuentros de la
+  // temporada en vez de un cartel vacío.
+  const nextEvents = useMemo(() => {
+    const todayStr = toLocalISODate(new Date());
+
+    return events
+      .filter((event) => event.date > todayStr && event.status === 'upcoming')
+      .map(withOccupation)
+      .sort((a, b) => `${a.date}${a.startTime}`.localeCompare(`${b.date}${b.startTime}`))
+      .slice(0, 5);
+  }, [events]);
+
+  const isTodayMode = todayEvents.length > 0;
+  const boardEvents = isTodayMode ? todayEvents : nextEvents;
+
+  if (boardEvents.length === 0) {
     return (
       <View style={styles.container}>
         <FloatingCard style={styles.headerContainer} intensity="subtle">
@@ -111,14 +86,11 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
             <View style={styles.titleContainer}>
               <View style={styles.titleRow}>
                 <TrendingUp size={20} color={Colors.gold} />
-                <Text style={styles.title}>HOY EN VIVO</Text>
+                <Text style={styles.title}>PRÓXIMOS ENCUENTROS</Text>
               </View>
-              <Text style={styles.subtitle}>No hay eventos disponibles hoy</Text>
-              {__DEV__ && (
-                <Text style={[styles.subtitle, { fontSize: 12, marginTop: 4 }]}>
-                  Debug: {events.length} eventos totales
-                </Text>
-              )}
+              <Text style={styles.subtitle}>
+                Todavía no hay fechas cargadas para esta temporada
+              </Text>
             </View>
           </LinearGradient>
         </FloatingCard>
@@ -128,10 +100,9 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
+    const hour = Number.parseInt(hours, 10);
+    if (!Number.isFinite(hour)) return time;
+    return `${String(hour).padStart(2, '0')}:${minutes}`;
   };
 
   return (
@@ -143,9 +114,11 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
         <View style={styles.titleContainer}>
           <View style={styles.titleRow}>
             <TrendingUp size={20} color={Colors.gold} />
-            <Text style={styles.title}>HOY EN VIVO</Text>
+            <Text style={styles.title}>{isTodayMode ? 'HOY EN VIVO' : 'PRÓXIMOS ENCUENTROS'}</Text>
           </View>
-          <Text style={styles.subtitle}>Eventos con espacios disponibles</Text>
+          <Text style={styles.subtitle}>
+            {isTodayMode ? 'Eventos con espacios disponibles' : 'microCósmos · Verano 26/27'}
+          </Text>
         </View>
         </LinearGradient>
       </FloatingCard>
@@ -155,23 +128,23 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {featuredEvents.map((event, index) => (
+        {boardEvents.map((event, index) => (
           <TouchableOpacity
             key={event.id}
             style={[
               styles.eventCard,
               index === 0 && styles.firstCard,
-              index === featuredEvents.length - 1 && styles.lastCard,
+              index === boardEvents.length - 1 && styles.lastCard,
             ]}
             onPress={() => onEventPress?.(event)}
             activeOpacity={0.8}
           >
             <LinearGradient 
-              colors={event.occupationRatio < 0.3 ? Gradients.accent : Gradients.purpleGreen}
+              colors={event.availableSpots <= 2 ? Gradients.accent : Gradients.purpleGreen}
               style={styles.cardGradient}
             >
-              {/* Urgency indicator for very low occupation */}
-              {event.occupationRatio < 0.3 && (
+              {/* Urgency indicator: quedan 2 lugares o menos */}
+              {event.availableSpots <= 2 && (
                 <View style={styles.urgencyBadge}>
                   <Text style={styles.urgencyText}>¡Últimos lugares!</Text>
                 </View>
@@ -185,6 +158,15 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
                 </Text>
                 
                 <View style={styles.eventDetails}>
+                  {!isTodayMode && (
+                    <View style={styles.detailRow}>
+                      <CalendarDays size={12} color={Colors.white} />
+                      <Text style={styles.detailText}>
+                        {formatEventDate(event.date)}
+                      </Text>
+                    </View>
+                  )}
+
                   <View style={styles.detailRow}>
                     <Clock size={12} color={Colors.white} />
                     <Text style={styles.detailText}>
@@ -199,7 +181,7 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
                     </Text>
                   </View>
                   
-                  {event.location && (
+                  {isTodayMode && event.location && (
                     <View style={styles.detailRow}>
                       <MapPin size={12} color={Colors.white} />
                       <Text style={styles.detailText} numberOfLines={1}>
@@ -226,7 +208,7 @@ export function OnTodayBoard({ events, onEventPress }: OnTodayBoardProps) {
 
                 <View style={styles.priceContainer}>
                   <Text style={styles.priceLabel}>Desde</Text>
-                  <Text style={styles.price}>${event.price}</Text>
+                  <Text style={styles.price}>{formatPrice(event.price)}</Text>
                 </View>
               </View>
             </LinearGradient>

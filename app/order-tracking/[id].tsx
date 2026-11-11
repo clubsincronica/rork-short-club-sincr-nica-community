@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Package, Clock, MapPin, Phone, MessageCircle, CheckCircle } from 'lucide-react-native';
 import { Colors } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { useFoodCart } from '@/hooks/food-cart-store';
 import { FoodOrder } from '@/types/user';
 
@@ -200,7 +201,7 @@ export default function OrderTrackingScreen() {
                   )}
                 </View>
               </View>
-              <Text style={styles.orderItemPrice}>€{item.totalPrice.toFixed(2)}</Text>
+              <Text style={styles.orderItemPrice}>{formatPrice(item.totalPrice)}</Text>
             </View>
           ))}
 
@@ -208,21 +209,21 @@ export default function OrderTrackingScreen() {
 
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Subtotal</Text>
-            <Text style={styles.totalValue}>€{order.subtotal.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{formatPrice(order.subtotal)}</Text>
           </View>
           {order.orderType === 'delivery' && (
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>Envío</Text>
-              <Text style={styles.totalValue}>€{order.deliveryFee.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>{formatPrice(order.deliveryFee)}</Text>
             </View>
           )}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Impuestos</Text>
-            <Text style={styles.totalValue}>€{order.tax.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{formatPrice(order.tax)}</Text>
           </View>
           <View style={[styles.totalRow, styles.grandTotal]}>
             <Text style={styles.grandTotalLabel}>Total</Text>
-            <Text style={styles.grandTotalValue}>€{order.total.toFixed(2)}</Text>
+            <Text style={styles.grandTotalValue}>{formatPrice(order.total)}</Text>
           </View>
         </View>
 

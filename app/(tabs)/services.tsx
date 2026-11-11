@@ -6,6 +6,7 @@ import { useUser } from '@/hooks/user-store';
 import { useCalendar } from '@/hooks/calendar-store';
 import { mockServices } from '@/mocks/data';
 import { Colors } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 
 import { router } from 'expo-router';
 
@@ -174,7 +175,7 @@ export default function ServicesScreen() {
               <View style={styles.eventContent}>
                 <Text style={styles.eventTitle}>{reservation.service}</Text>
                 <Text style={styles.eventClient}>{reservation.client}</Text>
-                <Text style={styles.eventPrice}>€{reservation.price}</Text>
+                <Text style={styles.eventPrice}>{formatPrice(reservation.price)}</Text>
               </View>
             </View>
           ))

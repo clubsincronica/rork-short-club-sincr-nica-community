@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'rea
 import { Stack, useRouter } from 'expo-router';
 import { ArrowLeft, Clock, MapPin, ChevronRight, Package, CheckCircle } from 'lucide-react-native';
 import { Colors, Gradients } from '@/constants/colors';
+import { formatPrice } from '@/constants/currency';
 import { useFoodCart } from '@/hooks/food-cart-store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ConstellationBackground } from '@/components/ConstellationBackground';
@@ -181,7 +182,7 @@ export default function OrderHistoryScreen() {
                       <Text style={styles.itemsCount}>
                         {order.items.length} {order.items.length === 1 ? 'item' : 'items'}
                       </Text>
-                      <Text style={styles.orderTotal}>€{order.total.toFixed(2)}</Text>
+                      <Text style={styles.orderTotal}>{formatPrice(order.total)}</Text>
                     </View>
 
                     {order.status === 'delivered' && (

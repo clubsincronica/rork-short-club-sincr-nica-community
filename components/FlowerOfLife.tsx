@@ -1,14 +1,15 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { Colors, Gradients } from '@/constants/colors';
 
 interface FlowerOfLifeProps {
   size?: number;
   style?: any;
 }
 
-export function FlowerOfLife({ size = 120, style }: FlowerOfLifeProps) {
-  const radius = size * 0.06;
+export function FlowerOfLife({ size = 180, style }: FlowerOfLifeProps) {
+  const radius = size * 0.05;
   const centerX = size / 2;
   const centerY = size * 0.8; // Move center down so we show upper half
   const containerRadius = size * 0.45; // Outer circle radius
@@ -36,17 +37,17 @@ export function FlowerOfLife({ size = 120, style }: FlowerOfLifeProps) {
 
   return (
     <View style={[styles.container, style]}>
-      <Svg width={size} height={size * 0.6} viewBox={`0 0 ${size} ${size * 0.6}`}>
+      <Svg width={size} height={size * 0.65} viewBox={`0 0 ${size} ${size * 0.65}`}>
         <Defs>
           <LinearGradient id="flowerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#9CAF88" stopOpacity="0.9" />
-            <Stop offset="50%" stopColor="#F5F5DC" stopOpacity="0.8" />
-            <Stop offset="100%" stopColor="#9CAF88" stopOpacity="0.7" />
+            <Stop offset="0%" stopColor={Gradients.secondary[1]} stopOpacity="0.9" />
+            <Stop offset="50%" stopColor={Colors.clay} stopOpacity="0.8" />
+            <Stop offset="100%" stopColor={Gradients.secondary[1]} stopOpacity="0.7" />
           </LinearGradient>
           <LinearGradient id="circleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor="#9CAF88" stopOpacity="0.3" />
-            <Stop offset="50%" stopColor="#F5F5DC" stopOpacity="0.2" />
-            <Stop offset="100%" stopColor="#9CAF88" stopOpacity="0.1" />
+            <Stop offset="0%" stopColor={Gradients.secondary[1]} stopOpacity="0.3" />
+            <Stop offset="50%" stopColor={Colors.clay} stopOpacity="0.2" />
+            <Stop offset="100%" stopColor={Gradients.secondary[1]} stopOpacity="0.1" />
           </LinearGradient>
         </Defs>
         
