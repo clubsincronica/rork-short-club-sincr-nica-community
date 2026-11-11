@@ -11,9 +11,11 @@ const BACKEND_URL = 'https://clubsincronica-backend.onrender.com';
 // Detect if currently on web platform (Expo web)
 const isWebPlatform = (() => {
   try {
-    return typeof window !== 'undefined' && 
-           window.location?.hostname?.includes('localhost') &&
-           window.location?.hostname?.includes('.');
+    const hostname = window?.location?.hostname || '';
+    // Web: localhost con puerto (localhost:8081) o IP o dominio con punto
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const hasDot = hostname.includes('.') || isLocalhost;
+    return typeof window !== 'undefined' && hasDot;
   } catch (e) { return false; }
 })();
 
@@ -27,6 +29,7 @@ async function apiFetch(endpoint, options = {}) {
         ...(options.headers || {}),
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
+      credentials: 'include',  // Allow cookies/auth to pass
     });
     if (!res.ok) {
       const e = await res.text();
@@ -133,8 +136,11 @@ export const [UserProvider, useUser] = createContextHook(() => {
           await AsyncStorage.setItem('paymentMethods', JSON.stringify(pms));
           return { user, paymentMethods: pms };
         } catch (err) {
+          // backend falló → NO caemos a mocks silenciosos.
+          // En producción mostraríamos un mensaje al usuario; en dev lo registramos.
           if (__DEV__) console.error('Backend login error, falling back to mocks:', err.message);
-          // Fallback a mocks locales si el backend falla
+          // Retornamos null para indicar que el login no pudo completarse desde el backend
+          return { user: null, paymentMethods: [] };
         }
       }
       // Modo nativo (móvil APK): usar mocks locales como antes
@@ -171,12 +177,22 @@ export const [UserProvider, useUser] = createContextHook(() => {
     },
     onSuccess: ({ user, paymentMethods }) => {
       if (__DEV__) {
-        console.log('Login successful, updating state for:', user.email);
+        console.log('Login successful, updating state for:', user?.email || 'null user');
       }
-      setCurrentUser(user);
-      setPaymentMethods(paymentMethods);
-      queryClient.setQueryData(['currentUser'], user);
-      queryClient.setQueryData(['paymentMethods'], paymentMethods);
+      // Solo actualizar estado si hay usuario válido
+      if (user) {
+        setCurrentUser(user);
+        setPaymentMethods(paymentMethods);
+        queryClient.setQueryData(['currentUser'], user);
+        queryClient.setQueryData(['paymentMethods'], paymentMethods);
+      } else {
+        // Login falló (backend caído, credenciales inválidas): limpiar y mostrar error
+        setCurrentUser(null);
+        setPaymentMethods([]);
+        queryClient.setQueryData(['currentUser'], null);
+        queryClient.setQueryData(['paymentMethods'], []);
+        if (__DEV__) console.error('Login failed — no user returned from auth backend');
+      }
     },
     onError: (error) => {
       if (__DEV__) {
