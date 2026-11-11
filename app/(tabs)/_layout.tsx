@@ -1,18 +1,19 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Home, Briefcase, MessageCircle, User, MapPin } from 'lucide-react-native';
+import { Colors } from '@/constants/colors';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#9bdbbf',  // Mint green for active tabs
-        tabBarInactiveTintColor: '#b8b0c4', // Lighter purple-gray for much better contrast
+        tabBarActiveTintColor: Colors.accent,
+        tabBarInactiveTintColor: Colors.textMuted,
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#1a0d2e',
+          backgroundColor: Colors.primary,
           borderTopWidth: 1,
-          borderTopColor: 'rgba(107, 76, 138, 0.3)',
+          borderTopColor: Colors.surfaceBorder,
         },
         tabBarLabelStyle: {
           fontSize: 12,

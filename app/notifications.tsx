@@ -40,18 +40,18 @@ export default function NotificationsScreen() {
       case 'order-ready':
       case 'order-out-for-delivery':
       case 'order-delivered':
-        return <Package size={20} color={Colors.primary} />;
+        return <Package size={20} color={Colors.text} />;
       case 'order-cancelled':
-        return <X size={20} color={Colors.error} />;
+        return <X size={20} color={Colors.danger} />;
       case 'payment-successful':
       case 'payment-failed':
-        return <CreditCard size={20} color={Colors.primary} />;
+        return <CreditCard size={20} color={Colors.text} />;
       case 'new-review':
         return <Star size={20} color={Colors.gold} />;
       case 'special-offer':
         return <Tag size={20} color={Colors.gold} />;
       default:
-        return <Bell size={20} color={Colors.primary} />;
+        return <Bell size={20} color={Colors.text} />;
     }
   };
 
@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
   markAllText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   scrollView: {
     flex: 1,
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   unreadCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderLeftWidth: 3,
     borderLeftColor: Colors.gold,
   },

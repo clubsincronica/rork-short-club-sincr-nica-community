@@ -28,7 +28,7 @@ export default function VendorDashboard() {
           <Text style={styles.statLabel}>Ingresos Hoy</Text>
         </View>
         <View style={styles.statCard}>
-          <Package size={24} color={Colors.primary} />
+          <Package size={24} color={Colors.text} />
           <Text style={styles.statValue}>{stats.todayOrders}</Text>
           <Text style={styles.statLabel}>Pedidos Hoy</Text>
         </View>
@@ -95,7 +95,7 @@ export default function VendorDashboard() {
                 style={styles.iconButton}
                 onPress={() => router.push(`/vendor-edit-item/${item.id}`)}
               >
-                <Edit2 size={18} color={Colors.primary} />
+                <Edit2 size={18} color={Colors.text} />
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconButton}
@@ -110,7 +110,7 @@ export default function VendorDashboard() {
                   );
                 }}
               >
-                <Trash2 size={18} color={Colors.error} />
+                <Trash2 size={18} color={Colors.danger} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.iconButton}>
                 <Eye size={18} color={item.isAvailable ? Colors.success : Colors.textLight} />
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: '47%',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   orderCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuItem: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   menuItemPrice: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   menuItemActions: {
     flexDirection: 'row',
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   orderDetailCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   },
   orderItemMore: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     fontStyle: 'italic',
   },
   orderFooter: {
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   analyticCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   topItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -685,6 +685,6 @@ const styles = StyleSheet.create({
   topItemRevenue: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
 });

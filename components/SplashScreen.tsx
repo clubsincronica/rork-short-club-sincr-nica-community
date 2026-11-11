@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   fallbackText: {
     fontSize: 32,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
     marginBottom: 8,
   },
   fallbackSubtext: {

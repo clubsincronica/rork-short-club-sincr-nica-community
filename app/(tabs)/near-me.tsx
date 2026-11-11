@@ -278,7 +278,7 @@ export default function NearMeScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Navigation size={48} color={Colors.primary} />
+          <Navigation size={48} color={Colors.text} />
           <Text style={styles.loadingText}>Getting your location...</Text>
         </View>
       </View>
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   filtersContainer: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     marginRight: 8,
   },
   filterButtonActive: {
@@ -438,7 +438,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   userCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -515,13 +515,13 @@ const styles = StyleSheet.create({
   },
   permissionText: {
     fontSize: 14,
-    color: Colors.white,
+    color: Colors.textOnGold,
     fontWeight: '500',
     flex: 1,
   },
   permissionAction: {
     fontSize: 14,
-    color: Colors.white,
+    color: Colors.textOnGold,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },

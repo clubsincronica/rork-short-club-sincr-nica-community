@@ -323,7 +323,7 @@ export default function CalendarScreen() {
       <View style={styles.eventCard}>
         <View style={styles.eventHeader}>
           <View style={styles.eventTime}>
-            <Clock size={14} color={Colors.primary} />
+            <Clock size={14} color={Colors.text} />
             <Text style={styles.eventTimeText}>
               {item.startTime} - {item.endTime}
             </Text>
@@ -331,10 +331,10 @@ export default function CalendarScreen() {
           {isMyEvent && (
             <View style={styles.eventActions}>
               <TouchableOpacity onPress={() => openEventModal(item)}>
-                <Edit2 size={18} color={Colors.primary} />
+                <Edit2 size={18} color={Colors.text} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDeleteEvent(item.id)}>
-                <Trash2 size={18} color={Colors.error} />
+                <Trash2 size={18} color={Colors.danger} />
               </TouchableOpacity>
             </View>
           )}
@@ -407,7 +407,7 @@ export default function CalendarScreen() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={Colors.text} />
       </View>
     );
   }
@@ -461,13 +461,13 @@ export default function CalendarScreen() {
           <View style={styles.calendarContainer}>
             <View style={styles.calendarHeader}>
               <TouchableOpacity onPress={handlePreviousMonth}>
-                <ChevronLeft size={24} color={Colors.primary} />
+                <ChevronLeft size={24} color={Colors.text} />
               </TouchableOpacity>
               <Text style={styles.calendarMonth}>
                 {MONTHS[currentMonth.getMonth()]} {currentMonth.getFullYear()}
               </Text>
               <TouchableOpacity onPress={handleNextMonth}>
-                <ChevronRight size={24} color={Colors.primary} />
+                <ChevronRight size={24} color={Colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -599,7 +599,7 @@ export default function CalendarScreen() {
                         );
                       }}
                     >
-                      <X size={16} color={Colors.error} />
+                      <X size={16} color={Colors.danger} />
                       <Text style={styles.cancelReservationText}>Cancelar</Text>
                     </TouchableOpacity>
                   </View>
@@ -621,7 +621,7 @@ export default function CalendarScreen() {
             
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <Globe size={20} color={Colors.primary} />
+                <Globe size={20} color={Colors.text} />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Calendario Público</Text>
                   <Text style={styles.settingDescription}>
@@ -639,7 +639,7 @@ export default function CalendarScreen() {
 
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <Users size={20} color={Colors.primary} />
+                <Users size={20} color={Colors.text} />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Permitir Reservas</Text>
                   <Text style={styles.settingDescription}>
@@ -657,7 +657,7 @@ export default function CalendarScreen() {
 
             <View style={styles.settingItem}>
               <View style={styles.settingLeft}>
-                <Check size={20} color={Colors.primary} />
+                <Check size={20} color={Colors.text} />
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>Auto-confirmar Reservas</Text>
                   <Text style={styles.settingDescription}>
@@ -829,7 +829,7 @@ export default function CalendarScreen() {
 
               <View style={styles.switchGroup}>
                 <View style={styles.switchLeft}>
-                  <Globe size={20} color={Colors.primary} />
+                  <Globe size={20} color={Colors.text} />
                   <Text style={styles.switchLabel}>Evento Online</Text>
                 </View>
                 <Switch
@@ -884,7 +884,7 @@ export default function CalendarScreen() {
                     onPress={() => removeFromCart(item.eventId)}
                     style={styles.cartItemRemove}
                   >
-                    <Trash2 size={18} color={Colors.error} />
+                    <Trash2 size={18} color={Colors.danger} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -929,7 +929,7 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingBottom: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -963,14 +963,14 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   headerTabTextActive: {
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '600',
   },
   content: {
     flex: 1,
   },
   calendarContainer: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     margin: 16,
     borderRadius: 16,
     padding: 16,
@@ -1029,7 +1029,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   calendarDayTextToday: {
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '600',
   },
   calendarDayTextSelected: {
@@ -1080,7 +1080,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   eventCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1103,7 +1103,7 @@ const styles = StyleSheet.create({
   },
   eventTimeText: {
     fontSize: 12,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   eventActions: {
@@ -1151,7 +1151,7 @@ const styles = StyleSheet.create({
   },
   eventTagText: {
     fontSize: 11,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   eventFooter: {
@@ -1224,7 +1224,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   reservationCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1279,14 +1279,14 @@ const styles = StyleSheet.create({
   },
   cancelReservationText: {
     fontSize: 14,
-    color: Colors.error,
+    color: Colors.danger,
     fontWeight: '500',
   },
   settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -1348,7 +1348,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -1469,7 +1469,7 @@ const styles = StyleSheet.create({
   },
   cartItemPrice: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '600',
   },
   cartItemRemove: {
@@ -1490,7 +1490,7 @@ const styles = StyleSheet.create({
   cartTotalAmount: {
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   cartActions: {
     flexDirection: 'row',
@@ -1506,7 +1506,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clearCartText: {
-    color: Colors.error,
+    color: Colors.danger,
     fontSize: 16,
     fontWeight: '600',
   },

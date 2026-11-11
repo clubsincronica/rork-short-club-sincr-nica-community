@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   summaryCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     shadowColor: Colors.shadow,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   paymentSection: {
     padding: 16,
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 8,
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     marginBottom: 100,
   },
   infoCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
   },
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: Colors.border,

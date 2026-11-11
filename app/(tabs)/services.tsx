@@ -98,7 +98,7 @@ export default function ServicesScreen() {
   const renderOverview = () => (
     <View style={styles.overviewContainer}>
       <View style={styles.quickActions}>
-        {renderSectionButton('calendar', <Calendar size={24} color={Colors.primary} />, 'Mi Calendario', 'Ver disponibilidad y eventos', false)}
+        {renderSectionButton('calendar', <Calendar size={24} color={Colors.text} />, 'Mi Calendario', 'Ver disponibilidad y eventos', false)}
         {renderSectionButton('reservations', <Clock size={24} color={Colors.secondary} />, 'Administrar Reservas', '3 reservas pendientes', true)}
         {renderSectionButton('cart', <ShoppingCart size={24} color={Colors.accent} />, 'Carrito y Pagos', '2 items - $340', false)}
         {renderSectionButton('followup', <MessageSquare size={24} color={Colors.accentLight} />, 'Seguimiento', '2 clientes para contactar', false)}
@@ -110,7 +110,7 @@ export default function ServicesScreen() {
         {upcomingReservations.slice(0, 2).map(reservation => (
           <View key={reservation.id} style={styles.activityCard}>
             <View style={styles.activityIcon}>
-              <Clock size={20} color={Colors.primary} />
+              <Clock size={20} color={Colors.text} />
             </View>
             <View style={styles.activityContent}>
               <Text style={styles.activityTitle}>{reservation.service}</Text>
@@ -130,7 +130,7 @@ export default function ServicesScreen() {
   const renderCalendar = () => (
     <View style={styles.sectionContainer}>
         <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-          <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
+          <ChevronRight size={20} color={Colors.text} style={styles.rotatedIcon} />
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
         
@@ -192,7 +192,7 @@ export default function ServicesScreen() {
   const renderReservations = () => (
     <View style={styles.sectionContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-        <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
+        <ChevronRight size={20} color={Colors.text} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       
@@ -241,14 +241,14 @@ export default function ServicesScreen() {
                   <Text style={styles.acceptButtonText}>Aceptar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.declineButton}>
-                  <AlertCircle size={16} color={Colors.error} />
+                  <AlertCircle size={16} color={Colors.danger} />
                   <Text style={styles.declineButtonText}>Rechazar</Text>
                 </TouchableOpacity>
               </>
             )}
             {reservation.status === 'confirmed' && (
               <TouchableOpacity style={styles.messageButton}>
-                <MessageSquare size={16} color={Colors.primary} />
+                <MessageSquare size={16} color={Colors.text} />
                 <Text style={styles.messageButtonText}>Enviar Mensaje</Text>
               </TouchableOpacity>
             )}
@@ -261,7 +261,7 @@ export default function ServicesScreen() {
   const renderCart = () => (
     <View style={styles.sectionContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-        <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
+        <ChevronRight size={20} color={Colors.text} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       
@@ -294,7 +294,7 @@ export default function ServicesScreen() {
       {cartItems.map(item => (
         <View key={item.id} style={styles.cartItem}>
           <View style={styles.cartItemIcon}>
-            <Package size={20} color={Colors.primary} />
+            <Package size={20} color={Colors.text} />
           </View>
           <View style={styles.cartItemContent}>
             <Text style={styles.cartItemTitle}>{item.service}</Text>
@@ -310,7 +310,7 @@ export default function ServicesScreen() {
       <View style={styles.paymentMethods}>
         <Text style={styles.subsectionTitle}>Métodos de Pago</Text>
         <TouchableOpacity style={styles.paymentMethod}>
-          <CreditCard size={20} color={Colors.primary} />
+          <CreditCard size={20} color={Colors.text} />
           <Text style={styles.paymentMethodText}>•••• 4242</Text>
           <View style={styles.defaultBadge}>
             <Text style={styles.defaultBadgeText}>Principal</Text>
@@ -323,7 +323,7 @@ export default function ServicesScreen() {
   const renderFollowUp = () => (
     <View style={styles.sectionContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-        <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
+        <ChevronRight size={20} color={Colors.text} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       
@@ -336,7 +336,7 @@ export default function ServicesScreen() {
           <Text style={styles.followUpStatLabel}>Tasa de retención</Text>
         </View>
         <View style={styles.followUpStatCard}>
-          <Users size={20} color={Colors.primary} />
+          <Users size={20} color={Colors.text} />
           <Text style={styles.followUpStatValue}>45</Text>
           <Text style={styles.followUpStatLabel}>Clientes activos</Text>
         </View>
@@ -355,7 +355,7 @@ export default function ServicesScreen() {
             <Text style={styles.followUpNotes}>{client.notes}</Text>
           </View>
           <TouchableOpacity style={styles.followUpAction}>
-            <MessageSquare size={20} color={Colors.primary} />
+            <MessageSquare size={20} color={Colors.text} />
           </TouchableOpacity>
         </View>
       ))}
@@ -369,7 +369,7 @@ export default function ServicesScreen() {
   const renderNotifications = () => (
     <View style={styles.sectionContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-        <ChevronRight size={20} color={Colors.primary} style={styles.rotatedIcon} />
+        <ChevronRight size={20} color={Colors.text} style={styles.rotatedIcon} />
         <Text style={styles.backButtonText}>Volver</Text>
       </TouchableOpacity>
       
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingBottom: 20,
     paddingTop: 20,
     borderBottomWidth: 1,
@@ -647,7 +647,7 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
   serviceCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     marginBottom: 16,
     shadowColor: Colors.shadow,
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
   servicePrice: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   serviceDescription: {
     fontSize: 14,
@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   bookingCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     marginBottom: 16,
     shadowColor: Colors.shadow,
@@ -787,7 +787,7 @@ const styles = StyleSheet.create({
   },
   bookingProvider: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     marginBottom: 4,
   },
   bookingDate: {
@@ -819,7 +819,7 @@ const styles = StyleSheet.create({
   sectionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -832,7 +832,7 @@ const styles = StyleSheet.create({
   sectionButtonHighlight: {
     borderWidth: 2,
     borderColor: Colors.gold,
-    backgroundColor: '#FFF8E1',
+    backgroundColor: Colors.surfaceStrong,
   },
   sectionIcon: {
     width: 48,
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
@@ -919,7 +919,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: Colors.primary,
+    color: Colors.text,
     marginLeft: 4,
   },
   primaryButton: {
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
   secondaryButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginVertical: 16,
@@ -950,7 +950,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   calendarStats: {
     flexDirection: 'row',
@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
   },
   calendarStatCard: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
@@ -967,7 +967,7 @@ const styles = StyleSheet.create({
   calendarStatValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   calendarStatLabel: {
     fontSize: 12,
@@ -983,7 +983,7 @@ const styles = StyleSheet.create({
   },
   eventCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1002,7 +1002,7 @@ const styles = StyleSheet.create({
   eventTimeText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   eventDateText: {
     fontSize: 12,
@@ -1042,7 +1042,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   activeReservationTab: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   reservationTabText: {
     fontSize: 14,
@@ -1051,10 +1051,10 @@ const styles = StyleSheet.create({
   activeReservationTabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   reservationCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1076,7 +1076,7 @@ const styles = StyleSheet.create({
   },
   reservationClient: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     marginTop: 2,
   },
   reservationPrice: {
@@ -1132,7 +1132,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.error,
     borderRadius: 8,
@@ -1142,7 +1142,7 @@ const styles = StyleSheet.create({
   declineButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.error,
+    color: Colors.danger,
   },
   messageButton: {
     flexDirection: 'row',
@@ -1156,7 +1156,7 @@ const styles = StyleSheet.create({
   messageButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   cartSummary: {
     backgroundColor: Colors.gold,
@@ -1197,7 +1197,7 @@ const styles = StyleSheet.create({
   },
   cartItem: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1236,7 +1236,7 @@ const styles = StyleSheet.create({
   cartItemPrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   paymentMethods: {
     marginTop: 24,
@@ -1244,7 +1244,7 @@ const styles = StyleSheet.create({
   paymentMethod: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     gap: 12,
@@ -1263,7 +1263,7 @@ const styles = StyleSheet.create({
   defaultBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   followUpStats: {
     flexDirection: 'row',
@@ -1274,7 +1274,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     gap: 12,
@@ -1290,7 +1290,7 @@ const styles = StyleSheet.create({
   },
   followUpCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1319,7 +1319,7 @@ const styles = StyleSheet.create({
   },
   followUpService: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     marginTop: 2,
   },
   followUpTime: {
@@ -1342,7 +1342,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   notificationSettings: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
@@ -1373,7 +1373,7 @@ const styles = StyleSheet.create({
   },
   notificationCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,

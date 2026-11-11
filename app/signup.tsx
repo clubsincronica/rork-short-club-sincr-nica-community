@@ -128,7 +128,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Full name"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.textMuted}
                   value={name}
                   onChangeText={(text) => {
                     setName(text);
@@ -149,7 +149,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Email address"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.textMuted}
                   value={email}
                   onChangeText={(text) => {
                     setEmail(text);
@@ -172,7 +172,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.textMuted}
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -204,7 +204,7 @@ export default function SignupScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm password"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.textMuted}
                   value={confirmPassword}
                   onChangeText={(text) => {
                     setConfirmPassword(text);
@@ -263,7 +263,7 @@ export default function SignupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: Colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
@@ -293,12 +293,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.textLight,
   },
   form: {
     marginBottom: 32,
@@ -309,7 +309,7 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 56,
@@ -320,13 +320,13 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    color: '#333',
+    color: Colors.text,
   },
   eyeIcon: {
     padding: 4,
   },
   errorText: {
-    color: '#ff3b30',
+    color: Colors.danger,
     fontSize: 12,
     marginTop: 4,
     marginLeft: 16,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
   },
   termsText: {
     textAlign: 'center',
-    color: '#999',
+    color: Colors.textMuted,
     fontSize: 12,
     lineHeight: 18,
     paddingHorizontal: 20,
@@ -363,11 +363,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   footerText: {
-    color: '#666',
+    color: Colors.textLight,
     fontSize: 14,
   },
   loginLink: {
-    color: Colors.primary,
+    color: Colors.text,
     fontSize: 14,
     fontWeight: '600',
   },

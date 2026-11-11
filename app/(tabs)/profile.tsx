@@ -317,7 +317,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: currentUser.avatar }} style={styles.avatar} />
               {currentUser.verified && (
                 <View style={styles.verifiedBadge}>
-                  <CheckCircle size={16} color={Colors.white} />
+                  <CheckCircle size={16} color={Colors.textOnGold} />
                 </View>
               )}
               <TouchableOpacity 
@@ -476,7 +476,7 @@ export default function ProfileScreen() {
             >
               <View style={styles.menuItemLeft}>
                 <View style={styles.menuIcon}>
-                  <item.icon size={20} color={Colors.primary} />
+                  <item.icon size={20} color={Colors.text} />
                 </View>
                 <View style={styles.menuContent}>
                   <Text style={styles.menuTitle}>{item.title}</Text>
@@ -499,7 +499,7 @@ export default function ProfileScreen() {
             }}
             testID="logout-button"
           >
-            <LogOut size={20} color={Colors.error} />
+            <LogOut size={20} color={Colors.danger} />
             <Text style={styles.logoutText}>Cerrar Sesión</Text>
           </TouchableOpacity>
         </View>
@@ -786,7 +786,7 @@ export default function ProfileScreen() {
               {paymentMethods.map((method) => (
                 <View key={method.id} style={styles.paymentMethod}>
                   <View style={styles.paymentMethodInfo}>
-                    <CreditCard size={24} color={Colors.primary} />
+                    <CreditCard size={24} color={Colors.text} />
                     <View style={styles.paymentMethodDetails}>
                       <Text style={styles.paymentMethodBrand}>
                         {method.brand} •••• {method.last4}
@@ -799,13 +799,13 @@ export default function ProfileScreen() {
                     </View>
                   </View>
                   <TouchableOpacity onPress={() => handleDeletePaymentMethod(method.id)}>
-                    <Trash2 size={20} color={Colors.error} />
+                    <Trash2 size={20} color={Colors.danger} />
                   </TouchableOpacity>
                 </View>
               ))}
 
               <TouchableOpacity style={styles.addPaymentButton} onPress={handleAddPaymentMethod}>
-                <Plus size={20} color={Colors.primary} />
+                <Plus size={20} color={Colors.text} />
                 <Text style={styles.addPaymentText}>Agregar método de pago</Text>
               </TouchableOpacity>
             </ScrollView>
@@ -902,7 +902,7 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     marginHorizontal: 16,
     marginTop: -15,
     borderRadius: 16,
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
   },
   specialtyText: {
     fontSize: 12,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   menuContainer: {
@@ -969,7 +969,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -1018,7 +1018,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 1,
@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.error,
+    color: Colors.danger,
   },
   footer: {
     alignItems: 'center',
@@ -1120,8 +1120,8 @@ const styles = StyleSheet.create({
   },
   menuItemHighlight: {
     borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: Colors.secondary,
+    borderColor: Colors.gold,
+    backgroundColor: Colors.surfaceStrong,
   },
   modalOverlay: {
     flex: 1,
@@ -1129,7 +1129,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -1193,7 +1193,7 @@ const styles = StyleSheet.create({
   },
   tabButtons: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 4,
     marginBottom: 16,
@@ -1221,14 +1221,14 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   tabButtonTextActive: {
-    color: Colors.primary,
+    color: Colors.text,
   },
   activityList: {
     gap: 12,
   },
   activityItem: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     gap: 12,
@@ -1281,7 +1281,7 @@ const styles = StyleSheet.create({
   },
   achievementCard: {
     width: '48%',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -1380,7 +1380,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
   },
   switchAuth: {
     flexDirection: 'row',
@@ -1395,7 +1395,7 @@ const styles = StyleSheet.create({
   },
   switchAuthLink: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '600',
   },
   paymentMethod: {
@@ -1448,6 +1448,6 @@ const styles = StyleSheet.create({
   addPaymentText: {
     fontSize: 16,
     fontWeight: '500',
-    color: Colors.primary,
+    color: Colors.text,
   },
 });

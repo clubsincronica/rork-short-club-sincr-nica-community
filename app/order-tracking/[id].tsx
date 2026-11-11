@@ -160,7 +160,7 @@ export default function OrderTrackingScreen() {
         {/* Estimated Time */}
         {order.status !== 'delivered' && order.status !== 'cancelled' && (
           <View style={styles.estimatedTimeCard}>
-            <Clock size={24} color={Colors.primary} />
+            <Clock size={24} color={Colors.text} />
             <View style={styles.estimatedTimeContent}>
               <Text style={styles.estimatedTimeLabel}>Tiempo estimado</Text>
               <Text style={styles.estimatedTimeValue}>30-45 min</Text>
@@ -172,7 +172,7 @@ export default function OrderTrackingScreen() {
         {order.orderType === 'delivery' && order.deliveryAddress && (
           <View style={styles.deliveryCard}>
             <View style={styles.deliveryHeader}>
-              <MapPin size={20} color={Colors.primary} />
+              <MapPin size={20} color={Colors.text} />
               <Text style={styles.deliveryTitle}>Dirección de Entrega</Text>
             </View>
             <Text style={styles.deliveryAddress}>{order.deliveryAddress}</Text>
@@ -230,11 +230,11 @@ export default function OrderTrackingScreen() {
         {/* Contact Options */}
         <View style={styles.contactSection}>
           <TouchableOpacity style={styles.contactButton}>
-            <Phone size={20} color={Colors.primary} />
+            <Phone size={20} color={Colors.text} />
             <Text style={styles.contactButtonText}>Llamar al Restaurante</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.contactButton}>
-            <MessageCircle size={20} color={Colors.primary} />
+            <MessageCircle size={20} color={Colors.text} />
             <Text style={styles.contactButtonText}>Enviar Mensaje</Text>
           </TouchableOpacity>
         </View>
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   statusSection: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 20,
     marginBottom: 16,
   },
@@ -321,7 +321,7 @@ const styles = StyleSheet.create({
     color: Colors.success,
   },
   estimatedTimeCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   deliveryCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 16,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   orderDetailsCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 16,
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
@@ -486,6 +486,6 @@ const styles = StyleSheet.create({
   contactButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
 });

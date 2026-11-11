@@ -17,7 +17,7 @@ export function MenuItemCard({ menuItem, onPress }: MenuItemCardProps) {
     const flames = [];
     for (let i = 0; i < menuItem.spicyLevel; i++) {
       flames.push(
-        <Flame key={i} size={12} color={Colors.error} fill={Colors.error} />
+        <Flame key={i} size={12} color={Colors.danger} fill={Colors.danger} />
       );
     }
     return flames;
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   prepTime: {
     fontSize: 12,

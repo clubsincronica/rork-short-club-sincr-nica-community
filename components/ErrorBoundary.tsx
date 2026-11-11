@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   },
   debugText: {
     fontSize: 12,
-    color: Colors.error,
+    color: Colors.danger,
     fontFamily: 'monospace',
     marginBottom: 8,
   },

@@ -191,7 +191,7 @@ export default function CartScreen() {
                 style={styles.removeButton}
                 onPress={() => removeFromCart(index)}
               >
-                <Trash2 size={18} color={Colors.error} />
+                <Trash2 size={18} color={Colors.danger} />
               </TouchableOpacity>
             </View>
           ))}
@@ -276,11 +276,11 @@ const styles = StyleSheet.create({
   browseButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textOnGold,
   },
   restaurantSection: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginBottom: 8,
   },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   orderTypeSection: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginBottom: 8,
   },
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   selectedOrderType: {
     borderColor: Colors.gold,
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   addressSection: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginBottom: 8,
   },
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   itemsSection: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginBottom: 8,
   },
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   },
   clearText: {
     fontSize: 14,
-    color: Colors.error,
+    color: Colors.danger,
     fontWeight: '600',
   },
   cartItem: {
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   itemPrice: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   quantityControls: {
     flexDirection: 'row',
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   summarySection: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     marginBottom: 100,
   },
@@ -487,14 +487,14 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: Colors.border,

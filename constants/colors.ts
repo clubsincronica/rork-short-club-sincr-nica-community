@@ -16,15 +16,25 @@ export const Colors = {
   goldLight: '#f8df8e',     // Gold claro (degradados)
   goldDark: '#c9a227',      // Gold profundo (bordes)
   textOnGold: '#16293a',    // Tinta sobre gold/pasteles
-  surfaceLight: 'rgba(255, 255, 255, 0.14)', // Superficie clara translúcida
-  text: '#c9ced8',          // Texto claro (fondo #14161b)
-  textLight: '#dfe5ee',    // Texto ligero
+  ink: '#16293a',           // Tinta oscura (superficies claras)
+  // Superficies de vidrio (tema oscuro microCósmos)
+  surface: 'rgba(255, 255, 255, 0.08)',
+  surfaceStrong: 'rgba(255, 255, 255, 0.13)',
+  surfaceLight: 'rgba(255, 255, 255, 0.14)', // alias histórico
+  surfaceBorder: 'rgba(255, 255, 255, 0.18)',
+  // Texto sobre superficies OSCURAS
+  text: '#eef2f7',          // Texto principal
+  textLight: '#c9ced8',     // Texto secundario
+  textMuted: '#9fb0bf',     // Texto terciario
+  textOnDark: '#eef2f7',
   textOnPrimary: '#ffffff', // Texto sobre primary (blanco)
   background: '#0f1a24',    // Fondo temporada
   white: '#FFFFFF',
-  success: '#27756b',       // Verde oscuro para success
+  success: '#27756b',       // Verde oscuro para success (rellenos)
+  successText: '#7fe3c4',   // Verde legible sobre fondo oscuro
   warning: '#d4a853',       // Ámbar warning
-  error: '#b32611',         // Rojo error
+  error: '#b32611',         // Rojo error (rellenos)
+  danger: '#ff9a85',        // Rojo legible sobre fondo oscuro (texto/iconos)
   info: '#357188',          // Info = primaryDark
   border: '#5d7d88',        // Border color
   shadow: 'rgba(22, 41, 58, 0.15)',

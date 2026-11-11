@@ -68,7 +68,7 @@ export default function OrderHistoryScreen() {
             headerShown: true,
             headerTitle: 'Historial de Pedidos',
             headerStyle: {
-              backgroundColor: Colors.white,
+              backgroundColor: Colors.surface,
             },
             headerLeft: () => (
               <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   filterTabTextActive: {
-    color: Colors.text,
+    color: Colors.textOnGold,
   },
   scrollView: {
     flex: 1,
@@ -268,13 +268,13 @@ const styles = StyleSheet.create({
   browseButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.text,
+    color: Colors.textOnGold,
   },
   ordersList: {
     padding: 16,
   },
   orderCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,

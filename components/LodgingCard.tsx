@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   priceUnit: {
     fontSize: 14,
@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
   hostName: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   description: {
     fontSize: 16,

@@ -117,13 +117,13 @@ export default function MessagesScreen() {
           
           <View style={styles.chatActions}>
             <TouchableOpacity style={styles.chatActionButton} testID="phone-button">
-              <Phone size={20} color={Colors.primary} />
+              <Phone size={20} color={Colors.text} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.chatActionButton} testID="video-button">
-              <Video size={20} color={Colors.primary} />
+              <Video size={20} color={Colors.text} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.chatActionButton} testID="more-button">
-              <MoreHorizontal size={20} color={Colors.primary} />
+              <MoreHorizontal size={20} color={Colors.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -193,7 +193,7 @@ export default function MessagesScreen() {
           <View style={styles.content}>
             <View style={styles.statsContainer}>
               <View style={styles.statItem}>
-                <MessageCircle size={20} color={Colors.primary} />
+                <MessageCircle size={20} color={Colors.text} />
                 <Text style={styles.statValue}>{mockConversations.length}</Text>
                 <Text style={styles.statLabel}>Chats Activos</Text>
               </View>
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 25,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     paddingVertical: 20,
     paddingHorizontal: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     marginHorizontal: 16,
     marginTop: -10,
     borderRadius: 16,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 16,
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   chatHeaderInfo: {
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     alignItems: 'flex-end',

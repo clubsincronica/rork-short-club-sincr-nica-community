@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textOnGold,
   },
   providerInfo: {
     flexDirection: 'row',
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: Colors.text,
   },
   description: {
     fontSize: 16,

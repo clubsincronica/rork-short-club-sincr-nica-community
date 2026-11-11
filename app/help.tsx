@@ -257,7 +257,7 @@ export default function HelpScreen() {
                       </View>
                     </View>
                     {expandedFAQ === faq.id ? (
-                      <ChevronUp size={20} color={Colors.primary} />
+                      <ChevronUp size={20} color={Colors.text} />
                     ) : (
                       <ChevronDown size={20} color={Colors.textLight} />
                     )}
@@ -281,7 +281,7 @@ export default function HelpScreen() {
                 <TouchableOpacity key={index} style={styles.contactMethod} onPress={method.action}>
                   <View style={styles.contactMethodLeft}>
                     <View style={styles.contactMethodIcon}>
-                      <method.icon size={20} color={Colors.primary} />
+                      <method.icon size={20} color={Colors.text} />
                     </View>
                     <View style={styles.contactMethodInfo}>
                       <Text style={styles.contactMethodTitle}>{method.title}</Text>
@@ -344,7 +344,7 @@ export default function HelpScreen() {
               <TouchableOpacity key={index} style={styles.resourceItem} onPress={resource.action}>
                 <View style={styles.resourceLeft}>
                   <View style={styles.resourceIcon}>
-                    <resource.icon size={20} color={Colors.primary} />
+                    <resource.icon size={20} color={Colors.text} />
                   </View>
                   <View style={styles.resourceInfo}>
                     <Text style={styles.resourceTitle}>{resource.title}</Text>
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -398,11 +398,11 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.surfaceBorder,
   },
   tab: {
     flex: 1,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     marginRight: 8,
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   faqItem: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     marginBottom: 8,
     shadowColor: Colors.shadow,
@@ -515,7 +515,7 @@ const styles = StyleSheet.create({
   },
   faqCategoryText: {
     fontSize: 11,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   faqAnswer: {
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   contactForm: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     shadowColor: Colors.shadow,
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,

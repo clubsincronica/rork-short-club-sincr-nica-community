@@ -213,7 +213,7 @@ export default function PrivacyScreen() {
               <View key={itemIndex} style={styles.settingItem}>
                 <View style={styles.settingLeft}>
                   <View style={styles.settingIcon}>
-                    <item.icon size={20} color={Colors.primary} />
+                    <item.icon size={20} color={Colors.text} />
                   </View>
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingTitle}>{item.title}</Text>
@@ -237,7 +237,7 @@ export default function PrivacyScreen() {
             <TouchableOpacity key={index} style={styles.actionItem} onPress={item.onPress}>
               <View style={styles.settingLeft}>
                 <View style={styles.settingIcon}>
-                  <item.icon size={20} color={Colors.primary} />
+                  <item.icon size={20} color={Colors.text} />
                 </View>
                 <View style={styles.settingInfo}>
                   <Text style={styles.settingTitle}>{item.title}</Text>
@@ -254,7 +254,7 @@ export default function PrivacyScreen() {
           <TouchableOpacity style={styles.dangerItem} onPress={handleDeleteAccount}>
             <View style={styles.settingLeft}>
               <View style={[styles.settingIcon, styles.dangerIcon]}>
-                <UserX size={20} color={Colors.error} />
+                <UserX size={20} color={Colors.danger} />
               </View>
               <View style={styles.settingInfo}>
                 <Text style={[styles.settingTitle, styles.dangerText]}>Eliminar Cuenta</Text>
@@ -263,7 +263,7 @@ export default function PrivacyScreen() {
                 </Text>
               </View>
             </View>
-            <ChevronRight size={20} color={Colors.error} />
+            <ChevronRight size={20} color={Colors.danger} />
           </TouchableOpacity>
         </View>
 
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   dangerText: {
-    color: Colors.error,
+    color: Colors.danger,
   },
   settingDescription: {
     fontSize: 12,
@@ -389,14 +389,14 @@ const styles = StyleSheet.create({
   dangerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.error,
+    color: Colors.danger,
     marginBottom: 12,
   },
   dangerItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,

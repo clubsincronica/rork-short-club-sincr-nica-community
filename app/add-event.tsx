@@ -269,7 +269,7 @@ export default function AddEventScreen() {
   const renderStep1 = () => (
     <View style={styles.stepContent}>
       <View style={styles.stepHeader}>
-        <Type size={24} color={Colors.primary} />
+        <Type size={24} color={Colors.text} />
         <Text style={styles.stepTitle}>Información Básica</Text>
         <Text style={styles.stepSubtitle}>Cuéntanos sobre tu evento</Text>
       </View>
@@ -338,7 +338,7 @@ export default function AddEventScreen() {
   const renderStep2 = () => (
     <View style={styles.stepContent}>
       <View style={styles.stepHeader}>
-        <CalendarIcon size={24} color={Colors.primary} />
+        <CalendarIcon size={24} color={Colors.text} />
         <Text style={styles.stepTitle}>Fecha y Horario</Text>
         <Text style={styles.stepSubtitle}>¿Cuándo será tu evento?</Text>
       </View>
@@ -440,14 +440,14 @@ export default function AddEventScreen() {
   const renderStep3 = () => (
     <View style={styles.stepContent}>
       <View style={styles.stepHeader}>
-        <MapPin size={24} color={Colors.primary} />
+        <MapPin size={24} color={Colors.text} />
         <Text style={styles.stepTitle}>Ubicación y Precio</Text>
         <Text style={styles.stepSubtitle}>Detalles del lugar y costo</Text>
       </View>
 
       <View style={styles.switchGroup}>
         <View style={styles.switchLeft}>
-          <Globe size={20} color={Colors.primary} />
+          <Globe size={20} color={Colors.text} />
           <Text style={styles.switchLabel}>Evento Online</Text>
         </View>
         <Switch
@@ -522,7 +522,7 @@ export default function AddEventScreen() {
   const renderStep4 = () => (
     <View style={styles.stepContent}>
       <View style={styles.stepHeader}>
-        <Check size={24} color={Colors.primary} />
+        <Check size={24} color={Colors.text} />
         <Text style={styles.stepTitle}>Revisión Final</Text>
         <Text style={styles.stepSubtitle}>Confirma los detalles de tu evento</Text>
       </View>
@@ -543,29 +543,29 @@ export default function AddEventScreen() {
 
         <View style={styles.reviewDetails}>
           <View style={styles.reviewDetail}>
-            <CalendarIcon size={16} color={Colors.primary} />
+            <CalendarIcon size={16} color={Colors.text} />
             <Text style={styles.reviewDetailText}>{eventForm.date}</Text>
           </View>
           <View style={styles.reviewDetail}>
-            <Clock size={16} color={Colors.primary} />
+            <Clock size={16} color={Colors.text} />
             <Text style={styles.reviewDetailText}>
               {eventForm.startTime} - {calculateEndTime(eventForm.startTime, eventForm.duration)}
             </Text>
           </View>
           <View style={styles.reviewDetail}>
-            <MapPin size={16} color={Colors.primary} />
+            <MapPin size={16} color={Colors.text} />
             <Text style={styles.reviewDetailText}>
               {eventForm.isOnline ? 'Online' : eventForm.location}
             </Text>
           </View>
           <View style={styles.reviewDetail}>
-            <Users size={16} color={Colors.primary} />
+            <Users size={16} color={Colors.text} />
             <Text style={styles.reviewDetailText}>
               Máx. {eventForm.maxParticipants} participantes
             </Text>
           </View>
           <View style={styles.reviewDetail}>
-            <DollarSign size={16} color={Colors.primary} />
+            <DollarSign size={16} color={Colors.text} />
             <Text style={styles.reviewDetailText}>
               {eventForm.price > 0 ? formatPrice(eventForm.price) : 'Gratuito'}
             </Text>
@@ -592,7 +592,7 @@ export default function AddEventScreen() {
     >
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color={Colors.primary} />
+          <ArrowLeft size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {isEditing ? 'Editar Evento' : 'Crear Evento'}
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -754,7 +754,7 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 16,
     color: Colors.text,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   inputError: {
     borderColor: Colors.error,
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    color: Colors.error,
+    color: Colors.danger,
     marginTop: 4,
   },
   characterCount: {
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginRight: 12,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   categoryChipActive: {
     backgroundColor: Colors.primary,
@@ -820,7 +820,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     marginRight: 8,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   timeChipActive: {
     backgroundColor: Colors.primary,
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.border,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   durationChipActive: {
     backgroundColor: Colors.primary,
@@ -893,7 +893,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     marginBottom: 24,
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   priceInput: {
     flex: 1,
@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   reviewCard: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 20,
     shadowColor: Colors.shadow,
@@ -954,7 +954,7 @@ const styles = StyleSheet.create({
   },
   reviewCategoryText: {
     fontSize: 12,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   reviewDescription: {
@@ -994,7 +994,7 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     padding: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     gap: 12,
@@ -1016,7 +1016,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',

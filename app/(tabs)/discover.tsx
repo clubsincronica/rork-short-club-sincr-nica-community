@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingBottom: 20,
     paddingTop: 20,
     borderBottomWidth: 1,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '700',
     letterSpacing: -0.5,
-    color: Colors.textLight,
+    color: Colors.textOnDark,
     marginBottom: 2,
   },
   seasonText: {
@@ -284,11 +284,11 @@ const styles = StyleSheet.create({
   },
   subtitleText: {
     fontSize: 16,
-    color: Colors.textLight,
+    color: Colors.textOnDark,
   },
   heroNote: {
     fontSize: 13,
-    color: Colors.secondary,
+    color: Colors.textMuted,
     marginTop: 4,
   },
   searchContainer: {

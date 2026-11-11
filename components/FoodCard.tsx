@@ -29,16 +29,16 @@ export function FoodCard({ foodProvider, onPress }: FoodCardProps) {
 
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
-      'organic': '#4CAF50',
-      'vegan': '#8BC34A',
-      'vegetarian': '#CDDC39',
-      'raw': '#FF9800',
-      'gluten-free': '#2196F3',
-      'ayurvedic': '#9C27B0',
-      'macrobiotic': '#607D8B',
-      'superfood': '#E91E63',
-      'juice-bar': '#00BCD4',
-      'healthy-meals': '#795548',
+      'organic': '#99eef5',
+      'vegan': '#afc6fe',
+      'vegetarian': '#f4c542',
+      'raw': '#fdae93',
+      'gluten-free': '#afc6fe',
+      'ayurvedic': '#af8fb4',
+      'macrobiotic': '#8f8b80',
+      'superfood': '#fdae93',
+      'juice-bar': '#99eef5',
+      'healthy-meals': '#f8df8e',
     };
     return colors[category] || Colors.primary;
   };
@@ -105,7 +105,7 @@ export function FoodCard({ foodProvider, onPress }: FoodCardProps) {
             )}
             {foodProvider.isPickupAvailable && (
               <View style={styles.deliveryOption}>
-                <ShoppingBag size={12} color={Colors.primary} />
+                <ShoppingBag size={12} color={Colors.text} />
                 <Text style={styles.deliveryText}>Pickup</Text>
               </View>
             )}
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.white,
+    color: Colors.textOnGold,
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -284,6 +284,6 @@ const styles = StyleSheet.create({
   certificationText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.white,
+    color: Colors.textOnGold,
   },
 });

@@ -243,7 +243,7 @@ export default function SettingsScreen() {
               <View key={itemIndex} style={styles.settingItem}>
                 <View style={styles.settingLeft}>
                   <View style={styles.settingIcon}>
-                    <item.icon size={20} color={Colors.primary} />
+                    <item.icon size={20} color={Colors.text} />
                   </View>
                   <View style={styles.settingInfo}>
                     <Text style={styles.settingTitle}>{item.title}</Text>
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: 12,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   footer: {

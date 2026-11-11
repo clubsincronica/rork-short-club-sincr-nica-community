@@ -92,7 +92,7 @@ export default function MenuItemScreen() {
   if (!menuItem || !provider) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={Colors.text} />
       </View>
     );
   }
@@ -102,7 +102,7 @@ export default function MenuItemScreen() {
     const flames = [];
     for (let i = 0; i < menuItem.spicyLevel; i++) {
       flames.push(
-        <Flame key={i} size={16} color={Colors.error} fill={Colors.error} />
+        <Flame key={i} size={16} color={Colors.danger} fill={Colors.danger} />
       );
     }
     return flames;
@@ -185,7 +185,7 @@ export default function MenuItemScreen() {
               style={styles.nutritionalToggle}
               onPress={() => setShowNutritionalInfo(!showNutritionalInfo)}
             >
-              <Info size={16} color={Colors.primary} />
+              <Info size={16} color={Colors.text} />
               <Text style={styles.nutritionalToggleText}>
                 Información Nutricional
               </Text>
@@ -324,7 +324,7 @@ export default function MenuItemScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
   },
   scrollView: {
     flex: 1,
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   },
   nutritionalToggleText: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '600',
   },
   nutritionalInfo: {
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   },
   requiredText: {
     fontSize: 12,
-    color: Colors.error,
+    color: Colors.danger,
     fontWeight: '500',
   },
   option: {
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   },
   optionPrice: {
     fontSize: 14,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '600',
   },
   instructionsInput: {
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingHorizontal: 16,
     paddingTop: 16,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     shadowColor: Colors.shadow,

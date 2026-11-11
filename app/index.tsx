@@ -42,7 +42,7 @@ export default function Index() {
   // Show loading while determining where to navigate
   return (
     <SafeAreaView style={styles.container}>
-      <ActivityIndicator size="large" color={Colors.primary} />
+      <ActivityIndicator size="large" color={Colors.text} />
     </SafeAreaView>
   );
 }

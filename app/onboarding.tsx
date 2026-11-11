@@ -147,7 +147,7 @@ export default function OnboardingScreen() {
               placeholder="Search languages..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#999"
+              placeholderTextColor={Colors.textMuted}
               testID="language-search"
             />
             <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
@@ -166,7 +166,7 @@ export default function OnboardingScreen() {
                     <Text style={styles.optionSubtitle}>{language.name}</Text>
                   </View>
                   {selectedLanguage?.code === language.code && (
-                    <Check size={20} color={Colors.primary} />
+                    <Check size={20} color={Colors.text} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -182,7 +182,7 @@ export default function OnboardingScreen() {
               placeholder="Search countries..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#999"
+              placeholderTextColor={Colors.textMuted}
               testID="country-search"
             />
             {!selectedCountry ? (
@@ -205,7 +205,7 @@ export default function OnboardingScreen() {
                       <Text style={styles.optionTitle}>{country.name}</Text>
                     </View>
                     {selectedCountry === country.name && (
-                      <Check size={20} color={Colors.primary} />
+                      <Check size={20} color={Colors.text} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -220,7 +220,7 @@ export default function OnboardingScreen() {
                   placeholder="Enter your city..."
                   value={selectedCity}
                   onChangeText={setSelectedCity}
-                  placeholderTextColor="#999"
+                  placeholderTextColor={Colors.textMuted}
                   autoFocus
                   testID="city-input"
                 />
@@ -246,7 +246,7 @@ export default function OnboardingScreen() {
               placeholder="Search currencies..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              placeholderTextColor="#999"
+              placeholderTextColor={Colors.textMuted}
               testID="currency-search"
             />
             <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
@@ -268,7 +268,7 @@ export default function OnboardingScreen() {
                     </View>
                   </View>
                   {selectedCurrency?.code === currency.code && (
-                    <Check size={20} color={Colors.primary} />
+                    <Check size={20} color={Colors.text} />
                   )}
                 </TouchableOpacity>
               ))}
@@ -350,7 +350,7 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   keyboardAvoid: {
     flex: 1,
@@ -362,13 +362,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: Colors.surface,
   },
   backButton: {
     width: 50,
   },
   backButtonText: {
-    color: Colors.primary,
+    color: Colors.text,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: Colors.surfaceBorder,
   },
   progressDotActive: {
     backgroundColor: Colors.primary,
@@ -396,12 +396,12 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 8,
   },
   stepSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.textLight,
   },
   welcomeContainer: {
     flex: 1,
@@ -413,20 +413,20 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: Colors.text,
     marginBottom: 10,
     textAlign: 'center',
   },
   welcomeSubtitle: {
     fontSize: 20,
-    color: Colors.primary,
+    color: Colors.text,
     textAlign: 'center',
     marginBottom: 20,
     fontWeight: '600',
   },
   welcomeDescription: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.textLight,
     textAlign: 'center',
     marginBottom: 50,
     lineHeight: 24,
@@ -449,13 +449,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   searchInput: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 20,
-    color: '#333',
+    color: Colors.text,
   },
   optionsList: {
     flex: 1,
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     marginBottom: 10,
   },
@@ -484,11 +484,11 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: Colors.text,
   },
   optionSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: Colors.textLight,
     marginTop: 2,
   },
   countryFlag: {
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: Colors.text,
     width: 40,
     textAlign: 'center',
   },
@@ -510,23 +510,23 @@ const styles = StyleSheet.create({
   },
   selectedCountryText: {
     fontSize: 16,
-    color: '#666',
+    color: Colors.textLight,
     marginBottom: 20,
   },
   cityInput: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 20,
-    color: '#333',
+    color: Colors.text,
   },
   changeCountryButton: {
     alignSelf: 'flex-start',
   },
   changeCountryText: {
-    color: Colors.primary,
+    color: Colors.text,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    borderTopColor: Colors.surface,
   },
   continueButton: {
     flexDirection: 'row',
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   continueButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: Colors.surfaceBorder,
   },
   continueButtonText: {
     color: '#fff',
@@ -568,19 +568,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   loginButtonText: {
-    color: Colors.primary,
+    color: Colors.text,
     fontSize: 16,
     fontWeight: '600',
   },
   signupButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 32,
     alignItems: 'center',
   },
   signupButtonText: {
-    color: '#333',
+    color: Colors.text,
     fontSize: 16,
     fontWeight: '600',
   },

@@ -200,7 +200,7 @@ export default function PaymentScreen() {
             {method.type === 'mercadopago' ? (
               <Text style={styles.mercadopagoText}>MP</Text>
             ) : (
-              <CreditCard size={20} color={Colors.primary} />
+              <CreditCard size={20} color={Colors.text} />
             )}
           </View>
           <View style={styles.paymentMethodInfo}>
@@ -231,7 +231,7 @@ export default function PaymentScreen() {
             style={styles.deleteButton}
             onPress={() => handleDeleteCard(method.id)}
           >
-            <Trash2 size={16} color={Colors.error} />
+            <Trash2 size={16} color={Colors.danger} />
           </TouchableOpacity>
           {isSelected && (
             <View style={styles.selectedIndicator}>
@@ -248,7 +248,7 @@ export default function PaymentScreen() {
       <Stack.Screen 
         options={{ 
           title: 'Pago',
-          headerStyle: { backgroundColor: Colors.white },
+          headerStyle: { backgroundColor: Colors.surface },
           headerTintColor: Colors.text,
           headerTitleStyle: { fontWeight: '600' },
         }} 
@@ -294,7 +294,7 @@ export default function PaymentScreen() {
                 style={styles.addButton}
                 onPress={() => setIsAddingCard(true)}
               >
-                <Plus size={20} color={Colors.primary} />
+                <Plus size={20} color={Colors.text} />
                 <Text style={styles.addButtonText}>Añadir</Text>
               </TouchableOpacity>
             </View>
@@ -432,7 +432,7 @@ export default function PaymentScreen() {
           {/* Save Payment Info Toggle */}
           <View style={styles.savePaymentToggle}>
             <View style={styles.savePaymentLeft}>
-              <Lock size={16} color={Colors.primary} />
+              <Lock size={16} color={Colors.text} />
               <Text style={styles.savePaymentLabel}>Guardar información de pago</Text>
             </View>
             <Switch
@@ -487,12 +487,12 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     fontSize: 16,
-    color: Colors.primary,
+    color: Colors.text,
     fontWeight: '500',
   },
   bookingCard: {
     flexDirection: 'row',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -540,13 +540,13 @@ const styles = StyleSheet.create({
   bookingPriceText: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   paymentMethodCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   defaultBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.white,
+    color: Colors.textOnGold,
   },
   deleteButton: {
     padding: 4,
@@ -621,7 +621,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addCardForm: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 20,
     marginTop: 8,
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   priceBreakdown: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
   },
@@ -720,12 +720,12 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   securityInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     marginHorizontal: 20,
     padding: 16,
     borderRadius: 12,
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     marginHorizontal: 20,
     padding: 16,
     borderRadius: 12,
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   paymentFooter: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
   addMercadopagoButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,

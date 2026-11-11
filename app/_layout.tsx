@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
@@ -11,10 +12,25 @@ import { VendorProvider } from '@/hooks/vendor-store';
 import CustomSplashScreen from '@/components/SplashScreen';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppSettingsProvider, useAppSettings } from '@/hooks/app-settings-store';
+import { Colors } from '@/constants/colors';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+// Tema oscuro microCósmos: evita el fondo claro por defecto de React Navigation
+const navTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: Colors.accent,
+    background: Colors.background,
+    card: Colors.primary,
+    text: Colors.text,
+    border: Colors.surfaceBorder,
+    notification: Colors.accent,
+  },
+};
 
 const styles = StyleSheet.create({
   rootContainer: {
@@ -73,7 +89,15 @@ function RootLayoutNav() {
   }, [isLoading, settings.hasCompletedOnboarding, router]);
 
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+    <Stack
+      screenOptions={{
+        headerBackTitle: 'Back',
+        headerStyle: { backgroundColor: Colors.primary },
+        headerTintColor: Colors.text,
+        headerTitleStyle: { color: Colors.text },
+        contentStyle: { backgroundColor: Colors.background },
+      }}
+    >
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="login" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
@@ -169,7 +193,9 @@ export default function RootLayout() {
               <FoodCartProvider>
                 <VendorProvider>
                   <GestureHandlerRootView style={styles.rootContainer}>
-                    <RootLayoutNav />
+                    <ThemeProvider value={navTheme}>
+                      <RootLayoutNav />
+                    </ThemeProvider>
                   </GestureHandlerRootView>
                 </VendorProvider>
               </FoodCartProvider>

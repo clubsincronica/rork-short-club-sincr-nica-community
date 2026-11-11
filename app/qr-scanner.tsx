@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   resultModalContent: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderRadius: 16,
     padding: 20,
     width: '100%',

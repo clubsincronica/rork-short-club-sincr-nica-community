@@ -68,7 +68,7 @@ export default function RestaurantScreen() {
   if (!provider) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={Colors.text} />
       </View>
     );
   }
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoriesWrapper: {
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   activeCategoryButtonText: {
-    color: Colors.text,
+    color: Colors.textOnGold,
     fontWeight: '700',
   },
   menuContent: {
