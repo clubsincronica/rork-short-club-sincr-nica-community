@@ -5,6 +5,40 @@ import { useState, useEffect, useMemo } from 'react';
 import { User, PaymentMethod, UserPreferences } from '@/types/user';
 import { mockUsers } from '@/mocks/data';
 
+// Backend URL for production (Render) — used by web view only
+const BACKEND_URL = 'https://clubsincronica-backend.onrender.com';
+
+// Detect if currently on web platform (Expo web)
+const isWebPlatform = (() => {
+  try {
+    return typeof window !== 'undefined' && 
+           window.location?.hostname?.includes('localhost') &&
+           window.location?.hostname?.includes('.');
+  } catch (e) { return false; }
+})();
+
+// Generic API caller for web platform
+async function apiFetch(endpoint, options = {}) {
+  try {
+    const res = await fetch(`${BACKEND_URL}${endpoint}`, {
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+    if (!res.ok) {
+      const e = await res.text();
+      throw new Error(`Backend error ${res.status}: ${e}`);
+    }
+    return await res.json();
+  } catch (err) {
+    if (__DEV__) console.error('apiFetch error:', err.message);
+    return null;
+  }
+}
+
 export const [UserProvider, useUser] = createContextHook(() => {
   // Check if we're in a preview environment
   const isPreview = (() => {
@@ -65,7 +99,45 @@ export const [UserProvider, useUser] = createContextHook(() => {
       if (__DEV__) {
         console.log('Login mutation called with:', 'id' in userData ? 'User object' : userData.email);
       }
-      // If full user object is provided, use it directly (for signup)
+      // En modo web (Expo web), consultar el backend real en Render
+      if (isWebPlatform) {
+        try {
+          const user = await apiFetch('/users/login', {
+            method: 'POST',
+            body: { email: userData.email, password: userData.password },
+          });
+          if (!user || !user.email) throw new Error('User not found from backend');
+          // Guardar en AsyncStorage también para persistencia local
+          await AsyncStorage.setItem('currentUser', JSON.stringify(user));
+          // Cargar payment methods from backend si vienen, si no, mocks
+          const pms = user.paymentMethods || [
+            {
+              id: '1',
+              type: 'card',
+              last4: '4242',
+              brand: 'Visa',
+              expiryMonth: 12,
+              expiryYear: 2025,
+              isDefault: true,
+            },
+            {
+              id: '2',
+              type: 'card',
+              last4: '5555',
+              brand: 'Mastercard',
+              expiryMonth: 6,
+              expiryYear: 2024,
+              isDefault: false,
+            },
+          ];
+          await AsyncStorage.setItem('paymentMethods', JSON.stringify(pms));
+          return { user, paymentMethods: pms };
+        } catch (err) {
+          if (__DEV__) console.error('Backend login error, falling back to mocks:', err.message);
+          // Fallback a mocks locales si el backend falla
+        }
+      }
+      // Modo nativo (móvil APK): usar mocks locales como antes
       const user = 'id' in userData ? userData : (mockUsers.find(u => u.email === userData.email) || mockUsers[0]);
       if (__DEV__) {
         console.log('User to login:', user.email);
