@@ -6,16 +6,19 @@ pagos, notificaciones, QR. Generada con Rork, en desarrollo activo.
 
 ## Directorios canónicos
 
-- **Este dir (`rork-short-club-sincr-nica-community-main`, branch `master`) = ÚNICO
-  working copy activo.** Remoto: https://github.com/clubsincronica/rork-short-club-sincr-nica-community
-- El dir hermano SIN sufijo (`rork-short-club-sincr-nica-community`, branch
-  `add/react-18`) es el **scaffold Rork congelado** (Expo 53, oct-2025). NO trabajar ahí.
+- **`rork-short-club-sincr-nica-community` (dir SIN sufijo), branch `add/react-18` =
+  ÚNICO working copy activo** (Expo 53.0.27 · React 19.0.0 · RN 0.79.6; corre en
+  `localhost:8081`). Remoto: https://github.com/clubsincronica/rork-short-club-sincr-nica-community
+- El dir hermano `-main`, branch `master` (Expo 57.0.9 · RN 0.86.2) = **scaffold
+  congelado 2026-10-08. NO trabajar ahí.** (Corregido 2026-11-16: la línea anterior
+  tenía los dos dirs invertidos y contradecía la rama `add/react-18` donde está el
+  trabajo real.)
 
 ## Stack
 
-- **Frontend:** Expo SDK 57 · React Native 0.86 · React 19 · expo-router 57 (file-based,
-  tabs en `app/(tabs)/`) · NativeWind 4 · Zustand · TanStack Query · Stripe RN ·
-  socket.io-client · react-native-maps.
+- **Frontend:** Expo SDK 53 · React Native 0.79 · React 19 · expo-router 5.x (file-based,
+  tabs en `app/(tabs)/`) · NativeWind 4 · Zustand · TanStack Query · react-native-maps ·
+  react-native-web. (Sin Stripe RN ni socket.io-client en el front.)
 - **Backend (`backend/`):** Express 4 + TypeScript · SQLite (dev) → **Postgres (prod)** ·
   auth JWT propia (NO Firebase/Supabase) · Stripe webhook + OAuth Mercado Pago
   (`routes/oauth-mp.ts`, `routes/webhooks.ts`) · deploy Railway/Render (`Dockerfile`,
