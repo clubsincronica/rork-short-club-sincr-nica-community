@@ -13,6 +13,8 @@ describe('toPublicUser', () => {
     id: 7,
     email: 'someone@example.com',
     password_hash: '$2b$10$abcdefghijklmnopqrstuv',
+    mp_access_token: 'APP_USR-1234567890',
+    mp_refresh_token: 'mp-refresh-secret',
     name: 'Someone',
     is_host: 1,
     role: 'user',
@@ -22,6 +24,13 @@ describe('toPublicUser', () => {
     const user = toPublicUser(row);
 
     expect(user).not.toHaveProperty('password_hash');
+  });
+
+  it('removes MercadoPago OAuth tokens', () => {
+    const user = toPublicUser(row);
+
+    expect(user).not.toHaveProperty('mp_access_token');
+    expect(user).not.toHaveProperty('mp_refresh_token');
   });
 
   it('keeps the rest of the fields untouched', () => {
