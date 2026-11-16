@@ -105,7 +105,7 @@ export const [UserProvider, useUser] = createContextHook(() => {
       // En modo web (Expo web), consultar el backend real en Render
       if (isWebPlatform) {
         try {
-          const user = await apiFetch('/users/login', {
+          const user = await apiFetch('/api/auth', {
             method: 'POST',
             body: { email: userData.email, password: userData.password },
           });
