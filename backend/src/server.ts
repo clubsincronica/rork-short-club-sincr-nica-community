@@ -19,6 +19,7 @@ import oauthMpRoutes from './routes/oauth-mp';
 import { initializeDatabase, messageQueries, conversationQueries, getDb, mergeDuplicateConversations } from './models/database-sqljs';
 import { validateEnvironment, isProduction, getJWTSecret } from './config/env';
 import { apiLimiter } from './middleware/rateLimiter';
+import { getAllowedOrigins, isOriginAllowed } from './config/cors';
 
 // Validate environment variables before starting server
 try {
@@ -37,12 +38,8 @@ function rowToObject(columns: string[], values: any[]): any {
   return obj;
 }
 
-// CORS Configuration
-const allowedOrigins = [
-  'https://clubsincronica.app',
-  'https://www.clubsincronica.app',
-  'https://rork.com' // From app.json
-];
+// CORS Configuration — allowlist comes from CORS_ORIGINS (see config/cors.ts)
+const allowedOrigins = getAllowedOrigins();
 
 // Helper to check origin
 function getCorsOptions() {
@@ -54,10 +51,10 @@ function getCorsOptions() {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.indexOf(origin) !== -1) {
+      if (isOriginAllowed(origin, allowedOrigins)) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(new Error(`Not allowed by CORS: ${origin}`));
       }
     },
     credentials: true,
