@@ -21,6 +21,7 @@ import {
 } from '../middleware/validation';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { toPublicUser } from '../utils/public-user';
 
 const router = express.Router();
 
@@ -29,8 +30,10 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
   try {
     let { email, password, name, avatar, bio, location, latitude, longitude, phone, website, interests, services, isHost } = req.body;
     console.log(`[AUTH DEBUG] Received login request for email: '${email}'`);
-    // Log the raw request body for debugging
-    console.log('[AUTH DEBUG] Raw request body:', req.body);
+    // Log the request body for debugging — NEVER the plaintext password (DNR: no loggear secretos)
+    const { password: _pw, ...safeBody } = req.body || {};
+    void _pw;
+    console.log('[AUTH DEBUG] Request body (sin password):', safeBody);
 
     // Default coordinates if not provided (so users are always discoverable)
     if (latitude === undefined || latitude === null) {
@@ -86,7 +89,7 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
       );
       user = await userQueries.getUserById(result.lastID);
       isNewUser = true;
-      console.log(`[AUTH DEBUG] Created new user: ${JSON.stringify(user)}`);
+      console.log(`[AUTH DEBUG] Created new user: ${JSON.stringify(toPublicUser(user))}`);
       console.log(`[AUTH DEBUG] Email used for user creation: '${email}'`);
     } else {
       // Existing user: enforce password rules
@@ -121,7 +124,7 @@ router.post('/auth', authLimiter, validateAuth, handleValidationErrors, async (r
       role: user.role || 'user'
     }, jwtSecret, { expiresIn: '30d' });
     console.log(`[AUTH DEBUG] Email returned in token: '${user.email}'`);
-    res.json({ user, token, isNewUser });
+    res.json({ user: toPublicUser(user), token, isNewUser });
   } catch (error) {
     console.error('Auth error:', error);
     res.status(500).json({ error: 'Authentication failed' });
@@ -140,7 +143,7 @@ router.get('/users', async (req: Request, res: Response) => {
       user.isHost = user.is_host === 1;
     });
 
-    res.json(users);
+    res.json(users.map(toPublicUser));
   } catch (error) {
     console.error('Get all users error:', error);
     res.status(500).json({ error: 'Failed to get users' });
@@ -162,7 +165,7 @@ router.get('/users/:id', validateUserId, handleValidationErrors, async (req: Req
     if (user.services) user.services = JSON.parse(user.services);
     user.isHost = user.is_host === 1;
 
-    res.json(user);
+    res.json(toPublicUser(user));
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({ error: 'Failed to get user' });
@@ -196,7 +199,7 @@ router.put('/users/:id', strictLimiter, validateUserId, validateUpdateUser, hand
     if (user.services) user.services = JSON.parse(user.services);
     user.isHost = user.is_host === 1;
 
-    res.json(user);
+    res.json(toPublicUser(user));
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({ error: 'Failed to update user' });
@@ -225,7 +228,7 @@ router.get('/users/nearby/:latitude/:longitude', validateNearbyUsers, handleVali
       user.isHost = user.is_host === 1;
     });
 
-    res.json(users);
+    res.json(users.map(toPublicUser));
   } catch (error) {
     // Log the full error object for debugging
     console.error('Nearby users error:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
@@ -246,7 +249,7 @@ router.get('/users/search/:query', validateSearch, handleValidationErrors, async
       user.isHost = user.is_host === 1;
     });
 
-    res.json(users);
+    res.json(users.map(toPublicUser));
   } catch (error) {
     console.error('Search users error:', error);
     res.status(500).json({ error: 'Failed to search users' });
