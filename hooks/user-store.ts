@@ -105,11 +105,16 @@ export const [UserProvider, useUser] = createContextHook(() => {
       // En modo web (Expo web), consultar el backend real en Render
       if (isWebPlatform) {
         try {
-          const user = await apiFetch('/api/auth', {
+          const data = await apiFetch('/api/auth', {
             method: 'POST',
             body: { email: userData.email, password: userData.password },
           });
+          // El backend responde el envoltorio { user, token, isNewUser };
+          // tolerar también un usuario "pelado" por si cambia el contrato.
+          const user = data?.user ?? data;
           if (!user || !user.email) throw new Error('User not found from backend');
+          // Persistir el JWT para futuras llamadas autenticadas
+          if (data?.token) await AsyncStorage.setItem('authToken', data.token);
           // Guardar en AsyncStorage también para persistencia local
           await AsyncStorage.setItem('currentUser', JSON.stringify(user));
           // Cargar payment methods from backend si vienen, si no, mocks

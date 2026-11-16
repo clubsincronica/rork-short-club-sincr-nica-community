@@ -345,10 +345,12 @@ export default function ProfileScreen() {
               <View style={styles.detailItem}>
                 <Calendar size={14} color={Colors.white} />
                 <Text style={styles.detailText}>
-                  Se unió {new Date(currentUser.joinedDate).toLocaleDateString('es-ES', { 
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
+                  {currentUser.joinedDate || currentUser.created_at
+                    ? `Se unió ${new Date(currentUser.joinedDate ?? currentUser.created_at ?? '').toLocaleDateString('es-ES', { 
+                        month: 'long', 
+                        year: 'numeric' 
+                      })}`
+                    : 'Se unió recientemente'}
                 </Text>
               </View>
             </View>
@@ -368,16 +370,16 @@ export default function ProfileScreen() {
             <Text style={styles.statText}>Reseñas</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{currentUser.specialties.length}</Text>
+            <Text style={styles.statValue}>{currentUser.specialties?.length ?? 0}</Text>
             <Text style={styles.statText}>Especialidades</Text>
           </View>
         </View>
 
-        {currentUser.specialties.length > 0 && (
+        {(currentUser.specialties?.length ?? 0) > 0 && (
           <View style={styles.specialtiesContainer}>
             <Text style={styles.sectionTitle}>Especialidades</Text>
             <View style={styles.specialtiesList}>
-              {currentUser.specialties.map((specialty, index) => (
+              {(currentUser.specialties ?? []).map((specialty, index) => (
                 <View key={index} style={styles.specialtyTag}>
                   <Text style={styles.specialtyText}>{specialty}</Text>
                 </View>

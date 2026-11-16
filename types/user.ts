@@ -14,6 +14,10 @@ export interface User {
   reviewCount: number;
   joinedDate: string;
   verified: boolean;
+  // Campos que devuelve el backend real (POST /api/auth) — los usuarios de la API
+  // no traen joinedDate/specialties del mock
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Service {
